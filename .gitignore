@@ -15,3 +15,7 @@
 *.exe
 *.out
 *.app
+
+pagebuf/*~
+pagebuf/*.o
+pagebuf/*.lib
