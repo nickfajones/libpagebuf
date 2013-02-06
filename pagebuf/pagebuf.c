@@ -62,7 +62,7 @@ struct pb_data *pb_data_create_data_ref(
     return NULL;
 
   data->root = root_data;
-  data->base = (char*)data->base + off;
+  data->base = (char*)root_data->base + off;
   data->len = len;
 
   data->use_count = 1;
@@ -119,16 +119,16 @@ struct pb_page *pb_page_create(struct pb_data *data) {
   return page;
 }
 
-struct pb_page *pb_page_clone(const struct pb_page *page) {
-  struct pb_page *new_page = malloc(sizeof(struct pb_page));
+struct pb_page *pb_page_clone(const struct pb_page *src_page) {
+  struct pb_page *page = malloc(sizeof(struct pb_page));
   if (!page)
     return NULL;
 
-  new_page->base = page->base;
-  new_page->len = page->len;
-  new_page->data = page->data;
-  new_page->prev = NULL;
-  new_page->next = NULL;
+  page->base = src_page->base;
+  page->len = src_page->len;
+  page->data = src_page->data;
+  page->prev = NULL;
+  page->next = NULL;
 
   pb_data_get(page->data);
 

@@ -166,7 +166,7 @@ struct pb_page *pb_page_create(struct pb_data *data);
  * Duplicate the base and len values and additionally increment the use count
  * of the pb_data instance
  */
-struct pb_page *pb_page_clone(const struct pb_page *page);
+struct pb_page *pb_page_clone(const struct pb_page *src_page);
 /**
  * Destroy the pb_page instance.
  *
