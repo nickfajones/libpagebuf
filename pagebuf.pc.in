@@ -1,0 +1,10 @@
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+libdir=@libdir@
+includedir=@includedir@
+
+Name: LibPageBuf
+Description: Buffer objects for use in socket programming
+Version: 0.1.0
+Libs: -L${libdir} -lpagebuf
+Cflags: -I${includedir}/pagebuf

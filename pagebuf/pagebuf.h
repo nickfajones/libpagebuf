@@ -17,8 +17,9 @@
 #ifndef PAGEBUF_H
 #define PAGEBUF_H
 
-#include <stdint.h>
 
+#include <stdint.h>
+#include <stdbool.h>
 
 
 #ifdef __CPLUSPLUS
@@ -26,9 +27,7 @@ extern "C" {
 #endif
 
 
-
 #define PB_BUFFER_DEFAULT_PAGE_SIZE                       1024
-
 
 
 /** Responsibility that the pb_data instance has over the memory region.
@@ -49,8 +48,12 @@ enum pb_data_responsibility {
  * When a call to put finds a zero use count it will internally call destroy.
  */
 struct pb_data {
-  /** Memory region start address. */
-  void *root;
+  /**
+   * pb_data representing the root of a large memory region that is at
+   * the head of this page of data.
+   */
+  struct pb_data *root;
+
   /** Data region address. */
   void *base;
   /** Length of memory region. */
@@ -63,22 +66,40 @@ struct pb_data {
   enum pb_data_responsibility responsibility;
 };
 
-
 /**
  * Create a pb_data instance.
  *
  * Memory region buf is now owned by the pb_data instance and will be freed
  * when the instance is destroyed.
- * Use count is initialised to zero.
+ *
+ * Use count is initialised to one, therefore returned data instance must
+ * be treated with the pb_data_put function when the creator is finished with
+ * it, whether it is passed to another owner or not.
  */
 struct pb_data *pb_data_create(void *buf, uint16_t len);
 /**
  * Create a pb_data instance.
  *
  * Memory region buf is not owned by the pb_data instance.
- * Use count is initialised to zero.
+ *
+ * Use count is initialised to one, therefore returned data instance must
+ * be treated with the pb_data_put function when the creator is finished with
+ * it, whether it is passed to another owner or not.
  */
-struct pb_data *pb_data_create_ref(const void *buf, uint16_t off, uint16_t len);
+struct pb_data *pb_data_create_buf_ref(const void *buf, uint16_t len);
+/**
+ * Create a pb_data instance.
+ *
+ * Memory region is owned by root_data, so a reference is held by this new
+ * pb_data instance to the root.  Root should be created using pb_data_create
+ * and since it is a reference only, the root may have zero length;
+ *
+ * Use count is initialised to one, therefore returned data instance must
+ * be treated with the pb_data_put function when the creator is finished with
+ * it, whether it is passed to another owner or not.
+ */
+struct pb_data *pb_data_create_data_ref(
+  struct pb_data *root_data, uint64_t off, uint16_t len);
 /**
  * Destroy a pb_data instance.
  *
@@ -100,6 +121,17 @@ void pb_data_put(struct pb_data *data);
 
 
 
+struct pb_page;
+struct pb_page_iterator {
+  /** Previous page in a list structure. */
+  struct pb_page *prev;
+  /** Next page in a list structure */
+  struct pb_page *next;
+};
+
+void pb_page_iterator_has_next(struct pb_page_iterator *iterator);
+struct pb_page *pb_page_iterator_deref(struct pb_page_iterator *iterator);
+
 /**
  * Reference and usage of a pb_data instance.
  *
@@ -108,20 +140,19 @@ void pb_data_put(struct pb_data *data);
  * Multiple pb_page instances may refer to one pb_data instance.
  */
 struct pb_page {
-  /** The start of the usage region, always within the referenced region. */
-  void *base;
-  /** The length of the usage region, always <= to the referenced region. */
-  uint16_t len;
-
-  /** The reference to the pb_data instance, will raise the use count. */
-  struct pb_data *data;
-
   /** Previous page in a list structure. */
   struct pb_page *prev;
   /** Next page in a list structure */
   struct pb_page *next;
-};
 
+  /** The reference to the pb_data instance, will raise the use count. */
+  struct pb_data *data;
+
+  /** The start of the usage region, always within the referenced region. */
+  void *base;
+  /** The length of the usage region, always <= to the referenced region. */
+  uint16_t len;
+};
 
 /**
  * Create a pb_page instance.
@@ -159,6 +190,11 @@ struct pb_page_list {
 };
 
 /**
+ * Clear all of the pages in a pb_page_list instance.
+ */
+void pb_page_list_clear(struct pb_page_list *list);
+
+/**
  * Get the combined size of all non consumed data in a page list
  */
 uint64_t pb_page_list_get_size(const struct pb_page_list *list);
@@ -177,8 +213,7 @@ bool pb_page_list_append_page_clone(
  * Expand a list, adding data and pages containing len bytes
  */
 uint64_t pb_page_list_reserve(
-  struct pb_page_list *list,
-  uint64_t len);
+  struct pb_page_list *list, uint64_t len, uint16_t max_page_len);
 
 /**
  * Internal functions that write data to a pb_page_list from various sources
@@ -188,17 +223,15 @@ uint64_t pb_page_list_write_data(
 uint64_t pb_page_list_write_data_ref(
   struct pb_page_list *list, const void *buf, uint64_t len);
 uint64_t pb_page_list_write_page_list(
-  struct pb_page_list *list, const struct pb_page_list *src_list, uint64_t len);
+  struct pb_page_list *list, const struct pb_page_list *src_list,
+  uint64_t len);
 
 /**
  * Internal functions that manipulate the starting and ending points of a list
  */
-uint64_t pb_page_list_seek(
-  struct pb_page_list *list, uint64_t len);
-uint64_t pb_page_list_trim(
-  struct pb_page_list *list, uint64_t len);
-uint64_t pb_page_list_rewind(
-  struct pb_page_list *list, uint64_t len);
+uint64_t pb_page_list_seek(struct pb_page_list *list, uint64_t len);
+uint64_t pb_page_list_trim(struct pb_page_list *list, uint64_t len);
+uint64_t pb_page_list_rewind(struct pb_page_list *list, uint64_t len);
 
 
 
@@ -239,9 +272,9 @@ struct pb_buffer {
    */
   uint64_t retain_size;
   /**
-   * Maximum size of pages allocated when reserving pages for writing.
+   * Maximum length of pages allocated when reserving pages for writing.
    */
-  uint16_t reserve_page_size;
+  uint16_t reserve_max_page_len;
 
   /**
    * Has the data list been altered since its size was last measured?
@@ -252,7 +285,7 @@ struct pb_buffer {
 /**
  * Create a pb_buffer instance.
  */
-struct pb_buffer *pb_buffer_create();
+struct pb_buffer *pb_buffer_create(void);
 /**
  * Destroy a pb_buffer instance.
  */
