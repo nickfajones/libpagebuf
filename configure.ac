@@ -187,5 +187,6 @@ dnl -----------------------------------------------
 AC_PREFIX_DEFAULT(/usr/local)
 AC_OUTPUT(Makefile \
           pagebuf.pc \
-          pagebuf/Makefile
+          pagebuf/Makefile \
+          test/Makefile
 )

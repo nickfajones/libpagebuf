@@ -28,9 +28,6 @@ extern "C" {
 #endif
 
 
-#define PB_BUFFER_DEFAULT_PAGE_SIZE                       1024
-
-
 
 /** Responsibility that the pb_data instance has over the memory region.
  *  Either owned, thus freed when use count reaches zero,
@@ -52,7 +49,7 @@ enum pb_data_responsibility {
 struct pb_data {
   /** The start of the region. */
   void *base;
-  /** The length of the in octets. */
+  /** The length of the data region in octets. */
   uint16_t len;
 
   /** Use count, maintained with atomic operations. */
@@ -230,6 +227,20 @@ uint64_t pb_page_list_rewind(struct pb_page_list *list, uint64_t len);
 uint64_t pb_page_list_read_data(
   struct pb_page_list *list, void *buf, uint64_t len);
 
+/**
+ * Internal function that duplicates part of a page list into another.
+ */
+bool pb_page_list_dup(
+  struct pb_page_list *list, const struct pb_page_list* src_list,
+  uint64_t off, uint64_t len);
+
+
+
+/**
+ * When a pb_buffer is asked to reserve write space, the requested size of
+ * the reservation will be split into pages of this size by default.
+ */
+#define PB_BUFFER_DEFAULT_PAGE_SIZE                       1024
 
 
 /**
@@ -374,11 +385,13 @@ struct pb_iterator *pb_buffer_get_data_iterator(
 /**
  *
  */
-struct pb_buffer *pb_buffer_dup(struct pb_buffer *buffer);
-struct pb_buffer *pb_buffer_dup_seek(struct pb_buffer *buffer, uint64_t off);
-struct pb_buffer *pb_buffer_dup_trim(struct pb_buffer *buffer, uint64_t len);
+struct pb_buffer *pb_buffer_dup(struct pb_buffer *src_buffer);
+struct pb_buffer *pb_buffer_dup_seek(
+  struct pb_buffer *src_buffer, uint64_t off);
+struct pb_buffer *pb_buffer_dup_trim(
+  struct pb_buffer *src_buffer, uint64_t len);
 struct pb_buffer *pb_buffer_dup_sub(
-  struct pb_buffer *buffer, uint64_t off, uint64_t len);
+  struct pb_buffer *src_buffer, uint64_t off, uint64_t len);
 
 
 /**
@@ -395,6 +408,8 @@ struct pb_vec {
 struct pb_iterator {
   struct pb_vec vec;
   struct pb_page *page;
+
+  bool is_reverse;
 };
 
 /**
@@ -404,17 +419,24 @@ struct pb_iterator {
  * is the recommended method
  */
 void pb_iterator_init(
-  const struct pb_buffer *buffer, struct pb_iterator *iterator);
+  const struct pb_buffer *buffer, struct pb_iterator *iterator,
+  bool is_reverse);
+/**
+ * Is the iterator a reverse iterator?
+ */
+bool pb_iterator_is_reverse(struct pb_iterator *iterator);
 /**
  * Does the iterator reference a valid page?
- *
- * If so, prepare it and advance the iterator.
  */
-bool pb_iterator_valid(struct pb_iterator *iterator);
+bool pb_iterator_is_valid(struct pb_iterator *iterator);
 /**
- * Get the pb_vec of the current iterator location and advance to the next.
+ * Advance the iterator to the next element.
  */
-const struct pb_vec *pb_iterator_get(struct pb_iterator *iterator);
+void pb_iterator_next(struct pb_iterator *iterator);
+/**
+ * Get the pb_vec of the current iterator location.
+ */
+const struct pb_vec *pb_iterator_get_vec(struct pb_iterator *iterator);
 
 
 #ifdef __CPLUSPLUS

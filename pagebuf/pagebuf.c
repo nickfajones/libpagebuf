@@ -177,6 +177,8 @@ uint64_t pb_page_list_get_size(const struct pb_page_list *list) {
   return size;
 }
 
+/*******************************************************************************
+ */
 bool pb_page_list_prepend_data(
     struct pb_page_list *list, struct pb_data *data) {
   struct pb_page *page = pb_page_create(data);
@@ -237,6 +239,8 @@ bool pb_page_list_append_page_clone(
   return true;
 }
 
+/*******************************************************************************
+ */
 uint64_t pb_page_list_reserve(
     struct pb_page_list *list, uint64_t len, uint16_t max_page_len) {
   uint64_t reserved = 0;
@@ -275,6 +279,8 @@ uint64_t pb_page_list_reserve(
   return reserved;
 }
 
+/*******************************************************************************
+ */
 uint64_t pb_page_list_write_data(
     struct pb_page_list *list, const void *buf, uint64_t len) {
   uint64_t written = 0;
@@ -364,6 +370,8 @@ uint64_t pb_page_list_write_page_list(struct pb_page_list *list,
   return written;
 }
 
+/*******************************************************************************
+ */
 uint64_t pb_page_list_seek(struct pb_page_list *list, uint64_t len) {
   uint64_t seeked = 0;
   struct pb_page *itr = list->head;
@@ -453,22 +461,64 @@ uint64_t pb_page_list_rewind(struct pb_page_list *list, uint64_t len) {
   return rewinded;
 }
 
+/*******************************************************************************
+ */
 uint64_t pb_page_list_read_data(
     struct pb_page_list *list, void *buf, uint64_t len) {
   uint64_t readed = 0;
   struct pb_page *itr = list->head;
 
-  while ((len > 0) && (itr))
-    {
+  while ((len > 0) && (itr)) {
     uint16_t to_read = (len < itr->len) ? len : itr->len;
 
     memcpy((char*)buf + readed, itr->base, to_read);
 
     readed += to_read;
     len -= to_read;
-    }
+
+    itr = itr->next;
+  }
 
   return readed;
+}
+
+/*******************************************************************************
+ */
+bool pb_page_list_dup(
+    struct pb_page_list *list, const struct pb_page_list *src_list,
+    uint64_t off, uint64_t len) {
+  struct pb_page *itr = src_list->head;
+
+  while ((off > 0) && (itr)) {
+    if (off < itr->len)
+      break;
+
+    off -= itr->len;
+
+    itr = itr->next;
+  }
+
+  while ((len > 0) && (itr)) {
+    if (!pb_page_list_append_page_clone(list, itr))
+      return false;
+
+    if (off > 0) {
+      list->tail->base = (char*)itr->base + off;
+      list->tail->len -= off;
+
+      off = 0;
+    }
+
+    uint16_t to_retain = (len < list->tail->len) ? len : list->tail->len;
+
+    list->tail->len = to_retain;
+
+    len -= to_retain;
+
+    itr = itr->next;
+  }
+
+  return true;
 }
 
 
@@ -624,31 +674,108 @@ uint64_t pb_buffer_read(struct pb_buffer *buffer, void *buf, uint64_t len) {
   return pb_page_list_read_data(&buffer->data_list, buf, len);
 }
 
+/*******************************************************************************
+ */
+struct pb_buffer *pb_buffer_dup(struct pb_buffer *src_buffer) {
+  struct pb_buffer *buffer = malloc(sizeof(struct pb_buffer));
+  if (!buffer)
+    return NULL;
+
+  if (!pb_page_list_dup(&buffer->data_list, &src_buffer->data_list, 0, 0)) {
+    pb_buffer_destroy(buffer);
+
+    return NULL;
+  }
+
+  return buffer;
+}
+struct pb_buffer *pb_buffer_dup_seek(
+    struct pb_buffer *src_buffer, uint64_t off) {
+  struct pb_buffer *buffer = malloc(sizeof(struct pb_buffer));
+  if (!buffer)
+    return NULL;
+
+  if (!pb_page_list_dup(&buffer->data_list, &src_buffer->data_list, off, 0)) {
+    pb_buffer_destroy(buffer);
+
+    return NULL;
+  }
+
+  return buffer;
+}
+struct pb_buffer *pb_buffer_dup_trim(
+    struct pb_buffer *src_buffer, uint64_t len) {
+  struct pb_buffer *buffer = malloc(sizeof(struct pb_buffer));
+  if (!buffer)
+    return NULL;
+
+  if (!pb_page_list_dup(&buffer->data_list, &src_buffer->data_list, 0, len)) {
+    pb_buffer_destroy(buffer);
+
+    return NULL;
+  }
+
+  return buffer;
+}
+struct pb_buffer *pb_buffer_dup_sub(
+    struct pb_buffer *src_buffer, uint64_t off, uint64_t len) {
+  struct pb_buffer *buffer = malloc(sizeof(struct pb_buffer));
+  if (!buffer)
+    return NULL;
+
+  if (!pb_page_list_dup(&buffer->data_list, &src_buffer->data_list, off, len)) {
+    pb_buffer_destroy(buffer);
+
+    return NULL;
+  }
+
+  return buffer;
+}
+
 
 
 /*******************************************************************************
  */
 void pb_iterator_init(
-    const struct pb_buffer *buffer, struct pb_iterator *iterator) {
+    const struct pb_buffer *buffer, struct pb_iterator *iterator,
+    bool is_reverse) {
   iterator->vec.base = NULL;
   iterator->vec.len = 0;
 
-  iterator->page = buffer->data_list.head;
+  iterator->is_reverse = is_reverse;
+
+  if (!iterator->is_reverse)
+    iterator->page = buffer->data_list.head;
+  else
+    iterator->page = buffer->data_list.tail;
 }
 
-bool pb_iterator_valid(struct pb_iterator *iterator) {
-  if (!iterator->page)
-    return false;
+bool pb_iterator_is_reverse(struct pb_iterator *iterator) {
+  return iterator->is_reverse;
+}
+
+bool pb_iterator_has_is_valid(struct pb_iterator *iterator) {
+  return (iterator->page != NULL);
+}
+
+void pb_iterator_next(struct pb_iterator *iterator) {
+  if (!iterator->is_reverse)
+    iterator->page = iterator->page->next;
+  else
+    iterator->page = iterator->page->prev;
+}
+
+const struct pb_vec *pb_iterator_get_vec(struct pb_iterator *iterator) {
+  if (!iterator->page) {
+    iterator->vec.base = NULL;
+    iterator->vec.len = 0;
+
+    return &iterator->vec;
+  }
 
   iterator->vec.base = iterator->page->base;
   iterator->vec.len = iterator->page->len;
 
-  iterator->page = iterator->page->next;
-
-  return true;
-}
-
-const struct pb_vec *pb_iterator_get(struct pb_iterator *iterator) {
   return &iterator->vec;
 }
 
