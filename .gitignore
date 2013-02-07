@@ -11,6 +11,7 @@
 *.dSYM
 *.a
 *.pdf
+.deps
 .libs
 /.cproject
 /.project
@@ -35,5 +36,7 @@
 /libtool
 /ltmain.sh
 /missing
+/pagebuf.pc
 /stamp-h1
 pagebuf/Makefile.in
+pagebuf/Makefile

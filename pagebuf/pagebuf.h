@@ -18,6 +18,7 @@
 #define PAGEBUF_H
 
 
+#include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -28,6 +29,7 @@ extern "C" {
 
 
 #define PB_BUFFER_DEFAULT_PAGE_SIZE                       1024
+
 
 
 /** Responsibility that the pb_data instance has over the memory region.
@@ -48,15 +50,9 @@ enum pb_data_responsibility {
  * When a call to put finds a zero use count it will internally call destroy.
  */
 struct pb_data {
-  /**
-   * pb_data representing the root of a large memory region that is at
-   * the head of this page of data.
-   */
-  struct pb_data *root;
-
-  /** Data region address. */
+  /** The start of the region. */
   void *base;
-  /** Length of memory region. */
+  /** The length of the in octets. */
   uint16_t len;
 
   /** Use count, maintained with atomic operations. */
@@ -64,6 +60,12 @@ struct pb_data {
 
   /** Responsibility that this structure has over the memory region. */
   enum pb_data_responsibility responsibility;
+
+  /**
+   * pb_data representing the root of a large memory region that is at
+   * the head of this page of data.
+   */
+  struct pb_data *root;
 };
 
 /**
@@ -121,17 +123,6 @@ void pb_data_put(struct pb_data *data);
 
 
 
-struct pb_page;
-struct pb_page_iterator {
-  /** Previous page in a list structure. */
-  struct pb_page *prev;
-  /** Next page in a list structure */
-  struct pb_page *next;
-};
-
-void pb_page_iterator_has_next(struct pb_page_iterator *iterator);
-struct pb_page *pb_page_iterator_deref(struct pb_page_iterator *iterator);
-
 /**
  * Reference and usage of a pb_data instance.
  *
@@ -140,18 +131,18 @@ struct pb_page *pb_page_iterator_deref(struct pb_page_iterator *iterator);
  * Multiple pb_page instances may refer to one pb_data instance.
  */
 struct pb_page {
-  /** Previous page in a list structure. */
-  struct pb_page *prev;
-  /** Next page in a list structure */
-  struct pb_page *next;
+  /** The offset into the referenced region. */
+  void *base;
+  /** The remaining length of the referenced in octets. */
+  uint16_t len;
 
   /** The reference to the pb_data instance, will raise the use count. */
   struct pb_data *data;
 
-  /** The start of the usage region, always within the referenced region. */
-  void *base;
-  /** The length of the usage region, always <= to the referenced region. */
-  uint16_t len;
+  /** Previous page in a list structure. */
+  struct pb_page *prev;
+  /** Next page in a list structure */
+  struct pb_page *next;
 };
 
 /**
@@ -233,6 +224,12 @@ uint64_t pb_page_list_seek(struct pb_page_list *list, uint64_t len);
 uint64_t pb_page_list_trim(struct pb_page_list *list, uint64_t len);
 uint64_t pb_page_list_rewind(struct pb_page_list *list, uint64_t len);
 
+/**
+ * Internal function that reads data from a list.
+ */
+uint64_t pb_page_list_read_data(
+  struct pb_page_list *list, void *buf, uint64_t len);
+
 
 
 /**
@@ -270,7 +267,7 @@ struct pb_buffer {
   /**
    * Amount of data to retain after seeking.
    */
-  uint64_t retain_size;
+  uint64_t retain_max_size;
   /**
    * Maximum length of pages allocated when reserving pages for writing.
    */
@@ -345,6 +342,12 @@ uint64_t pb_buffer_write_buf(
   struct pb_buffer *buffer, const struct pb_buffer *src_buffer, uint64_t len);
 
 /**
+ * Get iterator to pb_buffer write list.
+ */
+struct pb_iterator *pb_buffer_get_write_iterator(
+  const struct pb_buffer *buffer);
+
+/**
  * Seek len bytes into data list of a pb_buffer instance.
  */
 uint64_t pb_buffer_seek(struct pb_buffer *buffer, uint64_t len);
@@ -362,12 +365,57 @@ uint64_t pb_buffer_rewind(struct pb_buffer *buffer, uint64_t len);
  */
 uint64_t pb_buffer_read(struct pb_buffer *buffer, void *buf, uint64_t len);
 
-//-----------------------------------------------------------------------------
+/**
+ * Get iterator to pb_buffer data.
+ */
+struct pb_iterator *pb_buffer_get_data_iterator(
+  const struct pb_buffer *buffer);
+
+/**
+ *
+ */
 struct pb_buffer *pb_buffer_dup(struct pb_buffer *buffer);
 struct pb_buffer *pb_buffer_dup_seek(struct pb_buffer *buffer, uint64_t off);
 struct pb_buffer *pb_buffer_dup_trim(struct pb_buffer *buffer, uint64_t len);
 struct pb_buffer *pb_buffer_dup_sub(
   struct pb_buffer *buffer, uint64_t off, uint64_t len);
+
+
+/**
+ * A structure representing a data region for external consumption.
+ */
+struct pb_vec {
+  void *base;
+  size_t len;
+};
+
+/**
+ * A structure used to iterate over buffer data.
+ */
+struct pb_iterator {
+  struct pb_vec vec;
+  struct pb_page *page;
+};
+
+/**
+ * Initialise a pb_iterator given a pb_buffer instance.
+ *
+ * Iterator instance should be created by the caller.  As a stack variable
+ * is the recommended method
+ */
+void pb_iterator_init(
+  const struct pb_buffer *buffer, struct pb_iterator *iterator);
+/**
+ * Does the iterator reference a valid page?
+ *
+ * If so, prepare it and advance the iterator.
+ */
+bool pb_iterator_valid(struct pb_iterator *iterator);
+/**
+ * Get the pb_vec of the current iterator location and advance to the next.
+ */
+const struct pb_vec *pb_iterator_get(struct pb_iterator *iterator);
+
 
 #ifdef __CPLUSPLUS
 }; // extern "C"

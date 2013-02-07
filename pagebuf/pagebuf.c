@@ -28,12 +28,13 @@ struct pb_data *pb_data_create(void *buf, uint16_t len) {
   if (!data)
     return NULL;
 
-  data->root = NULL;
   data->base = buf;
   data->len = len;
 
   data->use_count = 1;
   data->responsibility = pb_data_owned;
+
+  data->root = NULL;
 
   return data;
 }
@@ -43,14 +44,13 @@ struct pb_data *pb_data_create_buf_ref(const void *buf, uint16_t len) {
   if (!data)
     return NULL;
 
-  data->root = NULL;
   data->base = (void*)buf;
   data->len = len;
 
   data->use_count = 1;
   data->responsibility = pb_data_referenced;
 
-  pb_data_get(data->root);
+  data->root = NULL;
 
   return data;
 }
@@ -61,13 +61,13 @@ struct pb_data *pb_data_create_data_ref(
   if (!data)
     return NULL;
 
-  data->root = root_data;
   data->base = (char*)root_data->base + off;
   data->len = len;
 
   data->use_count = 1;
   data->responsibility = pb_data_referenced;
 
+  data->root = root_data;
   pb_data_get(data->root);
 
   return data;
@@ -79,11 +79,12 @@ void pb_data_destroy(struct pb_data *data) {
   else if (data->root)
     pb_data_put(data->root);
 
-  data->root = NULL;
   data->base = NULL;
   data->len = 0;
 
   data->use_count = 0;
+
+  data->root = NULL;
 
   free(data);
 }
@@ -132,7 +133,7 @@ struct pb_page *pb_page_clone(const struct pb_page *src_page) {
 
   pb_data_get(page->data);
 
-  return new_page;
+  return page;
 }
 
 void pb_page_destroy(struct pb_page *page) {
@@ -452,6 +453,24 @@ uint64_t pb_page_list_rewind(struct pb_page_list *list, uint64_t len) {
   return rewinded;
 }
 
+uint64_t pb_page_list_read_data(
+    struct pb_page_list *list, void *buf, uint64_t len) {
+  uint64_t readed = 0;
+  struct pb_page *itr = list->head;
+
+  while ((len > 0) && (itr))
+    {
+    uint16_t to_read = (len < itr->len) ? len : itr->len;
+
+    memcpy((char*)buf + readed, itr->base, to_read);
+
+    readed += to_read;
+    len -= to_read;
+    }
+
+  return readed;
+}
+
 
 
 /*******************************************************************************
@@ -597,5 +616,39 @@ uint64_t pb_buffer_trim(struct pb_buffer *buffer, uint64_t len) {
 
 uint64_t pb_buffer_rewind(struct pb_buffer *buffer, uint64_t len) {
   return 0;
+}
+
+/*******************************************************************************
+ */
+uint64_t pb_buffer_read(struct pb_buffer *buffer, void *buf, uint64_t len) {
+  return pb_page_list_read_data(&buffer->data_list, buf, len);
+}
+
+
+
+/*******************************************************************************
+ */
+void pb_iterator_init(
+    const struct pb_buffer *buffer, struct pb_iterator *iterator) {
+  iterator->vec.base = NULL;
+  iterator->vec.len = 0;
+
+  iterator->page = buffer->data_list.head;
+}
+
+bool pb_iterator_valid(struct pb_iterator *iterator) {
+  if (!iterator->page)
+    return false;
+
+  iterator->vec.base = iterator->page->base;
+  iterator->vec.len = iterator->page->len;
+
+  iterator->page = iterator->page->next;
+
+  return true;
+}
+
+const struct pb_vec *pb_iterator_get(struct pb_iterator *iterator) {
+  return &iterator->vec;
 }
 
