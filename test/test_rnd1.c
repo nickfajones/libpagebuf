@@ -20,7 +20,10 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <string.h>
+#include <assert.h>
 #include <stdio.h>
+
+#include <openssl/evp.h>
 
 #include <pagebuf/pagebuf.h>
 
@@ -35,7 +38,7 @@ static char stream_buf[STREAM_BUF_SIZE];
 
 /*******************************************************************************
  */
-uint32_t generate_seed() {
+uint32_t generate_seed(void) {
   uint8_t seed_buf[2];
   uint32_t seed;
   int fd;
@@ -65,10 +68,9 @@ close_fd:
 
 /*******************************************************************************
  */
-void generate_stream_source_buf()
+void generate_stream_source_buf(void)
   {
-  for (size_t counter = 0; counter < STREAM_BUF_SIZE; ++counter)
-    {
+  for (size_t counter = 0; counter < STREAM_BUF_SIZE; ++counter) {
     stream_source_buf[counter] = random();
     }
   }
@@ -79,8 +81,9 @@ void generate_stream_source_buf()
 void read_stream(size_t len)
   {
   size_t skipper = random();
-  for (size_t counter = 0; counter < len && counter < STREAM_BUF_SIZE; ++counter)
-    {
+  for (size_t counter = 0;
+       counter < len && counter < STREAM_BUF_SIZE;
+       ++counter) {
     skipper = (skipper + random()) % STREAM_BUF_SIZE;
 
     stream_buf[counter] = stream_source_buf[skipper];
@@ -92,11 +95,18 @@ void read_stream(size_t len)
 int main(int argc, char **argv) {
   char opt;
   uint32_t seed = (UINT16_MAX + 1);
+
+  struct pb_buffer *buffer;
+
+  uint32_t iterations_limit;
+  uint32_t iterations = 0;
+
   uint64_t bytes_written = 0;
   uint64_t bytes_readed = 0;
 
-  while ((opt = getopt(argc, argv, "s:")) != -1)
-    {
+  EVP_MD_CTX mdctx;
+
+  while ((opt = getopt(argc, argv, "s:")) != -1) {
     switch (opt)
       {
       case 's':
@@ -118,13 +128,57 @@ int main(int argc, char **argv) {
 
   seed %= UINT16_MAX;
 
-  printf("Uusing prng seed: '%d'\n", seed);
+  printf("Using prng seed: '%d'\n", seed);
 
   srandom(seed);
 
   generate_stream_source_buf();
 
+  iterations_limit = 50000 + (random() % 50000);
 
+  printf("Iterations to run: %d\n", iterations_limit);
+
+  buffer = pb_buffer_create();
+
+  EVP_MD_CTX_init(&mdctx);
+  EVP_DigestInit_ex(&mdctx, EVP_md5(), NULL);
+
+  while (iterations < iterations_limit) {
+    size_t write_size;
+    size_t read_size;
+
+    printf("\riteration: '%d'          ", iterations + 1);
+
+    write_size = 64 + (random() % (4 * 1024));
+    if (write_size > STREAM_BUF_SIZE)
+      write_size = STREAM_BUF_SIZE;
+
+    read_stream(write_size);
+
+    if (pb_buffer_write_data(buffer, stream_buf, write_size) != write_size) {
+      assert(0);
+
+      return -1;
+      }
+
+    bytes_written += write_size;
+
+    read_size = (random() % (bytes_written - bytes_readed));
+    if (read_size > STREAM_BUF_SIZE)
+      read_size = STREAM_BUF_SIZE;
+
+    if (pb_buffer_read_data(buffer, stream_buf, read_size) != read_size) {
+      assert(0);
+
+      return -1;
+    }
+
+    bytes_readed += read_size;
+
+    ++iterations;
+  }
+
+  EVP_MD_CTX_cleanup(&mdctx);
 
   return 0;
 }

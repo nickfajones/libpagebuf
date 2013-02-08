@@ -8,5 +8,5 @@ EXTRA_DIST=LICENSE NOTICE
 pkgconfigdir=$(libdir)/pkgconfig
 pkgconfig_DATA=pagebuf.pc
 
-tests:
+tests: all
 	@(cd test && $(MAKE) tests)

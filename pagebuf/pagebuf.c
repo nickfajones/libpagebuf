@@ -28,6 +28,8 @@ struct pb_data *pb_data_create(void *buf, uint16_t len) {
   if (!data)
     return NULL;
 
+  memset(data, 0, sizeof(struct pb_data));
+
   data->base = buf;
   data->len = len;
 
@@ -43,6 +45,8 @@ struct pb_data *pb_data_create_buf_ref(const void *buf, uint16_t len) {
   struct pb_data *data = malloc(sizeof(struct pb_data));
   if (!data)
     return NULL;
+
+  memset(data, 0, sizeof(struct pb_data));
 
   data->base = (void*)buf;
   data->len = len;
@@ -60,6 +64,8 @@ struct pb_data *pb_data_create_data_ref(
   struct pb_data *data = malloc(sizeof(struct pb_data));
   if (!data)
     return NULL;
+
+  memset(data, 0, sizeof(struct pb_data));
 
   data->base = (char*)root_data->base + off;
   data->len = len;
@@ -109,6 +115,8 @@ struct pb_page *pb_page_create(struct pb_data *data) {
   if (!page)
     return NULL;
 
+  memset(page, 0, sizeof(struct pb_page));
+
   page->base = data->base;
   page->len = data->len;
   page->data = data;
@@ -124,6 +132,8 @@ struct pb_page *pb_page_clone(const struct pb_page *src_page) {
   struct pb_page *page = malloc(sizeof(struct pb_page));
   if (!page)
     return NULL;
+
+  memset(page, 0, sizeof(struct pb_page));
 
   page->base = src_page->base;
   page->len = src_page->len;
@@ -158,10 +168,13 @@ void pb_page_list_clear(struct pb_page_list *list) {
   while (itr) {
     struct pb_page *page = itr;
 
-    itr = page->next;
+    itr = itr->next;
 
     pb_page_destroy(page);
   }
+
+  list->head = NULL;
+  list->tail = NULL;
 }
 
 uint64_t pb_page_list_get_size(const struct pb_page_list *list) {
@@ -258,19 +271,19 @@ uint64_t pb_page_list_reserve(
 
     bytes = malloc(to_reserve);
     if (!bytes)
-      return reserved;
+      break;
 
     data = pb_data_create(bytes, to_reserve);
     if (!data) {
       free(bytes);
 
-      return reserved;
+      break;
     }
 
     append_result = pb_page_list_append_data(list, data);
     pb_data_put(data);
     if (!append_result)
-      return reserved;
+      break;
 
     reserved += to_reserve;
     len -= to_reserve;
@@ -294,7 +307,7 @@ uint64_t pb_page_list_write_data(
   memcpy(bytes, buf, len);
 
   root_data = pb_data_create(bytes, 0);
-  if (root_data) {
+  if (!root_data) {
     free(bytes);
 
     return written;
@@ -307,12 +320,12 @@ uint64_t pb_page_list_write_data(
 
     data = pb_data_create_data_ref(root_data, written, to_write);
     if (!data)
-      return written;
+      break;
 
     append_result = pb_page_list_append_data(list, data);
     pb_data_put(data);
     if (!append_result)
-      return written;
+      break;
 
     written += to_write;
     len -= to_write;
@@ -334,12 +347,12 @@ uint64_t pb_page_list_write_data_ref(
 
     data = pb_data_create_buf_ref((char*)buf + written, to_write);
     if (!data)
-      return written;
+      break;
 
     append_result = pb_page_list_append_data(list, data);
     pb_data_put(data);
     if (!append_result)
-      return written;
+      break;
 
     written += to_write;
     len -= to_write;
@@ -357,7 +370,7 @@ uint64_t pb_page_list_write_page_list(struct pb_page_list *list,
     uint16_t to_write = (len < itr->len) ? len : itr->len;
 
     if (!pb_page_list_append_page_clone(list, itr))
-      return written;
+      break;
 
     list->tail->len = to_write;
 
@@ -440,13 +453,13 @@ uint64_t pb_page_list_rewind(struct pb_page_list *list, uint64_t len) {
 
     bytes = malloc(to_rewind);
     if (!bytes)
-      return rewinded;
+      break;
 
     data = pb_data_create(bytes, to_rewind);
     if (!data) {
       free(bytes);
 
-      return rewinded;
+      break;
     }
 
     prepend_result = pb_page_list_prepend_data(list, data);
@@ -529,6 +542,8 @@ struct pb_buffer *pb_buffer_create() {
   struct pb_buffer *buffer = malloc(sizeof(struct pb_buffer));
   if (!buffer)
     return NULL;
+
+  memset(buffer, 0, sizeof(struct pb_buffer));
 
   pb_buffer_clear(buffer);
 
@@ -670,14 +685,15 @@ uint64_t pb_buffer_rewind(struct pb_buffer *buffer, uint64_t len) {
 
 /*******************************************************************************
  */
-uint64_t pb_buffer_read(struct pb_buffer *buffer, void *buf, uint64_t len) {
+uint64_t pb_buffer_read_data(
+    struct pb_buffer *buffer, void *buf, uint64_t len) {
   return pb_page_list_read_data(&buffer->data_list, buf, len);
 }
 
 /*******************************************************************************
  */
 struct pb_buffer *pb_buffer_dup(struct pb_buffer *src_buffer) {
-  struct pb_buffer *buffer = malloc(sizeof(struct pb_buffer));
+  struct pb_buffer *buffer = pb_buffer_create();
   if (!buffer)
     return NULL;
 
@@ -691,7 +707,7 @@ struct pb_buffer *pb_buffer_dup(struct pb_buffer *src_buffer) {
 }
 struct pb_buffer *pb_buffer_dup_seek(
     struct pb_buffer *src_buffer, uint64_t off) {
-  struct pb_buffer *buffer = malloc(sizeof(struct pb_buffer));
+  struct pb_buffer *buffer = pb_buffer_create();
   if (!buffer)
     return NULL;
 
@@ -705,7 +721,7 @@ struct pb_buffer *pb_buffer_dup_seek(
 }
 struct pb_buffer *pb_buffer_dup_trim(
     struct pb_buffer *src_buffer, uint64_t len) {
-  struct pb_buffer *buffer = malloc(sizeof(struct pb_buffer));
+  struct pb_buffer *buffer = pb_buffer_create();
   if (!buffer)
     return NULL;
 
@@ -719,7 +735,7 @@ struct pb_buffer *pb_buffer_dup_trim(
 }
 struct pb_buffer *pb_buffer_dup_sub(
     struct pb_buffer *src_buffer, uint64_t off, uint64_t len) {
-  struct pb_buffer *buffer = malloc(sizeof(struct pb_buffer));
+  struct pb_buffer *buffer = pb_buffer_create();
   if (!buffer)
     return NULL;
 

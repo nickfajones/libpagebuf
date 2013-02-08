@@ -374,7 +374,8 @@ uint64_t pb_buffer_rewind(struct pb_buffer *buffer, uint64_t len);
 /**
  * Read len bytes from a pb_buffer instance, into a memory region
  */
-uint64_t pb_buffer_read(struct pb_buffer *buffer, void *buf, uint64_t len);
+uint64_t pb_buffer_read_data(
+  struct pb_buffer *buffer, void *buf, uint64_t len);
 
 /**
  * Get iterator to pb_buffer data.
@@ -383,7 +384,7 @@ struct pb_iterator *pb_buffer_get_data_iterator(
   const struct pb_buffer *buffer);
 
 /**
- *
+ * Duplicate
  */
 struct pb_buffer *pb_buffer_dup(struct pb_buffer *src_buffer);
 struct pb_buffer *pb_buffer_dup_seek(
