@@ -79,6 +79,32 @@ struct pb_data *pb_data_create_data_ref(
   return data;
 }
 
+struct pb_data *pb_data_clone(const struct pb_data *src_data) {
+  struct pb_data *data = malloc(sizeof(struct pb_data);
+  if (!data)
+    return NULL;
+
+  memset(data, 0, sizeof(struct pb_data));
+
+  data->base = malloc(src_data->len);
+  if (!data->base) {
+    pb_data_put(data);
+
+    return NULL;
+  }
+
+  memcpy(data->base, src_data->base, src_data->len);
+
+  data->len = src_data->len;
+
+  data->use_count = 1;
+  data->responsibility = pb_data_owned;
+
+  data->root = NULL;
+
+  return data;
+}
+
 void pb_data_destroy(struct pb_data *data) {
   if (data->responsibility == pb_data_owned)
     free(data->base);
@@ -128,7 +154,7 @@ struct pb_page *pb_page_create(struct pb_data *data) {
   return page;
 }
 
-struct pb_page *pb_page_clone(const struct pb_page *src_page) {
+struct pb_page *pb_page_copy(const struct pb_page *src_page) {
   struct pb_page *page = malloc(sizeof(struct pb_page));
   if (!page)
     return NULL;
@@ -142,6 +168,28 @@ struct pb_page *pb_page_clone(const struct pb_page *src_page) {
   page->next = NULL;
 
   pb_data_get(page->data);
+
+  return page;
+}
+
+struct pb_page *pb_page_clone(const struct pb_page *src_page) {
+  struct pb_page *page = malloc(sizeof(struct pb_page));
+  if (!page)
+    return NULL;
+
+  memset(page, 0, sizeof(struct pb_page));
+
+  page->data = pb_data_clone(src_page->data);
+  if (!page->data) {
+    free(page);
+    
+    return NULL;
+  }
+
+  page->base = src_page->base;
+  page->len = src_page->len;
+  page->prev = NULL;
+  page->next = NULL;
 
   return page;
 }
@@ -232,22 +280,42 @@ bool pb_page_list_append_data(
   return true;
 }
 
-bool pb_page_list_append_page_clone(
-    struct pb_page_list *list, const struct pb_page *page) {
-  struct pb_page *new_page = pb_page_clone(page);
-  if (!new_page)
+bool pb_page_list_append_page_copy(
+    struct pb_page_list *list, const struct pb_page *src_page) {
+  struct pb_page *page = pb_page_copy(src_page);
+  if (!page)
     return false;
 
   if (list->head == NULL) {
-    list->head = new_page;
-    list->tail = new_page;
+    list->head = page;
+    list->tail = page;
 
     return true;
   }
 
-  list->tail->next = new_page;
-  new_page->prev = list->tail;
-  list->tail = new_page;
+  list->tail->next = page;
+  page->prev = list->tail;
+  list->tail = page;
+
+  return true;
+}
+
+bool pb_page_list_append_page_clone(
+    struct pb_page_list *list, const struct pb_page *src_page) {
+  struct pb_page *page = pb_page_clone(src_page);
+  if (!page)
+    return false;
+
+  if (list->head == NULL) {
+    list->head = page;
+    list->tail = page;
+
+    return true;
+  }
+
+  list->tail->next = page;
+  page->prev = list->tail;
+  list->tail = page;
 
   return true;
 }
@@ -369,7 +437,7 @@ uint64_t pb_page_list_write_page_list(struct pb_page_list *list,
   while ((len > 0) && (itr)) {
     uint16_t to_write = (len < itr->len) ? len : itr->len;
 
-    if (!pb_page_list_append_page_clone(list, itr))
+    if (!pb_page_list_append_page_copy(list, itr))
       break;
 
     list->tail->len = to_write;

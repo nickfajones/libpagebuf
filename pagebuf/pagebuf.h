@@ -100,6 +100,13 @@ struct pb_data *pb_data_create_buf_ref(const void *buf, uint16_t len);
 struct pb_data *pb_data_create_data_ref(
   struct pb_data *root_data, uint64_t off, uint16_t len);
 /**
+ * Clone a pb_data instance.
+ *
+ * A new memory region is allocated and the source memory region is copied
+ * byte by byte.
+ */
+struct pb_data *pb_data_clone(const struct pb_data *src_data);
+/**
  * Destroy a pb_data instance.
  *
  * Not to be called directly unless the instance was never accepted by a
@@ -149,10 +156,17 @@ struct pb_page {
  */
 struct pb_page *pb_page_create(struct pb_data *data);
 /**
+ * Copy a pb_page instance.
+ *
+ * Duplicate the base and len values of the source page, and reference its
+ * pb_data instance.
+ */
+struct pb_page *pb_page_copy(const struct pb_page *src_page);
+/**
  * Clone an existing pb_page instance
  *
- * Duplicate the base and len values and additionally increment the use count
- * of the pb_data instance
+ * Duplicate the base and len values as well as a full clone of the referenced
+ * pb_data instance.
  */
 struct pb_page *pb_page_clone(const struct pb_page *src_page);
 /**
@@ -194,6 +208,8 @@ bool pb_page_list_prepend_data(
   struct pb_page_list *list, struct pb_data *data);
 bool pb_page_list_append_data(
   struct pb_page_list *list, struct pb_data *data);
+bool pb_page_list_append_page_copy(
+  struct pb_page_list *list, const struct pb_page *page);
 bool pb_page_list_append_page_clone(
   struct pb_page_list *list, const struct pb_page *page);
 
