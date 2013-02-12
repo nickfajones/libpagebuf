@@ -253,6 +253,52 @@ bool pb_page_list_dup(
 
 
 /**
+ * A structure representing a data region for external consumption.
+ */
+struct pb_vec {
+  void *base;
+  size_t len;
+};
+
+/**
+ * A structure used to iterate over buffer data.
+ */
+struct pb_iterator {
+  struct pb_vec vec;
+  struct pb_page *page;
+
+  bool is_reverse;
+};
+
+/**
+ * Initialise a pb_iterator given a pb_buffer instance.
+ *
+ * Iterator instance should be created by the caller.  As a stack variable
+ * is the recommended method
+ */
+void pb_iterator_init(
+  const struct pb_page_list *buffer, struct pb_iterator *iterator,
+  bool is_reverse);
+/**
+ * Is the iterator a reverse iterator?
+ */
+bool pb_iterator_is_reverse(const struct pb_iterator *iterator);
+/**
+ * Does the iterator reference a valid page?
+ */
+bool pb_iterator_is_valid(const struct pb_iterator *iterator);
+/**
+ * Advance the iterator to the next element.
+ */
+void pb_iterator_next(struct pb_iterator *iterator);
+/**
+ * Get the pb_vec of the current iterator location.
+ */
+const struct pb_vec *pb_iterator_get_vec(struct pb_iterator *iterator);
+
+
+
+/**
  * When a pb_buffer is asked to reserve write space, the requested size of
  * the reservation will be split into pages of this size by default.
  */
@@ -369,10 +415,10 @@ uint64_t pb_buffer_write_buf(
   struct pb_buffer *buffer, const struct pb_buffer *src_buffer, uint64_t len);
 
 /**
- * Get iterator to pb_buffer write list.
+ * Get iterator to the pb_buffer write list.
  */
-struct pb_iterator *pb_buffer_get_write_iterator(
-  const struct pb_buffer *buffer);
+void pb_buffer_get_write_iterator(
+  struct pb_buffer *buffer, struct pb_iterator *iterator);
 
 /**
  * Seek len bytes into data list of a pb_buffer instance.
@@ -394,10 +440,10 @@ uint64_t pb_buffer_read_data(
   struct pb_buffer *buffer, void *buf, uint64_t len);
 
 /**
- * Get iterator to pb_buffer data.
+ * Get iterator to the pb_buffer data list.
  */
-struct pb_iterator *pb_buffer_get_data_iterator(
-  const struct pb_buffer *buffer);
+void pb_buffer_get_data_iterator(
+  struct pb_buffer *buffer, struct pb_iterator *iterator);
 
 /**
  * Duplicate
@@ -409,51 +455,6 @@ struct pb_buffer *pb_buffer_dup_trim(
   struct pb_buffer *src_buffer, uint64_t len);
 struct pb_buffer *pb_buffer_dup_sub(
   struct pb_buffer *src_buffer, uint64_t off, uint64_t len);
-
-
-/**
- * A structure representing a data region for external consumption.
- */
-struct pb_vec {
-  void *base;
-  size_t len;
-};
-
-/**
- * A structure used to iterate over buffer data.
- */
-struct pb_iterator {
-  struct pb_vec vec;
-  struct pb_page *page;
-
-  bool is_reverse;
-};
-
-/**
- * Initialise a pb_iterator given a pb_buffer instance.
- *
- * Iterator instance should be created by the caller.  As a stack variable
- * is the recommended method
- */
-void pb_iterator_init(
-  const struct pb_buffer *buffer, struct pb_iterator *iterator,
-  bool is_reverse);
-/**
- * Is the iterator a reverse iterator?
- */
-bool pb_iterator_is_reverse(struct pb_iterator *iterator);
-/**
- * Does the iterator reference a valid page?
- */
-bool pb_iterator_is_valid(struct pb_iterator *iterator);
-/**
- * Advance the iterator to the next element.
- */
-void pb_iterator_next(struct pb_iterator *iterator);
-/**
- * Get the pb_vec of the current iterator location.
- */
-const struct pb_vec *pb_iterator_get_vec(struct pb_iterator *iterator);
 
 
 #ifdef __CPLUSPLUS

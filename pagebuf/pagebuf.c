@@ -80,7 +80,7 @@ struct pb_data *pb_data_create_data_ref(
 }
 
 struct pb_data *pb_data_clone(const struct pb_data *src_data) {
-  struct pb_data *data = malloc(sizeof(struct pb_data);
+  struct pb_data *data = malloc(sizeof(struct pb_data));
   if (!data)
     return NULL;
 
@@ -606,6 +606,53 @@ bool pb_page_list_dup(
 
 /*******************************************************************************
  */
+void pb_iterator_init(
+    const struct pb_page_list *list, struct pb_iterator *iterator,
+    bool is_reverse) {
+  iterator->vec.base = NULL;
+  iterator->vec.len = 0;
+
+  iterator->is_reverse = is_reverse;
+
+  if (!iterator->is_reverse)
+    iterator->page = list->head;
+  else
+    iterator->page = list->tail;
+}
+
+bool pb_iterator_is_reverse(const struct pb_iterator *iterator) {
+  return iterator->is_reverse;
+}
+
+bool pb_iterator_is_valid(const struct pb_iterator *iterator) {
+  return (iterator->page != NULL);
+}
+
+void pb_iterator_next(struct pb_iterator *iterator) {
+  if (!iterator->is_reverse)
+    iterator->page = iterator->page->next;
+  else
+    iterator->page = iterator->page->prev;
+}
+
+const struct pb_vec *pb_iterator_get_vec(struct pb_iterator *iterator) {
+  if (!iterator->page) {
+    iterator->vec.base = NULL;
+    iterator->vec.len = 0;
+
+    return &iterator->vec;
+  }
+
+  iterator->vec.base = iterator->page->base;
+  iterator->vec.len = iterator->page->len;
+
+  return &iterator->vec;
+}
+
+
+
+/*******************************************************************************
+ */
 struct pb_buffer *pb_buffer_create() {
   struct pb_buffer *buffer = malloc(sizeof(struct pb_buffer));
   if (!buffer)
@@ -731,6 +778,13 @@ uint64_t pb_buffer_write_buf(
 
 /*******************************************************************************
  */
+void pb_buffer_get_write_iterator(
+    struct pb_buffer *buffer, struct pb_iterator *iterator) {
+  pb_iterator_init(&buffer->write_list, iterator, false);
+}
+
+/*******************************************************************************
+ */
 uint64_t pb_buffer_seek(struct pb_buffer *buffer, uint64_t len) {
   uint64_t seeked = pb_page_list_seek(&buffer->data_list, len);
 
@@ -756,6 +810,13 @@ uint64_t pb_buffer_rewind(struct pb_buffer *buffer, uint64_t len) {
 uint64_t pb_buffer_read_data(
     struct pb_buffer *buffer, void *buf, uint64_t len) {
   return pb_page_list_read_data(&buffer->data_list, buf, len);
+}
+
+/*******************************************************************************
+ */
+void pb_buffer_get_data_iterator(
+    struct pb_buffer *buffer, struct pb_iterator *iterator) {
+  pb_iterator_init(&buffer->data_list, iterator, false);
 }
 
 /*******************************************************************************
@@ -814,52 +875,5 @@ struct pb_buffer *pb_buffer_dup_sub(
   }
 
   return buffer;
-}
-
-
-
-/*******************************************************************************
- */
-void pb_iterator_init(
-    const struct pb_buffer *buffer, struct pb_iterator *iterator,
-    bool is_reverse) {
-  iterator->vec.base = NULL;
-  iterator->vec.len = 0;
-
-  iterator->is_reverse = is_reverse;
-
-  if (!iterator->is_reverse)
-    iterator->page = buffer->data_list.head;
-  else
-    iterator->page = buffer->data_list.tail;
-}
-
-bool pb_iterator_is_reverse(struct pb_iterator *iterator) {
-  return iterator->is_reverse;
-}
-
-bool pb_iterator_has_is_valid(struct pb_iterator *iterator) {
-  return (iterator->page != NULL);
-}
-
-void pb_iterator_next(struct pb_iterator *iterator) {
-  if (!iterator->is_reverse)
-    iterator->page = iterator->page->next;
-  else
-    iterator->page = iterator->page->prev;
-}
-
-const struct pb_vec *pb_iterator_get_vec(struct pb_iterator *iterator) {
-  if (!iterator->page) {
-    iterator->vec.base = NULL;
-    iterator->vec.len = 0;
-
-    return &iterator->vec;
-  }
-
-  iterator->vec.base = iterator->page->base;
-  iterator->vec.len = iterator->page->len;
-
-  return &iterator->vec;
 }
 

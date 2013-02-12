@@ -40,3 +40,5 @@
 /stamp-h1
 pagebuf/Makefile.in
 pagebuf/Makefile
+test/Makefile.in
+test/Makefile
