@@ -246,7 +246,6 @@ int main(int argc, char **argv) {
 
   gettimeofday(&start_time, NULL);
 
-  iterations_limit = 2;
   while (iterations < iterations_limit) {
     size_t write_size;
     size_t read_size;
@@ -275,7 +274,7 @@ int main(int argc, char **argv) {
       current_size = pb_buffer_get_data_size(test_itr->buffer);
       assert(current_size == (total_write_size - total_read_size));
 
-      if (!true) {
+      if (!use_direct) {
         written =
           pb_buffer_write_data(test_itr->buffer, stream_buf, write_size);
 
@@ -331,9 +330,10 @@ int main(int argc, char **argv) {
       current_size = pb_buffer_get_data_size(test_itr->buffer);
       assert(current_size == (total_write_size - total_read_size));
 
-      if (!true) {
+      if (!use_direct) {
         readed =
           pb_buffer_read_data(test_itr->buffer, stream_buf, read_size);
+
         assert(readed == read_size);
 
         EVP_DigestUpdate(&test_itr->mdctx, stream_buf, read_size);
@@ -441,7 +441,7 @@ int main(int argc, char **argv) {
     test_itr = test_itr->next;
   }
 
-  printf("Total bytes transferred: %ld Bytes (%ldb/s)",
+  printf("Total bytes transferred: %ld Bytes (%ldb/s)\n",
     (total_read_size * test_case_count),
     (total_read_size * test_case_count * 8) / end_time.tv_sec);
 

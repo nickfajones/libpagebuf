@@ -584,7 +584,7 @@ bool pb_page_list_dup(
       return false;
 
     if (off > 0) {
-      list->tail->base = (char*)itr->base + off;
+      list->tail->base = (char*)list->tail->base + off;
       list->tail->len -= off;
 
       off = 0;
@@ -739,6 +739,10 @@ uint64_t pb_buffer_reserve(struct pb_buffer *buffer, uint64_t len) {
 uint64_t pb_buffer_push(struct pb_buffer *buffer, uint64_t len) {
   uint64_t pushed =
     pb_page_list_write_page_list(&buffer->data_list, &buffer->write_list, len);
+  uint64_t seeked = pb_page_list_seek(&buffer->write_list, len);
+  if (seeked != pushed) {
+    pb_page_list_clear(&buffer->write_list);
+  }
 
   buffer->is_data_dirty = true;
 
