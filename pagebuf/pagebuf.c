@@ -182,7 +182,7 @@ struct pb_page *pb_page_clone(const struct pb_page *src_page) {
   page->data = pb_data_clone(src_page->data);
   if (!page->data) {
     free(page);
-    
+
     return NULL;
   }
 
@@ -733,7 +733,7 @@ uint64_t pb_buffer_reserve(struct pb_buffer *buffer, uint64_t len) {
   return
     capacity +
     pb_page_list_reserve(
-      &buffer->write_list, buffer->reserve_max_page_len, len - capacity);
+      &buffer->write_list, len - capacity, buffer->reserve_max_page_len);
 }
 
 uint64_t pb_buffer_push(struct pb_buffer *buffer, uint64_t len) {

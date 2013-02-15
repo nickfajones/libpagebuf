@@ -6,8 +6,8 @@ library_includedir = $(includedir)/$(GENERIC_LIBRARY_NAME)
 library_include_HEADERS = $(h_sources)
 
 INCLUDES = -I$(top_srcdir)
-AM_CFLAGS = -D_GNU_SOURCE -Wall -Wextra -std=gnu99 -pedantic \
-  -Wextra -Wno-missing-field-initializers -Wshadow -Wpointer-arith \
+AM_CFLAGS = -D_GNU_SOURCE -Wall -Werror -Wextra -pedantic \
+  -std=gnu99 -Wno-missing-field-initializers -Wshadow -Wpointer-arith \
   -Wstrict-prototypes -Wmissing-prototypes -Wno-unused-parameter
 
 noinst_LTLIBRARIES = libpagebuf-c.la

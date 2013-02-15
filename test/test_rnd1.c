@@ -16,6 +16,7 @@
 
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/time.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <fcntl.h>
@@ -62,7 +63,7 @@ close_fd:
  */
 void generate_stream_source_buf(char *source_buf, size_t source_buf_size) {
   for (size_t counter = 0; counter < source_buf_size; ++counter) {
-    source_buf[counter] = random();
+    source_buf[counter] = 'a' + (random() % 26);
   }
 }
 
@@ -90,7 +91,8 @@ struct test_case {
 
   EVP_MD_CTX mdctx;
 
-  bool use_direct;
+  unsigned char digest[EVP_MAX_MD_SIZE];
+  unsigned int digest_len;
 };
 
 struct test_case *test_case_create(void) {
@@ -107,7 +109,10 @@ struct test_case *test_case_create(void) {
   EVP_MD_CTX_init(&test_case->mdctx);
   EVP_DigestInit_ex(&test_case->mdctx, EVP_md5(), NULL);
 
-  test_case->use_direct = false;
+  memset(test_case->digest, 0, EVP_MAX_MD_SIZE);
+  test_case->digest_len = 0;
+
+  return test_case;
 }
 
 void test_cases_destroy(struct test_case *test_cases) {
@@ -131,6 +136,9 @@ void test_cases_destroy(struct test_case *test_cases) {
 
     EVP_MD_CTX_cleanup(&test_case->mdctx);
 
+    memset(test_case->digest, 0, EVP_MAX_MD_SIZE);
+    test_case->digest_len = 0;
+
     free(test_case);
   }
 }
@@ -138,82 +146,17 @@ void test_cases_destroy(struct test_case *test_cases) {
 struct test_case *test_cases_init(void) {
   struct test_case *test_head;
   struct test_case **test_case = &test_head;
-  
+
   (*test_case) = test_case_create();
   if (!*test_case)
     return NULL;
 
   (*test_case)->buffer = pb_buffer_create();
-  (*test_case)->description = strdup("Standard pb_buffer, read/write interface");
-
-  test_case = &(*test_case)->next;
-
-  (*test_case) = test_case_create();
-  if (!*test_case) {
-    test_cases_destroy(test_head);
-
-    return NULL;
-  }
-
-  (*test_case)->buffer = pb_buffer_create();
-  (*test_case)->description = strdup("Standard pb_buffer, direct interface");
-  (*test_case)->use_direct = true;
+  (*test_case)->description = strdup("Standard heap sourced pb_buffer");
 
   test_case = &(*test_case)->next;
 
   return test_head;
-}
-
-bool test_case_write(struct test_case *test_case, void *buf, uint64_t len) {
-  if (!test_case->use_direct) {
-    assert(pb_buffer_write_data(test_case->buffer, buf, len) == len);
-  } else {
-    uint64_t written = 0;
-    struct pb_iterator iterator;
-
-    assert(pb_buffer_reserve(test_case->buffer, len) == len);
-
-    pb_buffer_get_write_iterator(test_case->buffer, &iterator);
-
-    while (pb_iterator_is_valid(&iterator)) {
-      const struct pb_vec *write_vec = pb_iterator_get_vec(&iterator);
-
-      memcpy(write_vec->base, buf + written, write_vec->len);
-
-      written += write_vec->len;
-
-      pb_iterator_next(&iterator);
-    }
-
-    assert(written == len);
-
-    assert(pb_buffer_push(test_case->buffer, len) == len);
-  }
-}
-
-bool test_case_read(struct test_case *test_case, void *buf, uint64_t len) {
-  if (!test_case->use_direct) {
-    assert(pb_buffer_read_data(test_case->buffer, buf, len) == len);
-  } else {
-    uint64_t readed = 0;
-    struct pb_iterator iterator;
-
-    pb_buffer_get_data_iterator(test_case->buffer, &iterator);
-
-    while (pb_iterator_is_valid(&iterator)) {
-      const struct pb_vec *read_vec = pb_iterator_get_vec(&iterator);
-
-      memcpy(buf + readed, read_vec->base, read_vec->len);
-
-      readed += read_vec->len;
-
-      pb_iterator_next(&iterator);
-    }
-
-    assert(readed == len);
-
-    assert(pb_buffer_seek(test_case->buffer, len) == len);
-  }
 }
 
 
@@ -236,10 +179,19 @@ int main(int argc, char **argv) {
   uint64_t total_write_size = 0;
   uint64_t total_read_size = 0;
 
+  struct timeval start_time;
+  struct timeval end_time;
+
   struct test_case *test_cases = NULL;
   struct test_case *test_itr = NULL;
+  size_t test_case_count = 0;
 
   EVP_MD_CTX control_mdctx;
+
+  unsigned char control_digest[EVP_MAX_MD_SIZE];
+  unsigned int control_digest_len = 0;
+
+  int retval = 0;
 
   while ((opt = getopt(argc, argv, "s:")) != -1) {
     switch (opt) {
@@ -258,11 +210,11 @@ int main(int argc, char **argv) {
       return -1;
 
     printf("Using generated prng seed: '%d'\n", seed);
+  } else {
+    seed %= UINT16_MAX;
+
+    printf("Using prng seed: '%d'\n", seed);
   }
-
-  seed %= UINT16_MAX;
-
-  printf("Using prng seed: '%d'\n", seed);
 
   srandom(seed);
 
@@ -282,13 +234,23 @@ int main(int argc, char **argv) {
   test_cases = test_cases_init();
   if (!test_cases) {
     printf("Error creating test cases\n");
-    
+
     return -1;
   }
 
+  test_itr = test_cases;
+  while (test_itr) {
+    ++test_case_count;
+    test_itr = test_itr->next;
+  }
+
+  gettimeofday(&start_time, NULL);
+
+  iterations_limit = 2;
   while (iterations < iterations_limit) {
     size_t write_size;
     size_t read_size;
+    bool use_direct;
 
     printf("\riteration: '%d'          ", iterations + 1);
 
@@ -301,14 +263,48 @@ int main(int argc, char **argv) {
 
     read_stream(stream_source_buf, STREAM_BUF_SIZE, stream_buf, write_size);
 
+    EVP_DigestUpdate(&control_mdctx, stream_buf, write_size);
+
+    use_direct = (random() & 0x1);
+
     test_itr = test_cases;
     while (test_itr) {
       uint64_t current_size;
-      
-      current_size = pb_buffer_get_data_size(test_itr->buffer);
-      assert(current_size != (total_write_size - total_read_size));
+      uint64_t written = 0;
 
-      test_case_write(test_itr, stream_buf, write_size);
+      current_size = pb_buffer_get_data_size(test_itr->buffer);
+      assert(current_size == (total_write_size - total_read_size));
+
+      if (!true) {
+        written =
+          pb_buffer_write_data(test_itr->buffer, stream_buf, write_size);
+
+        assert(written == write_size);
+      } else {
+        uint64_t len;
+        struct pb_iterator iterator;
+
+        len = pb_buffer_reserve(test_itr->buffer, write_size);
+        assert(len == write_size);
+
+        pb_buffer_get_write_iterator(test_itr->buffer, &iterator);
+
+        while ((len > 0) && pb_iterator_is_valid(&iterator)) {
+          const struct pb_vec *write_vec = pb_iterator_get_vec(&iterator);
+          size_t to_write = (len < write_vec->len) ? len : write_vec->len;
+
+          memcpy(write_vec->base, stream_buf + written, to_write);
+
+          written += to_write;
+          len -= to_write;
+
+          pb_iterator_next(&iterator);
+        }
+
+        assert(written == write_size);
+
+        assert(pb_buffer_push(test_itr->buffer, write_size) == write_size);
+      }
 
       current_size = pb_buffer_get_data_size(test_itr->buffer);
       assert(current_size == ((total_write_size + write_size) - total_read_size));
@@ -325,14 +321,44 @@ int main(int argc, char **argv) {
       stream_buf_size = read_size;
     }
 
+    use_direct = (random() & 0x1);
+
     test_itr = test_cases;
     while (test_itr) {
       uint64_t current_size;
+      uint64_t readed = 0;
 
       current_size = pb_buffer_get_data_size(test_itr->buffer);
       assert(current_size == (total_write_size - total_read_size));
 
-      test_case_read(test_itr, stream_buf, read_size);
+      if (!true) {
+        readed =
+          pb_buffer_read_data(test_itr->buffer, stream_buf, read_size);
+        assert(readed == read_size);
+
+        EVP_DigestUpdate(&test_itr->mdctx, stream_buf, read_size);
+      } else {
+        uint64_t len = read_size;
+        struct pb_iterator iterator;
+
+        pb_buffer_get_data_iterator(test_itr->buffer, &iterator);
+
+        while ((len > 0) && pb_iterator_is_valid(&iterator)) {
+          const struct pb_vec *read_vec = pb_iterator_get_vec(&iterator);
+          size_t to_read = (len < read_vec->len) ? len : read_vec->len;
+
+          EVP_DigestUpdate(&test_itr->mdctx, read_vec->base, to_read);
+
+          readed += to_read;
+          len -= to_read;
+
+          pb_iterator_next(&iterator);
+        }
+
+        assert(readed == read_size);
+      }
+
+      assert(pb_buffer_seek(test_itr->buffer, read_size) == read_size);
 
       current_size = pb_buffer_get_data_size(test_itr->buffer);
       assert(current_size == (total_write_size - (total_read_size + read_size)));
@@ -344,6 +370,80 @@ int main(int argc, char **argv) {
 
     ++iterations;
   }
+
+  test_itr = test_cases;
+  while (test_itr) {
+    uint64_t current_size;
+    uint64_t readed = 0;
+    struct pb_iterator iterator;
+
+    current_size = pb_buffer_get_data_size(test_itr->buffer);
+    assert(current_size == (total_write_size - total_read_size));
+
+    pb_buffer_get_data_iterator(test_itr->buffer, &iterator);
+
+    while (pb_iterator_is_valid(&iterator)) {
+      const struct pb_vec *read_vec = pb_iterator_get_vec(&iterator);
+
+      EVP_DigestUpdate(&test_itr->mdctx, read_vec->base, read_vec->len);
+
+      readed += read_vec->len;
+
+      pb_iterator_next(&iterator);
+    }
+
+    EVP_DigestFinal_ex(
+      &test_itr->mdctx, test_itr->digest, &test_itr->digest_len);
+
+    assert(readed == (total_write_size - total_read_size));
+
+    assert(
+      pb_buffer_seek(test_itr->buffer, readed) ==
+        (total_write_size - total_read_size));
+
+    current_size = pb_buffer_get_data_size(test_itr->buffer);
+    assert(current_size == 0);
+
+    test_itr = test_itr->next;
+  }
+
+  total_read_size = total_write_size;
+
+  gettimeofday(&end_time, NULL);
+  end_time.tv_sec -= start_time.tv_sec;
+  if (end_time.tv_sec == 0)
+    end_time.tv_sec = 1;
+
+  EVP_DigestFinal_ex(&control_mdctx, control_digest, &control_digest_len);
+
+  printf("\nControl digest: ");
+  for (unsigned int i = 0; i < control_digest_len; i++)
+    {
+    printf("%02x", control_digest[i]);
+    }
+  printf("\n");
+
+  test_itr = test_cases;
+  while (test_itr) {
+    bool digest_match =
+      (memcmp(control_digest, test_itr->digest, control_digest_len) == 0);
+
+    printf("Test digest: '%s': ", test_itr->description);
+    for (unsigned int i = 0; i < test_itr->digest_len; i++)
+      {
+      printf("%02x", test_itr->digest[i]);
+      }
+    printf(" ...%s\n", (digest_match) ? "OK" : "ERROR");
+
+    if (!digest_match)
+      retval = -1;
+
+    test_itr = test_itr->next;
+  }
+
+  printf("Total bytes transferred: %ld Bytes (%ldb/s)",
+    (total_read_size * test_case_count),
+    (total_read_size * test_case_count * 8) / end_time.tv_sec);
 
   test_cases_destroy(test_cases);
   test_cases = NULL;
@@ -357,6 +457,6 @@ int main(int argc, char **argv) {
   free(stream_source_buf);
   stream_source_buf = NULL;
 
-  return 0;
+  return retval;
 }
 

@@ -56,20 +56,14 @@ AM_INIT_AUTOMAKE($PACKAGE, $VERSION, no-define)
 
 AC_CONFIG_MACRO_DIR([m4])
 
-AC_ARG_ENABLE(debug,   [  --enable-debug    Enable debug mode], [ enable_debug=yes ])
-if test "$enable_debug" = "yes"; then
-    CFLAGS="${CFLAGS} -DHTP_DEBUG"
-    echo "Debug mode enabled"
-fi
-
 OPTFLAGS="-O2 -g"
 
-AC_ARG_ENABLE(devmode, [  --enable-devmode  Enable development mode], [ enable_devmode=yes ])
-if test "$enable_devmode" = "yes"; then
+AC_ARG_ENABLE(debug,   [  --enable-debug    Enable debug mode], [ enable_debug=yes ])
+if test "$enable_debug" = "yes"; then
     OPTFLAGS="-O0 -g3"
     CFLAGS="${CFLAGS} -Werror -Wfatal-errors"
     CPPFLAGS="${CPPFLAGS} -Werror -Wfatal-errors"
-    echo "Development mode enabled"
+    echo "Debug mode enabled"
 fi
 
 CFLAGS="${CFLAGS} ${OPTFLAGS}"
