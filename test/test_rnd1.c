@@ -181,6 +181,7 @@ int main(int argc, char **argv) {
 
   struct timeval start_time;
   struct timeval end_time;
+  uint64_t millisecs;
 
   struct test_case *test_cases = NULL;
   struct test_case *test_itr = NULL;
@@ -250,8 +251,6 @@ int main(int argc, char **argv) {
     size_t write_size;
     size_t read_size;
     bool use_direct;
-
-    printf("\riteration: '%d'          ", iterations + 1);
 
     write_size = 64 + (random() % (4 * 1024));
     if (write_size > stream_buf_size) {
@@ -410,13 +409,14 @@ int main(int argc, char **argv) {
   total_read_size = total_write_size;
 
   gettimeofday(&end_time, NULL);
-  end_time.tv_sec -= start_time.tv_sec;
-  if (end_time.tv_sec == 0)
-    end_time.tv_sec = 1;
+  millisecs =
+    ((end_time.tv_sec - start_time.tv_sec) * 1000000) -
+    start_time.tv_usec +
+    end_time.tv_usec;
 
   EVP_DigestFinal_ex(&control_mdctx, control_digest, &control_digest_len);
 
-  printf("\nControl digest: ");
+  printf("Done...\nControl digest: ");
   for (unsigned int i = 0; i < control_digest_len; i++)
     {
     printf("%02x", control_digest[i]);
@@ -433,7 +433,7 @@ int main(int argc, char **argv) {
       {
       printf("%02x", test_itr->digest[i]);
       }
-    printf(" ...%s\n", (digest_match) ? "OK" : "ERROR");
+    printf(" ... %s\n", (digest_match) ? "OK" : "ERROR");
 
     if (!digest_match)
       retval = -1;
@@ -441,9 +441,9 @@ int main(int argc, char **argv) {
     test_itr = test_itr->next;
   }
 
-  printf("Total bytes transferred: %ld Bytes (%ldb/s)\n",
+  printf("Total bytes transferred: %ld Bytes (%ld bps)\n",
     (total_read_size * test_case_count),
-    (total_read_size * test_case_count * 8) / end_time.tv_sec);
+    (total_read_size * test_case_count * 8 * 1000000) / millisecs);
 
   test_cases_destroy(test_cases);
   test_cases = NULL;
