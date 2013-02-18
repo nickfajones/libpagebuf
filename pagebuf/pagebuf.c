@@ -297,10 +297,22 @@ bool pb_page_list_append_page_clone(
 uint64_t pb_page_list_reserve(
     struct pb_page_list *list, uint64_t len, uint16_t max_page_len) {
   uint64_t reserved = 0;
+  void *bytes;
+  struct pb_data *root_data;
+
+  bytes = malloc(len);
+  if (!bytes)
+    return reserved;
+
+  root_data = pb_data_create(bytes, 0);
+  if (!root_data) {
+    free(bytes);
+
+    return reserved;
+  }
 
   while (len > 0) {
     uint16_t to_reserve;
-    void *bytes;
     struct pb_data *data;
     bool append_result;
 
@@ -309,16 +321,9 @@ uint64_t pb_page_list_reserve(
       ((max_page_len != 0) && (max_page_len < to_reserve)) ?
         max_page_len : to_reserve;
 
-    bytes = malloc(to_reserve);
-    if (!bytes)
+    data = pb_data_create_data_ref(root_data, reserved, to_reserve);
+    if (!data)
       break;
-
-    data = pb_data_create(bytes, to_reserve);
-    if (!data) {
-      free(bytes);
-
-      break;
-    }
 
     append_result = pb_page_list_append_data(list, data);
     pb_data_put(data);
@@ -329,51 +334,39 @@ uint64_t pb_page_list_reserve(
     len -= to_reserve;
   }
 
+  pb_data_put(root_data);
+
   return reserved;
 }
 
 /*******************************************************************************
  */
 uint64_t pb_page_list_write_data(
-    struct pb_page_list *list, const void *buf, uint64_t len) {
+    struct pb_page_list *list, const void *buf, uint64_t len,
+    uint16_t max_page_len) {
   uint64_t written = 0;
-  void *bytes;
-  struct pb_data *root_data;
+  uint64_t reserved = 0;
+  struct pb_page_list temp_list;
+  struct pb_page *itr;
 
-  bytes = malloc(len);
-  if (!bytes)
-    return written;
+  temp_list.head = NULL;
+  temp_list.tail = NULL;
 
-  memcpy(bytes, buf, len);
+  reserved = pb_page_list_reserve(&temp_list, len, max_page_len);
+  itr = temp_list.head;
 
-  root_data = pb_data_create(bytes, 0);
-  if (!root_data) {
-    free(bytes);
+  while ((len > 0) && (itr)) {
+    uint16_t to_write = (len < itr->len) ? len : itr->len;
 
-    return written;
-  }
-
-  while (len > 0) {
-    uint16_t to_write = (len < UINT16_MAX) ? len : UINT16_MAX;
-    struct pb_data *data;
-    bool append_result;
-
-    data = pb_data_create_data_ref(root_data, written, to_write);
-    if (!data)
-      break;
-
-    append_result = pb_page_list_append_data(list, data);
-    pb_data_put(data);
-    if (!append_result)
-      break;
+    memcpy(itr->base, (char*)buf + written, to_write);
 
     written += to_write;
     len -= to_write;
+
+    itr = itr->next;
   }
 
-  pb_data_put(root_data);
-
-  return written;
+  return pb_page_list_push_page_list(list, &temp_list, reserved);
 }
 
 uint64_t pb_page_list_write_data_ref(
@@ -760,7 +753,9 @@ uint64_t pb_buffer_push(struct pb_buffer *buffer, uint64_t len) {
  */
 uint64_t pb_buffer_write_data(
     struct pb_buffer *buffer, const void *buf, uint64_t len) {
-  uint64_t written = pb_page_list_write_data(&buffer->data_list, buf, len);
+  uint64_t written =
+    pb_page_list_write_data(
+      &buffer->data_list, buf, len, buffer->reserve_max_page_len);
 
   buffer->is_data_dirty = true;
 

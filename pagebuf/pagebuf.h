@@ -225,7 +225,8 @@ uint64_t pb_page_list_reserve(
  * Internal functions that write data to a pb_page_list from various sources
  */
 uint64_t pb_page_list_write_data(
-  struct pb_page_list *list, const void *buf, uint64_t len);
+  struct pb_page_list *list, const void *buf, uint64_t len,
+  uint16_t max_page_len);
 uint64_t pb_page_list_write_data_ref(
   struct pb_page_list *list, const void *buf, uint64_t len);
 uint64_t pb_page_list_write_page_list(
