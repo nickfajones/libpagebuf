@@ -208,6 +208,8 @@ bool pb_page_list_prepend_data(
   struct pb_page_list *list, struct pb_data *data);
 bool pb_page_list_append_data(
   struct pb_page_list *list, struct pb_data *data);
+bool pb_page_list_append_page(
+  struct pb_page_list *list, struct pb_page *page);
 bool pb_page_list_append_page_copy(
   struct pb_page_list *list, const struct pb_page *page);
 bool pb_page_list_append_page_clone(
@@ -233,6 +235,9 @@ uint64_t pb_page_list_write_page_list(
 /**
  * Internal functions that manipulate the starting and ending points of a list
  */
+uint64_t pb_page_list_push_page_list(
+  struct pb_page_list *list, struct pb_page_list *src_list,
+  uint64_t len);
 uint64_t pb_page_list_seek(struct pb_page_list *list, uint64_t len);
 uint64_t pb_page_list_trim(struct pb_page_list *list, uint64_t len);
 uint64_t pb_page_list_rewind(struct pb_page_list *list, uint64_t len);

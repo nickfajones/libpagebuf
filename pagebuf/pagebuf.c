@@ -246,18 +246,7 @@ bool pb_page_list_prepend_data(
   if (!page)
     return false;
 
-  if (list->head == NULL) {
-    list->head = page;
-    list->tail = page;
-
-    return true;
-  }
-
-  list->head->prev = page;
-  page->next = list->head;
-  list->head = page;
-
-  return true;
+  return pb_page_list_append_page(list, page);
 }
 
 bool pb_page_list_append_data(
@@ -266,6 +255,11 @@ bool pb_page_list_append_data(
   if (!page)
     return false;
 
+  return pb_page_list_append_page(list, page);
+}
+
+bool pb_page_list_append_page(
+    struct pb_page_list *list, struct pb_page *page) {
   if (list->head == NULL) {
     list->head = page;
     list->tail = page;
@@ -286,18 +280,7 @@ bool pb_page_list_append_page_copy(
   if (!page)
     return false;
 
-  if (list->head == NULL) {
-    list->head = page;
-    list->tail = page;
-
-    return true;
-  }
-
-  list->tail->next = page;
-  page->prev = list->tail;
-  list->tail = page;
-
-  return true;
+  return pb_page_list_append_page(list, page);
 }
 
 bool pb_page_list_append_page_clone(
@@ -306,18 +289,7 @@ bool pb_page_list_append_page_clone(
   if (!page)
     return false;
 
-  if (list->head == NULL) {
-    list->head = page;
-    list->tail = page;
-
-    return true;
-  }
-
-  list->tail->next = page;
-  page->prev = list->tail;
-  list->tail = page;
-
-  return true;
+  return pb_page_list_append_page(list, page);
 }
 
 /*******************************************************************************
@@ -449,6 +421,45 @@ uint64_t pb_page_list_write_page_list(struct pb_page_list *list,
   }
 
   return written;
+}
+
+/*******************************************************************************
+ */
+uint64_t pb_page_list_push_page_list(struct pb_page_list *list,
+    struct pb_page_list *src_list, uint64_t len) {
+  uint64_t pushed = 0;
+  struct pb_page *itr = src_list->head;
+
+  while ((len > 0) && (itr)) {
+    if (len >= itr->len) {
+      if (!pb_page_list_append_page(list, itr))
+        break;
+
+      src_list->head = itr->next;
+      if (src_list->head)
+        src_list->head->prev = NULL;
+      else
+        src_list->tail = NULL;
+
+      pushed += itr->len;
+      len -= itr->len;
+
+      itr = src_list->head;
+    } else {
+      if (!pb_page_list_append_page_copy(list, itr))
+        break;
+
+      list->tail->len = len;
+
+      itr->base = (char*)itr->base + len;
+      itr->len -= len;
+
+      pushed += len;
+      len = 0;
+    }
+  }
+
+  return pushed;
 }
 
 /*******************************************************************************
@@ -738,11 +749,7 @@ uint64_t pb_buffer_reserve(struct pb_buffer *buffer, uint64_t len) {
 
 uint64_t pb_buffer_push(struct pb_buffer *buffer, uint64_t len) {
   uint64_t pushed =
-    pb_page_list_write_page_list(&buffer->data_list, &buffer->write_list, len);
-  uint64_t seeked = pb_page_list_seek(&buffer->write_list, len);
-  if (seeked != pushed) {
-    pb_page_list_clear(&buffer->write_list);
-  }
+    pb_page_list_push_page_list(&buffer->data_list, &buffer->write_list, len);
 
   buffer->is_data_dirty = true;
 
