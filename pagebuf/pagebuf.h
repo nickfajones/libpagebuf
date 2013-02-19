@@ -206,10 +206,14 @@ uint64_t pb_page_list_get_size(const struct pb_page_list *list);
  */
 bool pb_page_list_prepend_data(
   struct pb_page_list *list, struct pb_data *data);
+void pb_page_list_prepend_page(
+  struct pb_page_list *list, struct pb_page *page);
+
 bool pb_page_list_append_data(
   struct pb_page_list *list, struct pb_data *data);
-bool pb_page_list_append_page(
+void pb_page_list_append_page(
   struct pb_page_list *list, struct pb_page *page);
+
 bool pb_page_list_append_page_copy(
   struct pb_page_list *list, const struct pb_page *page);
 bool pb_page_list_append_page_clone(
@@ -256,6 +260,13 @@ bool pb_page_list_dup(
   struct pb_page_list *list, const struct pb_page_list* src_list,
   uint64_t off, uint64_t len);
 
+/**
+ * Internal function that inserts one list into another.
+ */
+uint64_t pb_page_list_insert_page_list(
+  struct pb_page_list *list, uint64_t off,
+  struct pb_page_list *src_list, uint64_t src_off,
+  uint64_t len);
 
 
 /**
@@ -462,6 +473,13 @@ struct pb_buffer *pb_buffer_dup_trim(
 struct pb_buffer *pb_buffer_dup_sub(
   struct pb_buffer *src_buffer, uint64_t off, uint64_t len);
 
+/**
+ * Insert
+ */
+uint64_t pb_buffer_insert_buf(
+  struct pb_buffer *buffer, uint64_t off,
+  struct pb_buffer *src_buffer, uint64_t src_off,
+  uint64_t len);
 
 #ifdef __CPLUSPLUS
 }; // extern "C"

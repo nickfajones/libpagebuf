@@ -246,7 +246,26 @@ bool pb_page_list_prepend_data(
   if (!page)
     return false;
 
-  return pb_page_list_append_page(list, page);
+  pb_page_list_prepend_page(list, page);
+
+  return true;
+}
+
+void pb_page_list_prepend_page(
+    struct pb_page_list *list, struct pb_page *page) {
+  if (list->head == NULL) {
+    list->head = page;
+    list->tail = page;
+
+    return;
+  }
+
+  page->prev = list->head->prev; // sneakily use this append as an insert
+  page->next = list->head;
+  if (list->head->prev)
+    list->head->prev->next = page; // don't forget the prev before the head ;-)
+  list->head->prev = page;
+  list->head = page;
 }
 
 bool pb_page_list_append_data(
@@ -255,23 +274,26 @@ bool pb_page_list_append_data(
   if (!page)
     return false;
 
-  return pb_page_list_append_page(list, page);
+  pb_page_list_append_page(list, page);
+
+  return true;
 }
 
-bool pb_page_list_append_page(
+void pb_page_list_append_page(
     struct pb_page_list *list, struct pb_page *page) {
   if (list->head == NULL) {
     list->head = page;
     list->tail = page;
 
-    return true;
+    return;
   }
 
-  list->tail->next = page;
+  page->next = list->tail->next; // sneakily use this append as an insert
   page->prev = list->tail;
+  if (list->tail->next)
+    list->tail->next->prev = page; // don't forget the next after the tail ;-)
+  list->tail->next = page;
   list->tail = page;
-
-  return true;
 }
 
 bool pb_page_list_append_page_copy(
@@ -280,7 +302,9 @@ bool pb_page_list_append_page_copy(
   if (!page)
     return false;
 
-  return pb_page_list_append_page(list, page);
+  pb_page_list_append_page(list, page);
+
+  return true;
 }
 
 bool pb_page_list_append_page_clone(
@@ -289,7 +313,9 @@ bool pb_page_list_append_page_clone(
   if (!page)
     return false;
 
-  return pb_page_list_append_page(list, page);
+  pb_page_list_append_page(list, page);
+
+  return true;
 }
 
 /*******************************************************************************
@@ -425,8 +451,7 @@ uint64_t pb_page_list_push_page_list(struct pb_page_list *list,
 
   while ((len > 0) && (itr)) {
     if (len >= itr->len) {
-      if (!pb_page_list_append_page(list, itr))
-        break;
+      pb_page_list_append_page(list, itr);
 
       src_list->head = itr->next;
       if (src_list->head)
@@ -604,6 +629,98 @@ bool pb_page_list_dup(
   }
 
   return true;
+}
+
+
+uint64_t pb_page_list_insert_page_list(
+    struct pb_page_list *list, uint64_t off,
+    struct pb_page_list *src_list, uint64_t src_off,
+    uint64_t len) {
+  uint64_t inserted = 0;
+  struct pb_page *itr;
+  struct pb_page *new_page;
+  struct pb_page *src_itr;
+  struct pb_page temp_page;
+  struct pb_page_list temp_list;
+
+  itr = list->head;
+  
+  while ((off > 0) && (itr)) {
+    if (off < itr->len)
+      break;
+
+    off -= itr->len;
+
+    itr = itr->next;
+  }
+
+  if ((off == 0) && (!itr))
+    // offset set beyond end of list, don't insert anything
+    return inserted;
+
+  if ((off != 0) && (itr)) {
+    // offset falls in the middle of a page, split it
+    new_page = pb_page_copy(itr);
+    if (!new_page)
+      return inserted;
+
+    itr->len = off;
+
+    new_page->base = (char*)new_page->base + off;
+    new_page->len -= off;
+
+    temp_list.head = itr;
+    temp_list.tail = itr;
+
+    pb_page_list_append_page(&temp_list, new_page);
+
+    // reset temp_list.tail back to itr for following insertion
+    temp_list.tail = itr;
+  } else if ((off == 0) && (itr)) {
+    // insert directly in front of a page, use a temp page in case itr is first
+    temp_page.next = itr;
+
+    temp_list.head = &temp_page;
+    temp_list.tail = &temp_page;
+  } else {
+    // offset was exactly to the end of the list, append
+    temp_list.head = list->head;
+    temp_list.tail = list->tail;
+  }
+
+  src_itr = src_list->head;
+
+  while ((src_off > 0) && (src_itr)) {
+    if (src_off < src_itr->len)
+      break;
+
+    src_off -= src_itr->len;
+
+    src_itr = src_itr->next;
+  }
+
+  while ((len > 0) && (src_itr)) {
+    if (!pb_page_list_append_page_copy(&temp_list, src_itr))
+      return inserted;
+
+    if (src_off > 0) {
+      temp_list.tail->base = (char*)temp_list.tail->base + src_off;
+      temp_list.tail->len -= src_off;
+
+      src_off = 0;
+    }
+
+    uint16_t to_insert = (len < temp_list.tail->len) ? len : temp_list.tail->len;
+
+    temp_list.tail->len = to_insert;
+
+    inserted += to_insert;
+    len -= to_insert;
+
+    src_itr = src_itr->next;
+  }
+
+  return inserted;
 }
 
 
@@ -881,5 +998,17 @@ struct pb_buffer *pb_buffer_dup_sub(
   }
 
   return buffer;
+}
+
+/*******************************************************************************
+ */
+uint64_t pb_buffer_insert_buf(
+    struct pb_buffer *buffer, uint64_t off,
+    struct pb_buffer *src_buffer, uint64_t src_off,
+    uint64_t len) {
+  return pb_page_list_insert_page_list(
+    &buffer->data_list, off,
+    &src_buffer->data_list, src_off,
+    len);
 }
 
