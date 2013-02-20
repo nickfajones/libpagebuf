@@ -173,7 +173,10 @@ int main(int argc, char **argv) {
   static char *stream_buf;
   static uint64_t stream_buf_size;
 
+  long val;
   uint32_t iterations_limit;
+  uint32_t iterations_min = 50000;
+  uint32_t iterations_range = 50000;
   uint32_t iterations = 0;
 
   uint64_t total_write_size = 0;
@@ -194,16 +197,26 @@ int main(int argc, char **argv) {
 
   int retval = 0;
 
-  while ((opt = getopt(argc, argv, "s:")) != -1) {
+  while ((opt = getopt(argc, argv, "i:r:s:")) != -1) {
     switch (opt) {
+      case 'i':
+        val = atol(optarg);
+        if (val > 0)
+          iterations_min = val;
+        break;
+      case 'r':
+        val = atol(optarg);
+        if (val > 0)
+          iterations_range = val;
+        break;
       case 's':
-        seed = atoi(optarg);
+        seed = atol(optarg);
         break;
       default:
-        printf("Usage: %s [-s seed]\n", argv[0]);
-        return -1;;
-      }
+        printf("Usage: %s [-i iterations_min] [-r iterations_max] [-s seed]\n", argv[0]);
+        return -1;
     }
+  }
 
   if (seed == (UINT16_MAX + 1)) {
     seed = generate_seed();
@@ -225,7 +238,7 @@ int main(int argc, char **argv) {
 
   generate_stream_source_buf(stream_source_buf, STREAM_BUF_SIZE);
 
-  iterations_limit = 50000 + (random() % 50000);
+  iterations_limit = iterations_min + (random() % iterations_range);
 
   printf("Iterations to run: %d\n", iterations_limit);
 

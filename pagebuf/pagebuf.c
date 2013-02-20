@@ -282,6 +282,8 @@ bool pb_page_list_append_data(
 void pb_page_list_append_page(
     struct pb_page_list *list, struct pb_page *page) {
   if (list->head == NULL) {
+    page->next = NULL;
+    page->prev = NULL;
     list->head = page;
     list->tail = page;
 
@@ -427,6 +429,7 @@ uint64_t pb_page_list_write_page_list(struct pb_page_list *list,
 
   while ((len > 0) && (itr)) {
     uint16_t to_write = (len < itr->len) ? len : itr->len;
+    struct pb_page *itr_next = itr->next;
 
     if (!pb_page_list_append_page_copy(list, itr))
       break;
@@ -436,7 +439,7 @@ uint64_t pb_page_list_write_page_list(struct pb_page_list *list,
     written += to_write;
     len -= to_write;
 
-    itr = itr->next;
+    itr = itr_next;
   }
 
   return written;
@@ -451,13 +454,14 @@ uint64_t pb_page_list_push_page_list(struct pb_page_list *list,
 
   while ((len > 0) && (itr)) {
     if (len >= itr->len) {
-      pb_page_list_append_page(list, itr);
-
+      // advance the src_list head first because pb_page_list_append changes itr
       src_list->head = itr->next;
       if (src_list->head)
         src_list->head->prev = NULL;
       else
         src_list->tail = NULL;
+
+      pb_page_list_append_page(list, itr);
 
       pushed += itr->len;
       len -= itr->len;
@@ -609,6 +613,8 @@ bool pb_page_list_dup(
   }
 
   while ((len > 0) && (itr)) {
+    struct pb_page *itr_next = itr->next;
+
     if (!pb_page_list_append_page_clone(list, itr))
       return false;
 
@@ -625,7 +631,7 @@ bool pb_page_list_dup(
 
     len -= to_retain;
 
-    itr = itr->next;
+    itr = itr_next;
   }
 
   return true;
@@ -644,7 +650,7 @@ uint64_t pb_page_list_insert_page_list(
   struct pb_page_list temp_list;
 
   itr = list->head;
-  
+
   while ((off > 0) && (itr)) {
     if (off < itr->len)
       break;
@@ -700,6 +706,8 @@ uint64_t pb_page_list_insert_page_list(
   }
 
   while ((len > 0) && (src_itr)) {
+    struct pb_page *src_itr_next = src_itr->next;
+
     if (!pb_page_list_append_page_copy(&temp_list, src_itr))
       return inserted;
 
@@ -717,7 +725,7 @@ uint64_t pb_page_list_insert_page_list(
     inserted += to_insert;
     len -= to_insert;
 
-    src_itr = src_itr->next;
+    src_itr = src_itr_next;
   }
 
   return inserted;
