@@ -56,19 +56,6 @@ AM_INIT_AUTOMAKE($PACKAGE, $VERSION, no-define)
 
 AC_CONFIG_MACRO_DIR([m4])
 
-OPTFLAGS="-O2 -g"
-
-AC_ARG_ENABLE(debug,   [  --enable-debug    Enable debug mode], [ enable_debug=yes ])
-if test "$enable_debug" = "yes"; then
-    OPTFLAGS="-O0 -g3"
-    CFLAGS="${CFLAGS} -Werror -Wfatal-errors"
-    CPPFLAGS="${CPPFLAGS} -Werror -Wfatal-errors"
-    echo "Debug mode enabled"
-fi
-
-CFLAGS="${CFLAGS} ${OPTFLAGS}"
-CPPFLAGS="${CPPFLAGS} ${OPTFLAGS}"
-
 dnl -----------------------------------------------
 dnl Checks for programs.
 dnl -----------------------------------------------
@@ -77,6 +64,9 @@ AC_PROG_CC
 AC_PROG_CXX
 AM_PROG_LIBTOOL
 AM_SANITY_CHECK
+
+CFLAGS=""
+CXXFLAGS=""
 
 # Determine the OS 
 AC_MSG_CHECKING([OS])
@@ -130,7 +120,7 @@ CFLAGS="${CFLAGS} -fstack-protector"
 AC_TRY_COMPILE(,,[gcc_have_fstack_protector=yes],[gcc_have_fstack_protector=no])
 AC_MSG_RESULT($gcc_have_fstack_protector)
 if test "$gcc_have_fstack_protector" != "yes"; then
-    CFLAGS="${TMPCFLAGS}"  
+    CFLAGS="${TMPCFLAGS}"
 fi
 fi
 
@@ -159,6 +149,27 @@ if test "$gcc_have_format_security" != "yes"; then
 fi
 
 dnl -----------------------------------------------
+dnl Construct final compiler flag set
+dnl -----------------------------------------------
+AC_ARG_ENABLE(debug,   [  --enable-debug    Enable debug mode], [ enable_debug=yes ])
+if test "$enable_debug" = "yes"; then
+    OPTFLAGS="-O0 -g3"
+    COMMON_CFLAGS="-Wall -Werror -Wfatal-errors"
+    CONFIG_CFLAGS="${CFLAGS}"
+    CFLAGS="${COMMON_CFLAGS} ${OPTFLAGS} -std=gnu99 ${CONFIG_CFLAGS}"
+    CXXFLAGS="${COMMON_CFLAGS} ${OPTFLAGS} -std=gnu++0x ${CONFIG_CFLAGS} ${CXXFLAGS}"
+    CPPFLAGS="-D_GNU_SOURCE ${CPPFLAGS}"
+    echo "Debug mode enabled"
+else
+    OPTFLAGS="-O2 -g"
+    COMMON_CFLAGS="-Wall"
+    CONFIG_CFLAGS="${CFLAGS}"
+    CFLAGS="${COMMON_CFLAGS} ${OPTFLAGS} -std=gnu99 ${CONFIG_CFLAGS}"
+    CXXFLAGS="${COMMON_CFLAGS} ${OPTFLAGS} -std=gnu++0x ${CONFIG_CFLAGS} ${CXXFLAGS}"
+    CPPFLAGS="-D_GNU_SOURCE -DNDEBUG ${CPPFLAGS}"
+fi
+
+dnl -----------------------------------------------
 dnl Check for doxygen
 dnl -----------------------------------------------
 AC_ARG_WITH([doxygen],
@@ -184,3 +195,4 @@ AC_OUTPUT(Makefile \
           pagebuf/Makefile \
           test/Makefile
 )
+

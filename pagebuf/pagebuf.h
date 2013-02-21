@@ -23,7 +23,7 @@
 #include <stdbool.h>
 
 
-#ifdef __CPLUSPLUS
+#ifdef __cplusplus
 extern "C" {
 #endif
 
@@ -269,6 +269,7 @@ uint64_t pb_page_list_insert_page_list(
   uint64_t len);
 
 
+
 /**
  * A structure representing a data region for external consumption.
  */
@@ -481,7 +482,7 @@ uint64_t pb_buffer_insert_buf(
   struct pb_buffer *src_buffer, uint64_t src_off,
   uint64_t len);
 
-#ifdef __CPLUSPLUS
+#ifdef __cplusplus
 }; // extern "C"
 #endif
 
