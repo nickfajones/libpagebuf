@@ -180,6 +180,20 @@ void pb_page_destroy(struct pb_page *page);
 
 
 /**
+ * The callbacks that a pb_list instance can use to allocate and free memory.
+ *
+ * The value ops passed the the various functions is the ops instance itself,
+ * allowing a user to use the ops instance as a token for their specific
+ * allocate and free implementation.
+ */
+struct pb_list_mem_ops {
+  void *(*alloc_fn)(struct pb_list_mem_ops *ops, size_t size);
+  void  (*free_fn)(struct pb_list_mem_ops *ops, void *ptr);
+};
+
+
+
+/**
  * List of pb_page structures that represent scattered memory regions for
  * reading and writing
  *
@@ -189,6 +203,8 @@ void pb_page_destroy(struct pb_page *page);
 struct pb_page_list {
   struct pb_page *head;
   struct pb_page *tail;
+
+  struct pb_list_mem_ops *mem_ops;
 };
 
 /**
@@ -202,15 +218,17 @@ void pb_page_list_clear(struct pb_page_list *list);
 uint64_t pb_page_list_get_size(const struct pb_page_list *list);
 
 /**
- * Internal functions that add data to pb_page_list structures
+ * Internal functions that add data to pb_page_list structures.
+ *
+ * The pb_data instance will be
  */
 bool pb_page_list_prepend_data(
   struct pb_page_list *list, struct pb_data *data);
-void pb_page_list_prepend_page(
-  struct pb_page_list *list, struct pb_page *page);
-
 bool pb_page_list_append_data(
   struct pb_page_list *list, struct pb_data *data);
+
+void pb_page_list_prepend_page(
+  struct pb_page_list *list, struct pb_page *page);
 void pb_page_list_append_page(
   struct pb_page_list *list, struct pb_page *page);
 
@@ -374,6 +392,10 @@ struct pb_buffer {
  * Create a pb_buffer instance.
  */
 struct pb_buffer *pb_buffer_create(void);
+/**
+ * Create a pb_buffer instance, providing specific list mem ops.
+ */
+struct pb_buffer *pb_buffer_create_ops(struct pb_list_mem_ops *ops);
 /**
  * Destroy a pb_buffer instance.
  */

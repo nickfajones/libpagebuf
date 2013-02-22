@@ -210,6 +210,25 @@ void pb_page_destroy(struct pb_page *page) {
 
 /*******************************************************************************
  */
+static void *pb_list_default_alloc_fn(
+    struct pb_list_mem_ops *ops, size_t size) {
+  return malloc(size);
+}
+
+static void pb_list_default_free_fn(
+    struct pb_list_mem_ops *ops, void *ptr) {
+  free(ptr);
+}
+
+static struct pb_list_mem_ops pb_list_default_mem_ops = {
+  &pb_list_default_alloc_fn,
+  &pb_list_default_free_fn,
+};
+
+
+
+/*******************************************************************************
+ */
 void pb_page_list_clear(struct pb_page_list *list) {
   struct pb_page *itr = list->head;
 
@@ -251,6 +270,17 @@ bool pb_page_list_prepend_data(
   return true;
 }
 
+bool pb_page_list_append_data(
+    struct pb_page_list *list, struct pb_data *data) {
+  struct pb_page *page = pb_page_create(data);
+  if (!page)
+    return false;
+
+  pb_page_list_append_page(list, page);
+
+  return true;
+}
+
 void pb_page_list_prepend_page(
     struct pb_page_list *list, struct pb_page *page) {
   if (list->head == NULL) {
@@ -266,17 +296,6 @@ void pb_page_list_prepend_page(
     list->head->prev->next = page; // don't forget the prev before the head ;-)
   list->head->prev = page;
   list->head = page;
-}
-
-bool pb_page_list_append_data(
-    struct pb_page_list *list, struct pb_data *data) {
-  struct pb_page *page = pb_page_create(data);
-  if (!page)
-    return false;
-
-  pb_page_list_append_page(list, page);
-
-  return true;
 }
 
 void pb_page_list_append_page(
@@ -328,13 +347,13 @@ uint64_t pb_page_list_reserve(
   void *bytes;
   struct pb_data *root_data;
 
-  bytes = malloc(len);
+  bytes = (*list->mem_ops->alloc_fn)(list->mem_ops, len);
   if (!bytes)
     return reserved;
 
   root_data = pb_data_create(bytes, 0);
   if (!root_data) {
-    free(bytes);
+    (*list->mem_ops->free_fn)(list->mem_ops, bytes);
 
     return reserved;
   }
@@ -379,6 +398,7 @@ uint64_t pb_page_list_write_data(
 
   temp_list.head = NULL;
   temp_list.tail = NULL;
+  temp_list.mem_ops = list->mem_ops;
 
   reserved = pb_page_list_reserve(&temp_list, len, max_page_len);
   itr = temp_list.head;
@@ -552,13 +572,13 @@ uint64_t pb_page_list_rewind(struct pb_page_list *list, uint64_t len) {
     struct pb_data *data;
     bool prepend_result;
 
-    bytes = malloc(to_rewind);
+    bytes = (*list->mem_ops->alloc_fn)(list->mem_ops, to_rewind);
     if (!bytes)
       break;
 
     data = pb_data_create(bytes, to_rewind);
     if (!data) {
-      free(bytes);
+      (*list->mem_ops->free_fn)(list->mem_ops, bytes);
 
       break;
     }
@@ -663,6 +683,8 @@ uint64_t pb_page_list_insert_page_list(
   if ((off == 0) && (!itr))
     // offset set beyond end of list, don't insert anything
     return inserted;
+
+  temp_list.mem_ops = list->mem_ops;
 
   if ((off != 0) && (itr)) {
     // offset falls in the middle of a page, split it
@@ -783,7 +805,9 @@ const struct pb_vec *pb_iterator_get_vec(struct pb_iterator *iterator) {
 /*******************************************************************************
  */
 struct pb_buffer *pb_buffer_create() {
-  struct pb_buffer *buffer = malloc(sizeof(struct pb_buffer));
+  struct pb_buffer *buffer =
+    (*pb_list_default_mem_ops.alloc_fn)(
+      &pb_list_default_mem_ops, sizeof(struct pb_buffer));
   if (!buffer)
     return NULL;
 
@@ -792,6 +816,10 @@ struct pb_buffer *pb_buffer_create() {
   pb_buffer_clear(buffer);
 
   buffer->reserve_max_page_len = PB_BUFFER_DEFAULT_PAGE_SIZE;
+
+  buffer->data_list.mem_ops = &pb_list_default_mem_ops;
+  buffer->write_list.mem_ops = &pb_list_default_mem_ops;
+  buffer->retain_list.mem_ops = &pb_list_default_mem_ops;
 
   return buffer;
 }
@@ -803,7 +831,7 @@ void pb_buffer_destroy(struct pb_buffer *buffer) {
 
   buffer->reserve_max_page_len = 0;
 
-  free(buffer);
+  (*buffer->data_list.mem_ops->free_fn)(buffer->data_list.mem_ops, buffer);
 }
 
 /*******************************************************************************
