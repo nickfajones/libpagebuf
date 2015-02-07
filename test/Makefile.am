@@ -1,4 +1,4 @@
-LDADD = $(top_builddir)/pagebuf/.libs/libpagebuf.a -lssl
+LDADD = $(top_builddir)/pagebuf/.libs/libpagebuf.a -lcrypto
 AM_CPPFLAGS = -I$(top_srcdir)
 check_PROGRAMS = test_rnd1
 

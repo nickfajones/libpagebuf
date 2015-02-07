@@ -5,7 +5,7 @@ c_sources = pagebuf.c
 library_includedir = $(includedir)/$(GENERIC_LIBRARY_NAME)
 library_include_HEADERS = $(h_sources)
 
-INCLUDES = -I$(top_srcdir)
+AM_CPPFLAGS = -I$(top_srcdir)
 AM_CFLAGS = -Wno-missing-field-initializers -Wshadow -Wpointer-arith \
   -Wstrict-prototypes -Wmissing-prototypes -Wno-unused-parameter
 

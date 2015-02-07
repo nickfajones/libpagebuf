@@ -3,9 +3,10 @@ dnl ----------------------
 dnl Initialization macros
 dnl ----------------------
 
-AC_INIT(pagebuf/pagebuf.h)
-AM_CONFIG_HEADER(config.h)
+AC_INIT([libpagebuf], [0.1])
+AM_INIT_AUTOMAKE()
 
+AC_CONFIG_HEADERS([config.h])
 
 dnl -----------------------------------------------
 dnl Package name and version number (user defined)
@@ -52,7 +53,6 @@ AC_SUBST(GENERIC_RELEASE)
 
 VERSION=$GENERIC_VERSION
 
-AM_INIT_AUTOMAKE($PACKAGE, $VERSION, no-define)
 
 AC_CONFIG_MACRO_DIR([m4])
 
