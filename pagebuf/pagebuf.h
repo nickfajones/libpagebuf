@@ -210,6 +210,7 @@ struct pb_page *pb_page_create(struct pb_data *data,
  * pb_data instance.
  */
 struct pb_page *pb_page_transfer(const struct pb_page *src_page,
+                                 size_t len, size_t src_off,
                                  const struct pb_allocator *allocator);
 
 /** Clone an existing pb_page instance
@@ -217,8 +218,8 @@ struct pb_page *pb_page_transfer(const struct pb_page *src_page,
  * Duplicate the base and len values as well as a full clone of the referenced
  * pb_data instance.
  */
-struct pb_page *pb_page_clone(uint8_t * const buf, size_t len, size_t src_off,
-                              const struct pb_page *src_page,
+struct pb_page *pb_page_clone(const struct pb_page *src_page,
+                              uint8_t * const buf, size_t len, size_t src_off,
                               const struct pb_allocator *allocator);
 
 /** Destroy the pb_page instance.
@@ -279,7 +280,7 @@ struct pb_list_strategy {
    *                    packed into target fragments up to the target page_size
    *                    in size.
    */
-  bool fragment_as_source;
+  bool fragment_as_target;
 };
 
 /** Get a built in, trivial list strategy.
@@ -367,6 +368,10 @@ struct pb_list {
   /** Increments an iterator to the next pb_page in a list's internal chain. */
   void (*iterator_next)(struct pb_list * const list,
                         struct pb_list_iterator * const list_iterator);
+  /** Decrements an iterator to the previous pb_page in a list's internal
+   *  chain. */
+  void (*iterator_prev)(struct pb_list * const list,
+                        struct pb_list_iterator * const list_iterator);
 
   /** Write data from a memory region to the pb_list instance.
    *
@@ -416,7 +421,7 @@ struct pb_list {
   /** Destroy a pb_list. */
   void (*destroy)(struct pb_list * const list);
 
-  /** Return the strategy used by the pb_list instance. */
+  /** The strategy used by the pb_list instance. */
   const struct pb_list_strategy *strategy;
 
   const struct pb_allocator *allocator;
@@ -450,6 +455,8 @@ void pb_trivial_list_get_iterator(struct pb_list * const list,
                                   struct pb_list_iterator * const iterator);
 void pb_trivial_list_iterator_next(struct pb_list * const list,
                                    struct pb_list_iterator * const iterator);
+void pb_trivial_list_iterator_prev(struct pb_list * const list,
+                                   struct pb_list_iterator * const iterator);
 bool pb_trivial_list_iterator_end(struct pb_list * const list,
                                   struct pb_list_iterator * const iterator);
 
@@ -472,7 +479,7 @@ void pb_trivial_list_destroy(struct pb_list * const list);
  *
  * Through this interface, a
  */
-struct pb_list_reader {
+struct pb_data_reader {
   /** Read data from the pb_list instance, into a memory region.
    *
    * buf indicates the start of the target memory region.
@@ -482,55 +489,123 @@ struct pb_list_reader {
    *
    * Data is read from the head of the source pb_list.  The amount of data read
    * is the lower of the size of the source pb_list and the value of len.
+   *
+   * Following a data read, the data reader will retain the position of the
+   * end of the read, thus, a subsequent call to read_list will continue from
+   * where the last read left off.
+   *
+   * However, if the pb_list undergoes an operation that alters its data
+   * revision, a subsequent call to read_list will read from the beginning
    */
-  uint64_t (*read_list)(struct pb_list * const list,
-                        uint8_t * const buf,
-                        uint64_t len);
+  uint64_t (*read_list)(struct pb_data_reader * const data_reader,
+                        uint8_t * const buf, uint64_t len);
+
+
+  void (*reset_read)(struct pb_data_reader * const data_reader);
+
+  void (*destroy)(struct pb_data_reader * const data_reader);
+
+  struct pb_list *list;
+
+  const struct pb_allocator *allocator;
 };
 
+/** A trivial data reader implementation that reads data via iterators
+ */
+struct pb_data_reader *pb_trivial_data_reader_create(
+                                          struct pb_list * const list);
+struct pb_data_reader *pb_trivial_data_reader_create_with_alloc(
+                                          struct pb_list * const list,
+                                          const struct pb_allocator *allocator);
+
+uint64_t pb_trivial_data_reader_read_list(
+                                     struct pb_data_reader * const data_reader,
+                                     uint8_t * const buf, uint64_t len);
+
+void pb_trivial_data_reader_reset_read(
+                                     struct pb_data_reader * const data_reader);
+
+void pb_trivial_data_reader_destroy(struct pb_data_reader * const data_reader);
 
 
-/** An interface for finding, reading and consuming LF or CRLF terminated lines
- *  in pb_list instances.
+
+/** An interface for discovering, reading and consuming LF or CRLF terminated
+ *  lines in pb_list instances.
  */
 struct pb_line_reader {
   /** Indicates whether a line exists at the head of a pb_list instance. */
-  bool (*has_line)(struct pb_line_reader * const line_reader,
-                   struct pb_list * const list);
-  void (*get_line)(struct pb_line_reader * const line_reader,
-                   struct pb_list * const list,
-                   uint8_t **base, size_t *len);
-  uint64_t (*seek_line)(struct pb_list * const list);
+  bool (*has_line)(struct pb_line_reader * const line_reader);
+
+  /** Returns the length of the line discovered by has_line. */
+  uint64_t (*get_line_len)(struct pb_line_reader * const line_reader);
+  /** Extracts the data of the line discovered by has_line.
+   *
+   * buf indicates the start of the destination memory region
+   * len indicates the shorter of the number of bytes to read or the length of
+   *     the memory region.
+   */
+  uint64_t (*get_line_data)(struct pb_line_reader * const line_reader,
+                            uint8_t * const base, uint64_t len);
+
+  uint64_t (*seek_line)(struct pb_line_reader * const line_reader);
+
+  /** Marks the present position of line discovery as a line end.
+   *
+   * If the character proceeding the termination point is a cr, it will be
+   * ignored in the line length calculation and included in the line. */
+  void (*terminate_line)(struct pb_line_reader * const line_reader);
+  /** Marks the present position of line discovery as a line end.
+   *
+   * If the character proceeding the termination point is a cr, it will be
+   * considered in the line length calculation. */
+  void (*terminate_line_and_cr)(struct pb_line_reader * const line_reader);
+
+  /** Indicates whether the line discovered in has_line is:
+   *    LF (false) or CRLF (true) */
+  bool (*is_line_crlf)(struct pb_line_reader * const line_reader);
+  /** Indicates whether the line discovery has reached the end of the list.
+   *
+   * Buffer end may be used as line end if terminate_line is called. */
+  bool (*is_list_end)(struct pb_line_reader * const line_reader);
+
+  /** Reset the current line discovery back to an initial state. */
+  void (*reset)(struct pb_line_reader * const line_reader);
+
+  /** Destroy a line reader instance. */
+  void (*destroy)(struct pb_line_reader * const line_reader);
+
+  struct pb_list *list;
+
+  const struct pb_allocator *allocator;
 };
 
 /** A trivial line reader implementation that searches for lines via iterators.
- * */
-struct pb_line_reader *pb_trivial_line_reader_create(void);
+ */
+struct pb_line_reader *pb_trivial_line_reader_create(
+                                          struct pb_list *list);
 struct pb_line_reader *pb_trivial_line_reader_create_with_alloc(
-    const struct pb_allocator *allocator);
+                                          struct pb_list *list,
+                                          const struct pb_allocator *allocator);
 
-bool pb_trivial_line_reader_has_line(struct pb_line_reader * const line_reader,
-                                     struct pb_list * const list);
-void pb_trivial_line_reader_get_line(struct pb_line_reader * const line_reader,
-                                     struct pb_list * const list,
-                                     uint8_t **base, size_t *len);
-uint64_t pb_trivial_line_reader_seek_line(struct pb_list * const list);
+bool pb_trivial_line_reader_has_line(struct pb_line_reader * const line_reader);
 
+uint64_t pb_trivial_line_reader_get_line_len(
+                                     struct pb_line_reader * const line_reader);
+uint64_t pb_trivial_line_reader_get_line_data(
+                                     struct pb_line_reader * const line_reader,
+                                     uint8_t * const buf, uint64_t len);
 
+uint64_t pb_trivial_line_reader_seek_line(
+                                     struct pb_line_reader * const line_reader);
 
+bool pb_trivial_line_reader_is_crlf(struct pb_line_reader * const line_reader);
+bool pb_trivial_line_reader_is_end(struct pb_line_reader * const line_reader);
 
+void pb_trivial_line_reader_terminate_line(
+                                     struct pb_line_reader * const line_reader);
 
-
-
-
-
-
-
-
-
-
-
-
+void pb_trivial_line_reader_reset(struct pb_line_reader * const line_reader);
+void pb_trivial_line_reader_destroy(struct pb_line_reader * const line_reader);
 
 
 
@@ -539,6 +614,20 @@ uint64_t pb_trivial_line_reader_seek_line(struct pb_list * const list);
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+#if 0
 /**
  * The callbacks that a pb_list instance can use to allocate and free memory.
  *
@@ -863,6 +952,7 @@ uint64_t pb_buffer_insert_buf(
   struct pb_buffer *buffer, uint64_t off,
   struct pb_buffer *src_buffer, uint64_t src_off,
   uint64_t len);
+#endif
 
 #ifdef __cplusplus
 }; // extern "C"
