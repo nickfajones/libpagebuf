@@ -38,6 +38,8 @@ static void *pb_trivial_alloc(enum pb_allocator_type type, size_t size,
 
 static void pb_trivial_free(enum pb_allocator_type type, void *obj, size_t size,
     const struct pb_allocator *allocator) {
+  memset(obj, 0, size);
+
   free(obj);
 }
 
@@ -120,8 +122,6 @@ void pb_data_destroy(struct pb_data * const data) {
   if (data->responsibility == pb_data_owned)
     allocator->free(
       pb_alloc_type_struct, data->data_vec.base, data->data_vec.len, allocator);
-
-  memset(data, 0, sizeof(struct pb_data));
 
   allocator->free(
     pb_alloc_type_struct, data, sizeof(struct pb_data), allocator);
@@ -246,11 +246,10 @@ const struct pb_list_strategy *pb_get_trivial_list_strategy(void) {
 struct pb_trivial_list {
   struct pb_list list;
 
-  struct pb_page *pages_head;
-  struct pb_page *pages_tail;
+  struct pb_page page_end;
 
-  uint64_t data_size;
   uint64_t data_revision;
+  uint64_t data_size;
 };
 
 /*******************************************************************************
@@ -307,11 +306,11 @@ struct pb_list *pb_trivial_list_create_with_strategy_with_alloc(
   trivial_list->list.strategy = strategy;
   trivial_list->list.allocator = allocator;
 
-  trivial_list->pages_head = NULL;
-  trivial_list->pages_tail = NULL;
+  trivial_list->page_end.prev = &trivial_list->page_end;
+  trivial_list->page_end.next = &trivial_list->page_end;
 
-  trivial_list->data_size = 0;
   trivial_list->data_revision = 0;
+  trivial_list->data_size = 0;
 
   return &trivial_list->list;
 }
@@ -372,15 +371,11 @@ uint64_t pb_trivial_list_reserve(struct pb_list * const list,
 
     pb_data_put(data);
 
-    if (trivial_list->pages_head) {
-      page->prev = trivial_list->pages_tail;
+    page->prev = trivial_list->page_end.prev;
+    page->next = &trivial_list->page_end;
 
-      trivial_list->pages_tail->next = page;
-      trivial_list->pages_tail = page;
-    } else {
-      trivial_list->pages_head = page;
-      trivial_list->pages_tail = page;
-    }
+    trivial_list->page_end.prev->next = page;
+    trivial_list->page_end.prev = page;
 
     len -= reserve_len;
     reserved += reserve_len;
@@ -417,18 +412,11 @@ uint64_t pb_trivial_list_seek(struct pb_list * const list, uint64_t len) {
 
       trivial_list->list.iterator_next(&trivial_list->list, &itr);
 
-      if (trivial_list->pages_head != trivial_list->pages_tail) {
-        trivial_list->pages_head = page->next;
+      trivial_list->page_end.next->prev = &trivial_list->page_end;
+      trivial_list->page_end.next = page->next;
 
-        page->next->prev = NULL;
-        page->next = NULL;
-      } else {
-        trivial_list->pages_head = NULL;
-        trivial_list->pages_tail = NULL;
-
-        page->prev = NULL;
-        page->next = NULL;
-      }
+      page->prev = NULL;
+      page->next = NULL;
 
       pb_page_destroy(page, trivial_list->list.allocator);
     }
@@ -484,15 +472,11 @@ uint64_t pb_trivial_list_rewind(struct pb_list * const list,
 
     pb_data_put(data);
 
-    if (trivial_list->pages_head) {
-      page->next = trivial_list->pages_head;
+    page->prev = trivial_list->page_end.prev;
+    page->next = trivial_list->page_end.next;
 
-      trivial_list->pages_head->prev = page;
-      trivial_list->pages_head = page;
-    } else {
-      trivial_list->pages_head = page;
-      trivial_list->pages_tail = page;
-    }
+    trivial_list->page_end.next->prev = page;
+    trivial_list->page_end.next = page;
 
     len -= reserve_len;
     rewinded += reserve_len;
@@ -509,14 +493,16 @@ void pb_trivial_list_get_iterator(struct pb_list * const list,
     struct pb_list_iterator * const iterator) {
   struct pb_trivial_list *trivial_list = (struct pb_trivial_list*)list;
 
-  iterator->page = trivial_list->pages_head;
+  iterator->page = trivial_list->page_end.next;
 }
 
 /*******************************************************************************
  */
 bool pb_trivial_list_iterator_end(struct pb_list * const list,
     struct pb_list_iterator * const iterator) {
-  return (iterator->page == NULL);
+  struct pb_trivial_list *trivial_list = (struct pb_trivial_list*)list;
+
+  return (iterator->page == &trivial_list->page_end);
 }
 
 /*******************************************************************************
@@ -535,12 +521,12 @@ uint64_t pb_trivial_list_write_data(struct pb_list * const list,
 
   struct pb_list_iterator itr;
 
-  if (trivial_list->pages_head) {
-    itr.page = trivial_list->pages_tail;
+  if (trivial_list->page_end.next != &trivial_list->page_end) {
+    itr.page = trivial_list->page_end.prev;
     pb_trivial_list_reserve(&trivial_list->list, len);
   } else {
     pb_trivial_list_reserve(&trivial_list->list, len);
-    itr.page = trivial_list->pages_head;
+    itr.page = trivial_list->page_end.next;
   }
 
   uint64_t written = 0;
@@ -582,12 +568,12 @@ uint64_t pb_trivial_list_write_data2(struct pb_list * const list,
 
   struct pb_list_iterator itr;
 
-  if (trivial_list->pages_head) {
-    itr.page = trivial_list->pages_tail;
+  if (trivial_list->page_end.next != &trivial_list->page_end) {
+    itr.page = trivial_list->page_end.prev;
     pb_trivial_list_reserve(&trivial_list->list, len);
   } else {
     pb_trivial_list_reserve(&trivial_list->list, len);
-    itr.page = trivial_list->pages_head;
+    itr.page = trivial_list->page_end.next;
   }
 
   uint64_t written = 0;
@@ -648,15 +634,11 @@ uint64_t pb_trivial_list_write_list(struct pb_list * const list,
     if (!page)
       return written;
 
-    if (trivial_list->pages_head) {
-      page->prev = trivial_list->pages_tail;
+    page->prev = trivial_list->page_end.prev;
+    page->next = trivial_list->page_end.prev->next;
 
-      trivial_list->pages_tail->next = page;
-      trivial_list->pages_tail = page;
-    } else {
-      trivial_list->pages_head = page;
-      trivial_list->pages_tail = page;
-    }
+    trivial_list->page_end.prev->next = page;
+    trivial_list->page_end.prev = page;
 
     len -= write_len;
     written += write_len;
@@ -714,15 +696,11 @@ uint64_t pb_trivial_list_write_list2(struct pb_list * const list,
       return written;
     }
 
-    if (trivial_list->pages_head) {
-      page->prev = trivial_list->pages_tail;
+    page->prev = trivial_list->page_end.prev;
+    page->next = trivial_list->page_end.prev->next;
 
-      trivial_list->pages_tail->next = page;
-      trivial_list->pages_tail = page;
-    } else {
-      trivial_list->pages_head = page;
-      trivial_list->pages_tail = page;
-    }
+    trivial_list->page_end.prev->next = page;
+    trivial_list->page_end.prev = page;
 
     len -= write_len;
     written += write_len;
@@ -751,7 +729,7 @@ uint64_t pb_trivial_list_overwrite_data(struct pb_list * const list,
   ++trivial_list->data_revision;
 
   struct pb_list_iterator itr;
-  itr.page = trivial_list->pages_head;
+  itr.page = trivial_list->page_end.next;
 
   uint64_t written = 0;
 
@@ -787,18 +765,11 @@ void pb_trivial_list_clear(struct pb_list * const list) {
 
     trivial_list->list.iterator_next(&trivial_list->list, &itr);
 
-    if (trivial_list->pages_head != trivial_list->pages_tail) {
-      trivial_list->pages_head = page->next;
+    trivial_list->page_end.next->prev = &trivial_list->page_end;
+    trivial_list->page_end.next = page->next;
 
-      page->next->prev = NULL;
-      page->next = NULL;
-    } else {
-      trivial_list->pages_head = NULL;
-      trivial_list->pages_tail = NULL;
-
-      page->prev = NULL;
-      page->next = NULL;
-    }
+    page->prev = NULL;
+    page->next = NULL;
 
     pb_page_destroy(page, trivial_list->list.allocator);
   }
@@ -812,8 +783,6 @@ void pb_trivial_list_destroy(struct pb_list * const list) {
   pb_trivial_list_clear(&trivial_list->list);
 
   const struct pb_allocator *allocator = trivial_list->list.allocator;
-
-  memset(trivial_list, 0, sizeof(struct pb_trivial_list));
 
   allocator->free(
     pb_alloc_type_struct, trivial_list, sizeof(struct pb_trivial_list),
@@ -978,6 +947,10 @@ bool pb_trivial_line_reader_has_line(
     trivial_line_reader->page_offset = 0;
   }
 
+  if (list->iterator_end(list, &trivial_line_reader->list_iterator) &&
+      trivial_line_reader->is_terminated)
+    return (trivial_line_reader->has_line = true);
+
   return false;
 }
 
@@ -1025,15 +998,41 @@ uint64_t pb_trivial_line_reader_get_line_data(
  */
 uint64_t pb_trivial_line_reader_seek_line(
     struct pb_line_reader * const line_reader) {
+  struct pb_trivial_line_reader *trivial_line_reader =
+    (struct pb_trivial_line_reader*)line_reader;
+  struct pb_list *list = trivial_line_reader->line_reader.list;
 
-  return 0;
+  if (trivial_line_reader->list_data_revision != list->get_data_revision(list))
+    pb_trivial_line_reader_reset(&trivial_line_reader->line_reader);
+
+  if (!trivial_line_reader->has_line)
+    return 0;
+
+  uint64_t to_seek = trivial_line_reader->list_offset;
+  list->seek(list, to_seek);
+
+  pb_trivial_line_reader_reset(&trivial_line_reader->line_reader);
+
+  return to_seek;
+}
+
+/*******************************************************************************
+ */
+bool pb_trivial_line_reader_is_crlf(struct pb_line_reader * const line_reader) {
+  struct pb_trivial_line_reader *trivial_line_reader =
+    (struct pb_trivial_line_reader*)line_reader;
+
+  return trivial_line_reader->has_cr;
 }
 
 /*******************************************************************************
  */
 void pb_trivial_line_reader_terminate_line(
     struct pb_line_reader * const line_reader) {
+  struct pb_trivial_line_reader *trivial_line_reader =
+    (struct pb_trivial_line_reader*)line_reader;
 
+  trivial_line_reader->is_terminated = true;
 }
 
 /*******************************************************************************
@@ -1064,8 +1063,6 @@ void pb_trivial_line_reader_destroy(struct pb_line_reader * const line_reader) {
 
   const struct pb_allocator *allocator =
     trivial_line_reader->line_reader.allocator;
-
-  memset(trivial_line_reader, 0, sizeof(struct pb_trivial_line_reader));
 
   allocator->free(
     pb_alloc_type_struct,
