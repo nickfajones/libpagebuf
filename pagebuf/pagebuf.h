@@ -1,5 +1,5 @@
 /*******************************************************************************
- *  Copyright 2013 Nick Jones <nick.fa.jones@gmail.com>
+ *  Copyright 2013-2015 Nick Jones <nick.fa.jones@gmail.com>
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -21,8 +21,6 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
-
-#include <sys/uio.h>
 
 
 #ifdef __cplusplus
@@ -359,9 +357,9 @@ struct pb_list {
   /** Indicates whether an iterator has traversed to the end of a lists
    *  internal chain of pages.
    *
-   * This function must always be called, and return true, before the data
+   * This function must always be called, and return false, before the data
    * vector of the pb_page of the iterator can be used.  The value of the
-   * pb_page pointer is undefined when the iterator end function returns false.
+   * pb_page pointer is undefined when the iterator end function returns true.
    */
   bool (*iterator_end)(struct pb_list * const list,
                        struct pb_list_iterator * const list_iterator);
@@ -369,7 +367,12 @@ struct pb_list {
   void (*iterator_next)(struct pb_list * const list,
                         struct pb_list_iterator * const list_iterator);
   /** Decrements an iterator to the previous pb_page in a list's internal
-   *  chain. */
+   *  chain.
+   *
+   * It is valid to call this function on an iterator that is the end
+   * iterator, according to iterator_end.  If this function is called on such
+   * an iterator, the list implementation must correctly decrement back to the
+   * position before end in this case. */
   void (*iterator_prev)(struct pb_list * const list,
                         struct pb_list_iterator * const list_iterator);
 
@@ -497,12 +500,13 @@ struct pb_data_reader {
    * However, if the pb_list undergoes an operation that alters its data
    * revision, a subsequent call to read_list will read from the beginning
    */
-  uint64_t (*read_list)(struct pb_data_reader * const data_reader,
-                        uint8_t * const buf, uint64_t len);
+  uint64_t (*read)(struct pb_data_reader * const data_reader,
+                   uint8_t * const buf, uint64_t len);
 
+  /** Reset the data reader back to the beginning of the pb_list instance. */
+  void (*reset)(struct pb_data_reader * const data_reader);
 
-  void (*reset_read)(struct pb_data_reader * const data_reader);
-
+  /** Destroy the pb_data_reader instance. */
   void (*destroy)(struct pb_data_reader * const data_reader);
 
   struct pb_list *list;
@@ -518,12 +522,10 @@ struct pb_data_reader *pb_trivial_data_reader_create_with_alloc(
                                           struct pb_list * const list,
                                           const struct pb_allocator *allocator);
 
-uint64_t pb_trivial_data_reader_read_list(
-                                     struct pb_data_reader * const data_reader,
+uint64_t pb_trivial_data_reader_read(struct pb_data_reader * const data_reader,
                                      uint8_t * const buf, uint64_t len);
 
-void pb_trivial_data_reader_reset_read(
-                                     struct pb_data_reader * const data_reader);
+void pb_trivial_data_reader_reset(struct pb_data_reader * const data_reader);
 
 void pb_trivial_data_reader_destroy(struct pb_data_reader * const data_reader);
 

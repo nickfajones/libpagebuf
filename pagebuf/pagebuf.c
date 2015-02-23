@@ -1,5 +1,5 @@
 /*******************************************************************************
- *  Copyright 2013 Nick Jones <nick.fa.jones@gmail.com>
+ *  Copyright 2013-2015 Nick Jones <nick.fa.jones@gmail.com>
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -793,6 +793,17 @@ void pb_trivial_list_destroy(struct pb_list * const list) {
 
 /*******************************************************************************
  */
+struct pb_trivial_data_reader {
+  struct pb_data_reader data_reader;
+
+  struct pb_list_iterator list_iterator;
+
+  uint64_t list_data_revision;
+
+  uint64_t page_offset;
+};
+/*******************************************************************************
+ */
 struct pb_data_reader *pb_trivial_data_reader_create(
     struct pb_list * const list) {
   return
@@ -801,54 +812,99 @@ struct pb_data_reader *pb_trivial_data_reader_create(
 
 struct pb_data_reader *pb_trivial_data_reader_create_with_alloc(
     struct pb_list * const list, const struct pb_allocator *allocator) {
-  struct pb_data_reader *data_reader =
+  struct pb_trivial_data_reader *trivial_data_reader =
     allocator->alloc(
-      pb_alloc_type_struct, sizeof(struct pb_data_reader), allocator);
-  if (!data_reader)
+      pb_alloc_type_struct, sizeof(struct pb_trivial_data_reader), allocator);
+  if (!trivial_data_reader)
     return NULL;
 
-  data_reader->read_list = &pb_trivial_data_reader_read_list;
+  trivial_data_reader->data_reader.read = &pb_trivial_data_reader_read;
 
-  data_reader->reset_read = &pb_trivial_data_reader_reset_read;
+  trivial_data_reader->data_reader.reset = &pb_trivial_data_reader_reset;
+  trivial_data_reader->data_reader.destroy = &pb_trivial_data_reader_destroy;
 
-  data_reader->destroy = &pb_trivial_data_reader_destroy;
+  trivial_data_reader->data_reader.list = list;
+  trivial_data_reader->data_reader.allocator = allocator;
 
-  data_reader->list = list;
-  data_reader->allocator = allocator;
+  trivial_data_reader->data_reader.reset(&trivial_data_reader->data_reader);
 
-  return data_reader;
+  return &trivial_data_reader->data_reader;
 }
 
-uint64_t pb_trivial_data_reader_read_list(
+uint64_t pb_trivial_data_reader_read(
     struct pb_data_reader * const data_reader,
     uint8_t * const buf,
     uint64_t len) {
-  struct pb_list *list = data_reader->list;
+  struct pb_trivial_data_reader *trivial_data_reader =
+    (struct pb_trivial_data_reader*)data_reader;
+  struct pb_list *list = trivial_data_reader->data_reader.list;
+  struct pb_list_iterator *itr = &trivial_data_reader->list_iterator;
+
+  if (list->get_data_revision(list) != trivial_data_reader->list_data_revision)
+    trivial_data_reader->data_reader.reset(&trivial_data_reader->data_reader);
+
+  if (trivial_data_reader->page_offset == itr->page->data_vec.len)
+    list->iterator_next(list, itr);
 
   uint64_t readed = 0;
 
-  struct pb_list_iterator itr;
-  list->get_iterator(list, &itr);
-
-  while (!list->iterator_end(list, &itr)) {
+  while ((len > 0) &&
+         (!list->iterator_end(list, itr))) {
     uint64_t read_len =
-      (itr.page->data_vec.len < len) ?
-       itr.page->data_vec.len : len;
+      (itr->page->data_vec.len < len) ?
+       itr->page->data_vec.len : len;
 
-    memcpy(buf + readed, itr.page->data_vec.base, read_len);
+    memcpy(
+      buf + trivial_data_reader->page_offset + readed,
+      itr->page->data_vec.base,
+      read_len);
 
-    list->iterator_next(list, &itr);
+    len -= read_len;
+    readed += read_len;
+
+    trivial_data_reader->page_offset += read_len;
+
+    if (trivial_data_reader->page_offset != itr->page->data_vec.len)
+      return readed;
+
+    list->iterator_next(list, itr);
+
+    trivial_data_reader->page_offset = 0;
+  }
+
+  if (list->iterator_end(list, itr)) {
+    list->iterator_prev(list, itr);
+
+    trivial_data_reader->page_offset = itr->page->data_vec.len;
   }
 
   return readed;
 }
 
-void pb_trivial_data_reader_reset_read(
-                                     struct pb_data_reader * const data_reader) {
+void pb_trivial_data_reader_reset(struct pb_data_reader * const data_reader) {
+  struct pb_trivial_data_reader *trivial_data_reader =
+    (struct pb_trivial_data_reader*)data_reader;
+  struct pb_list *list = trivial_data_reader->data_reader.list;
+
+  list->get_iterator(list, &trivial_data_reader->list_iterator);
+
+  trivial_data_reader->list_data_revision = list->get_data_revision(list);
+
+  trivial_data_reader->page_offset = 0;
 }
 
 void pb_trivial_data_reader_destroy(struct pb_data_reader * const data_reader) {
+  struct pb_trivial_data_reader *trivial_data_reader =
+    (struct pb_trivial_data_reader*)data_reader;
+  const struct pb_allocator *allocator =
+    trivial_data_reader->data_reader.allocator;
+
+  allocator->free(
+    pb_alloc_type_struct,
+    trivial_data_reader, sizeof(struct pb_trivial_data_reader),
+    allocator);
 }
+
 
 
 /*******************************************************************************
