@@ -270,7 +270,7 @@ struct pb_list_strategy {
    *                    When clone_on_write is true, source pages are
    *                    fragmented according to the lower of the source
    *                    fragment size, and the target page_size, which may be
-   *                    zero.
+   *                    zero, in which case the source fragment size is used.
    * as target (true):  target pb_list page_size takes precedence.
    *                    When clone_on_write is false, source fragments that
    *                    are greater than the target page_size limit are split.
@@ -347,13 +347,21 @@ struct pb_list {
   uint64_t (*rewind)(struct pb_list * const list,
                      uint64_t len);
 
-  /** Initialise an iterator to he list data, via a pages pointer.
+  /** Initialise an iterator to the start of the pb_list instance data.
    *
    * The iterator should be a pointer to an object on the stack that should
    * be manipulated only by the iterator methods of the same list instance.
    */
   void (*get_iterator)(struct pb_list * const list,
                        struct pb_list_iterator * const list_iterator);
+  /** Initialise an iterator to the end of the pb_list instance data.
+     *
+     * The iterator should be a pointer to an object on the stack that should
+     * be manipulated only by the iterator methods of the same list instance.
+     */
+  void (*get_iterator_end)(struct pb_list * const list,
+                           struct pb_list_iterator * const list_iterator);
+
   /** Indicates whether an iterator has traversed to the end of a lists
    *  internal chain of pages.
    *
@@ -361,8 +369,8 @@ struct pb_list {
    * vector of the pb_page of the iterator can be used.  The value of the
    * pb_page pointer is undefined when the iterator end function returns true.
    */
-  bool (*iterator_end)(struct pb_list * const list,
-                       struct pb_list_iterator * const list_iterator);
+  bool (*is_iterator_end)(struct pb_list * const list,
+                          struct pb_list_iterator * const list_iterator);
   /** Increments an iterator to the next pb_page in a list's internal chain. */
   void (*iterator_next)(struct pb_list * const list,
                         struct pb_list_iterator * const list_iterator);
@@ -370,7 +378,7 @@ struct pb_list {
    *  chain.
    *
    * It is valid to call this function on an iterator that is the end
-   * iterator, according to iterator_end.  If this function is called on such
+   * iterator, according to is_iterator_end.  If this function is called on such
    * an iterator, the list implementation must correctly decrement back to the
    * position before end in this case. */
   void (*iterator_prev)(struct pb_list * const list,
@@ -436,12 +444,12 @@ struct pb_list {
  */
 struct pb_list *pb_trivial_list_create(void);
 struct pb_list *pb_trivial_list_create_with_alloc(
-    const struct pb_allocator *allocator);
+                                      const struct pb_allocator *allocator);
 struct pb_list *pb_trivial_list_create_with_strategy(
-    const struct pb_list_strategy *strategy);
+                                      const struct pb_list_strategy *strategy);
 struct pb_list *pb_trivial_list_create_with_strategy_with_alloc(
-    const struct pb_list_strategy *strategy,
-    const struct pb_allocator *allocator);
+                                      const struct pb_list_strategy *strategy,
+                                      const struct pb_allocator *allocator);
 
 uint64_t pb_trivial_list_get_data_size(struct pb_list * const list);
 
@@ -460,8 +468,8 @@ void pb_trivial_list_iterator_next(struct pb_list * const list,
                                    struct pb_list_iterator * const iterator);
 void pb_trivial_list_iterator_prev(struct pb_list * const list,
                                    struct pb_list_iterator * const iterator);
-bool pb_trivial_list_iterator_end(struct pb_list * const list,
-                                  struct pb_list_iterator * const iterator);
+bool pb_trivial_list_is_iterator_end(struct pb_list * const list,
+                                     struct pb_list_iterator * const iterator);
 
 uint64_t pb_trivial_list_write_data(struct pb_list * const list,
                                     const uint8_t *buf,

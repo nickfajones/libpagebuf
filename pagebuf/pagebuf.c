@@ -293,7 +293,7 @@ struct pb_list *pb_trivial_list_create_with_strategy_with_alloc(
 
   trivial_list->list.get_iterator = &pb_trivial_list_get_iterator;
   trivial_list->list.iterator_next = &pb_trivial_list_iterator_next;
-  trivial_list->list.iterator_end = &pb_trivial_list_iterator_end;
+  trivial_list->list.is_iterator_end = &pb_trivial_list_is_iterator_end;
 
   trivial_list->list.write_data = &pb_trivial_list_write_data;
   trivial_list->list.write_list = &pb_trivial_list_write_list;
@@ -399,7 +399,7 @@ uint64_t pb_trivial_list_seek(struct pb_list * const list, uint64_t len) {
   trivial_list->list.get_iterator(&trivial_list->list, &itr);
 
   while ((len > 0) &&
-         (!trivial_list->list.iterator_end(&trivial_list->list, &itr))) {
+         (!trivial_list->list.is_iterator_end(&trivial_list->list, &itr))) {
     uint64_t seek_len =
       (itr.page->data_vec.len < len) ?
        itr.page->data_vec.len : len;
@@ -498,7 +498,7 @@ void pb_trivial_list_get_iterator(struct pb_list * const list,
 
 /*******************************************************************************
  */
-bool pb_trivial_list_iterator_end(struct pb_list * const list,
+bool pb_trivial_list_is_iterator_end(struct pb_list * const list,
     struct pb_list_iterator * const iterator) {
   struct pb_trivial_list *trivial_list = (struct pb_trivial_list*)list;
 
@@ -520,24 +520,29 @@ uint64_t pb_trivial_list_write_data(struct pb_list * const list,
   struct pb_trivial_list *trivial_list = (struct pb_trivial_list*)list;
 
   struct pb_list_iterator itr;
-
-  if (trivial_list->page_end.next != &trivial_list->page_end) {
-    itr.page = trivial_list->page_end.prev;
-    pb_trivial_list_reserve(&trivial_list->list, len);
-  } else {
-    pb_trivial_list_reserve(&trivial_list->list, len);
-    itr.page = trivial_list->page_end.next;
-  }
+  trivial_list->list.get_iterator_end(&trivial_list->list, &itr);
+  trivial_list->list.iterator_prev(&trivial_list->list, &itr);
 
   uint64_t written = 0;
   uint64_t offset = 0;
 
-  while ((len > 0) &&
-         (!trivial_list->list.iterator_end(&trivial_list->list, &itr))) {
-    uint64_t write_len = len;
+  while (len > 0) {
+    uint64_t write_len =
+      (trivial_list->list.strategy->page_size != 0) ?
+      (trivial_list->list.strategy->page_size < len) ?
+       trivial_list->list.strategy->page_size : len :
+       len;
 
     if (write_len > itr.page->data_vec.len)
       write_len = itr.page->data_vec.len;
+
+    trivial_list->list.reserve(&trivial_list->list, write_len);
+
+    if (!trivial_list->list.is_iterator_end(&trivial_list->list, &itr)) {
+      trivial_list->list.iterator_next(&trivial_list->list, &itr);
+    } else {
+      trivial_list->list.get_iterator(&trivial_list->list, &itr);
+    }
 
     memcpy(itr.page->data_vec.base + offset, buf + written, write_len);
 
@@ -547,7 +552,7 @@ uint64_t pb_trivial_list_write_data(struct pb_list * const list,
 
     trivial_list->data_size += write_len;
 
-    if ((offset + write_len) == itr.page->data_vec.len) {
+    if (offset == itr.page->data_vec.len) {
       trivial_list->list.iterator_next(&trivial_list->list, &itr);
 
       offset = 0;
@@ -556,6 +561,9 @@ uint64_t pb_trivial_list_write_data(struct pb_list * const list,
 
   return written;
 }
+
+
+
 
 uint64_t pb_trivial_list_write_data2(struct pb_list * const list,
     const uint8_t *buf,
@@ -567,28 +575,30 @@ uint64_t pb_trivial_list_write_data2(struct pb_list * const list,
   struct pb_trivial_list *trivial_list = (struct pb_trivial_list*)list;
 
   struct pb_list_iterator itr;
+  trivial_list->list.get_iterator_end(&trivial_list->list, &itr);
+  trivial_list->list.iterator_prev(&trivial_list->list, &itr);
 
-  if (trivial_list->page_end.next != &trivial_list->page_end) {
-    itr.page = trivial_list->page_end.prev;
-    pb_trivial_list_reserve(&trivial_list->list, len);
+  trivial_list->list.reserve(&trivial_list->list, len);
+
+  if (!trivial_list->list.is_iterator_end(&trivial_list->list, &itr)) {
+    trivial_list->list.iterator_next(&trivial_list->list, &itr);
   } else {
-    pb_trivial_list_reserve(&trivial_list->list, len);
-    itr.page = trivial_list->page_end.next;
+    trivial_list->list.get_iterator(&trivial_list->list, &itr);
   }
 
   uint64_t written = 0;
   uint64_t offset = 0;
 
   while ((len > 0) &&
-         (!trivial_list->list.iterator_end(&trivial_list->list, &itr))) {
-    uint64_t write_len = len;
+         (!trivial_list->list.is_iterator_end(&trivial_list->list, &itr))) {
+    uint64_t write_len =
+      (trivial_list->list.strategy->page_size != 0) ?
+      (trivial_list->list.strategy->page_size < len) ?
+       trivial_list->list.strategy->page_size : len :
+       len;
 
     if (write_len > itr.page->data_vec.len)
       write_len = itr.page->data_vec.len;
-
-    if ((trivial_list->list.strategy->page_size != 0) &&
-          (write_len > trivial_list->list.strategy->page_size))
-        write_len = trivial_list->list.strategy->page_size;
 
     memcpy(itr.page->data_vec.base + offset, buf + written, write_len);
 
@@ -598,7 +608,7 @@ uint64_t pb_trivial_list_write_data2(struct pb_list * const list,
 
     trivial_list->data_size += write_len;
 
-    if ((offset + write_len) == itr.page->data_vec.len) {
+    if (offset == itr.page->data_vec.len) {
       trivial_list->list.iterator_next(&trivial_list->list, &itr);
 
       offset = 0;
@@ -622,7 +632,7 @@ uint64_t pb_trivial_list_write_list(struct pb_list * const list,
   trivial_list->list.get_iterator(&trivial_list->list, &src_itr);
 
   while ((len > 0) &&
-         (!trivial_list->list.iterator_end(&trivial_list->list, &src_itr))) {
+         (!trivial_list->list.is_iterator_end(&trivial_list->list, &src_itr))) {
     uint64_t write_len = len;
 
     if (write_len > src_itr.page->data_vec.len)
@@ -670,7 +680,7 @@ uint64_t pb_trivial_list_write_list2(struct pb_list * const list,
   trivial_list->list.get_iterator(&trivial_list->list, &src_itr);
 
   while ((len > 0) &&
-         (!trivial_list->list.iterator_end(&trivial_list->list, &src_itr))) {
+         (!trivial_list->list.is_iterator_end(&trivial_list->list, &src_itr))) {
     uint64_t write_len = len;
 
     if (write_len > src_itr.page->data_vec.len)
@@ -734,7 +744,7 @@ uint64_t pb_trivial_list_overwrite_data(struct pb_list * const list,
   uint64_t written = 0;
 
   while ((len > 0) &&
-         (!trivial_list->list.iterator_end(&trivial_list->list, &itr))) {
+         (!trivial_list->list.is_iterator_end(&trivial_list->list, &itr))) {
     uint64_t write_len =
       (itr.page->data_vec.len < len) ?
        itr.page->data_vec.len : len;
@@ -760,7 +770,7 @@ void pb_trivial_list_clear(struct pb_list * const list) {
   struct pb_list_iterator itr;
   trivial_list->list.get_iterator(&trivial_list->list, &itr);
 
-  while (!trivial_list->list.iterator_end(&trivial_list->list, &itr)) {
+  while (!trivial_list->list.is_iterator_end(&trivial_list->list, &itr)) {
     struct pb_page *page = itr.page;
 
     trivial_list->list.iterator_next(&trivial_list->list, &itr);
@@ -849,7 +859,7 @@ uint64_t pb_trivial_data_reader_read(
   uint64_t readed = 0;
 
   while ((len > 0) &&
-         (!list->iterator_end(list, itr))) {
+         (!list->is_iterator_end(list, itr))) {
     uint64_t read_len =
       (itr->page->data_vec.len < len) ?
        itr->page->data_vec.len : len;
@@ -872,7 +882,7 @@ uint64_t pb_trivial_data_reader_read(
     trivial_data_reader->page_offset = 0;
   }
 
-  if (list->iterator_end(list, itr)) {
+  if (list->is_iterator_end(list, itr)) {
     list->iterator_prev(list, itr);
 
     trivial_data_reader->page_offset = itr->page->data_vec.len;
@@ -979,10 +989,10 @@ bool pb_trivial_line_reader_has_line(
   if (trivial_line_reader->has_line)
     return true;
 
-  if (list->iterator_end(list, &trivial_line_reader->list_iterator))
+  if (list->is_iterator_end(list, &trivial_line_reader->list_iterator))
     list->iterator_prev(list, &trivial_line_reader->list_iterator);
 
-  while (!list->iterator_end(list, &trivial_line_reader->list_iterator)) {
+  while (!list->is_iterator_end(list, &trivial_line_reader->list_iterator)) {
     const struct pb_data_vec *data_vec =
       &trivial_line_reader->list_iterator.page->data_vec;
 
@@ -1003,7 +1013,7 @@ bool pb_trivial_line_reader_has_line(
     trivial_line_reader->page_offset = 0;
   }
 
-  if (list->iterator_end(list, &trivial_line_reader->list_iterator) &&
+  if (list->is_iterator_end(list, &trivial_line_reader->list_iterator) &&
       trivial_line_reader->is_terminated)
     return (trivial_line_reader->has_line = true);
 
