@@ -536,7 +536,7 @@ uint64_t pb_trivial_list_write_data(struct pb_list * const list,
     if (write_len > itr.page->data_vec.len)
       write_len = itr.page->data_vec.len;
 
-    trivial_list->list.reserve(&trivial_list->list, write_len);
+    write_len = trivial_list->list.reserve(&trivial_list->list, write_len);
 
     if (!trivial_list->list.is_iterator_end(&trivial_list->list, &itr)) {
       trivial_list->list.iterator_next(&trivial_list->list, &itr);
@@ -578,7 +578,7 @@ uint64_t pb_trivial_list_write_data2(struct pb_list * const list,
   trivial_list->list.get_iterator_end(&trivial_list->list, &itr);
   trivial_list->list.iterator_prev(&trivial_list->list, &itr);
 
-  trivial_list->list.reserve(&trivial_list->list, len);
+  len = trivial_list->list.reserve(&trivial_list->list, len);
 
   if (!trivial_list->list.is_iterator_end(&trivial_list->list, &itr)) {
     trivial_list->list.iterator_next(&trivial_list->list, &itr);
@@ -589,8 +589,7 @@ uint64_t pb_trivial_list_write_data2(struct pb_list * const list,
   uint64_t written = 0;
   uint64_t offset = 0;
 
-  while ((len > 0) &&
-         (!trivial_list->list.is_iterator_end(&trivial_list->list, &itr))) {
+  while (len > 0) {
     uint64_t write_len =
       (trivial_list->list.strategy->page_size != 0) ?
       (trivial_list->list.strategy->page_size < len) ?
@@ -621,22 +620,23 @@ uint64_t pb_trivial_list_write_data2(struct pb_list * const list,
 /*******************************************************************************
  */
 uint64_t pb_trivial_list_write_list(struct pb_list * const list,
-    const struct pb_list * src_list,
+    struct pb_list * const src_list,
     uint64_t len) {
   struct pb_trivial_list *trivial_list = (struct pb_trivial_list*)list;
 
   uint64_t written = 0;
-  uint64_t src_offset = 0;
+
+  struct pb_list_iterator itr;
+  trivial_list->list.get_iterator_end(&trivial_list->list, &itr);
 
   struct pb_list_iterator src_itr;
-  trivial_list->list.get_iterator(&trivial_list->list, &src_itr);
+  src_list->get_iterator(src_list, &src_itr);
 
   while ((len > 0) &&
-         (!trivial_list->list.is_iterator_end(&trivial_list->list, &src_itr))) {
-    uint64_t write_len = len;
-
-    if (write_len > src_itr.page->data_vec.len)
-      write_len = src_itr.page->data_vec.len;
+         (!src_list->is_iterator_end(src_list, &src_itr))) {
+    uint64_t write_len =
+      (src_itr.page->data_vec.len < len) ?
+       src_itr.page->data_vec.len : len;
 
     struct pb_page *page =
       pb_page_transfer(
@@ -644,85 +644,67 @@ uint64_t pb_trivial_list_write_list(struct pb_list * const list,
     if (!page)
       return written;
 
-    page->prev = trivial_list->page_end.prev;
-    page->next = trivial_list->page_end.prev->next;
+    page->prev = itr.page->prev;
+    page->next = itr.page->next;
 
-    trivial_list->page_end.prev->next = page;
-    trivial_list->page_end.prev = page;
+    itr.page->prev->next = page;
+    itr.page->prev = page;
 
     len -= write_len;
     written += write_len;
-    src_offset += write_len;
 
     trivial_list->data_size += write_len;
 
-    trivial_list->list.iterator_next(&trivial_list->list, &src_itr);
-
-    src_offset = 0;
+    src_list->iterator_next(src_list, &src_itr);
   }
 
   return written;
 }
 
+
+
+
 uint64_t pb_trivial_list_write_list2(struct pb_list * const list,
-    const struct pb_list * src_list,
+    struct pb_list * const src_list,
     uint64_t len);
 
 uint64_t pb_trivial_list_write_list2(struct pb_list * const list,
-    const struct pb_list * src_list,
+    struct pb_list * const src_list,
     uint64_t len) {
   struct pb_trivial_list *trivial_list = (struct pb_trivial_list*)list;
 
   uint64_t written = 0;
-  uint64_t src_offset = 0;
+
+  struct pb_list_iterator itr;
+  trivial_list->list.get_iterator_end(&trivial_list->list, &itr);
 
   struct pb_list_iterator src_itr;
-  trivial_list->list.get_iterator(&trivial_list->list, &src_itr);
+  src_list->get_iterator(src_list, &src_itr);
 
   while ((len > 0) &&
-         (!trivial_list->list.is_iterator_end(&trivial_list->list, &src_itr))) {
-    uint64_t write_len = len;
-
-    if (write_len > src_itr.page->data_vec.len)
-      write_len = src_itr.page->data_vec.len;
-
-    if ((trivial_list->list.strategy->page_size != 0) &&
-        (write_len > trivial_list->list.strategy->page_size))
-      write_len = trivial_list->list.strategy->page_size;
-
-    uint8_t *buf =
-      trivial_list->list.allocator->alloc(
-        pb_alloc_type_region, write_len, trivial_list->list.allocator);
-    if (!buf)
-      return written;
+         (!src_list->is_iterator_end(src_list, &src_itr))) {
+    uint64_t write_len =
+      (src_itr.page->data_vec.len < len) ?
+       src_itr.page->data_vec.len : len;
 
     struct pb_page *page =
-      pb_page_clone(
-        src_itr.page, buf, write_len, src_offset, trivial_list->list.allocator);
-    if (!page) {
-      trivial_list->list.allocator->free(
-        pb_alloc_type_region, buf, write_len, trivial_list->list.allocator);
-
+      pb_page_transfer(
+        src_itr.page, write_len, 0, trivial_list->list.allocator);
+    if (!page)
       return written;
-    }
 
-    page->prev = trivial_list->page_end.prev;
-    page->next = trivial_list->page_end.prev->next;
+    page->prev = itr.page->prev;
+    page->next = itr.page->next;
 
-    trivial_list->page_end.prev->next = page;
-    trivial_list->page_end.prev = page;
+    itr.page->prev->next = page;
+    itr.page->prev = page;
 
     len -= write_len;
     written += write_len;
-    src_offset += write_len;
 
     trivial_list->data_size += write_len;
 
-    if ((src_offset + write_len) == src_itr.page->data_vec.len) {
-      trivial_list->list.iterator_next(&trivial_list->list, &src_itr);
-
-      src_offset = 0;
-    }
+    src_list->iterator_next(src_list, &src_itr);
   }
 
   return written;

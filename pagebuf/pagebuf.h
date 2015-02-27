@@ -399,7 +399,9 @@ struct pb_list {
                          uint64_t len);
   /** Write data from a source pb_list instance to the pb_list instance.
    *
-   * src_list is the list to write from.
+   * src_list is the list to write from.  This pb_list instance will not have
+   *          it's data modified, but it is not const because iterator
+   *          operations of this pb_list may cause internal state changes.
    * len indicates the amount of data to write, in bytes.
    *
    * returns the amount of data written.  This list will not be altered by
@@ -409,7 +411,7 @@ struct pb_list {
    * necessary.
    */
   uint64_t (*write_list)(struct pb_list * const list,
-                         const struct pb_list * src_list,
+                         struct pb_list * const src_list,
                          uint64_t len);
 
   /** Write data from a memory region to the pb_list instance.
@@ -475,7 +477,7 @@ uint64_t pb_trivial_list_write_data(struct pb_list * const list,
                                     const uint8_t *buf,
                                     uint64_t len);
 uint64_t pb_trivial_list_write_list(struct pb_list * const list,
-                                    const struct pb_list * src_list,
+                                    struct pb_list * const src_list,
                                     uint64_t len);
 uint64_t pb_trivial_list_overwrite_data(struct pb_list * const list,
                                         const uint8_t *buf,
