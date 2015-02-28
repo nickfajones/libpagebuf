@@ -211,6 +211,7 @@ struct pb_page *pb_page_transfer(const struct pb_page *src_page,
                                  size_t len, size_t src_off,
                                  const struct pb_allocator *allocator);
 
+#if 0
 /** Clone an existing pb_page instance
  *
  * Duplicate the base and len values as well as a full clone of the referenced
@@ -219,6 +220,7 @@ struct pb_page *pb_page_transfer(const struct pb_page *src_page,
 struct pb_page *pb_page_clone(const struct pb_page *src_page,
                               uint8_t * const buf, size_t len, size_t src_off,
                               const struct pb_allocator *allocator);
+#endif
 
 /** Destroy the pb_page instance.
  *
