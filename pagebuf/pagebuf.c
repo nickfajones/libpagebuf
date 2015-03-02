@@ -288,6 +288,7 @@ struct pb_list *pb_trivial_list_create_with_strategy_with_alloc(
   trivial_list->list.get_data_size = &pb_trivial_list_get_data_size;
   trivial_list->list.get_data_revision = &pb_trivial_list_get_data_revision;
 
+  trivial_list->list.insert = &pb_trivial_list_insert;
   trivial_list->list.reserve = &pb_trivial_list_reserve;
 
   trivial_list->list.seek = &pb_trivial_list_seek;
@@ -335,6 +336,19 @@ uint64_t pb_trivial_list_get_data_revision(struct pb_list * const list) {
 
 /*******************************************************************************
  */
+uint64_t pb_trivial_list_insert(struct pb_list * const list,
+    struct pb_list_iterator * const list_iterator,
+    size_t offset,
+    struct pb_page * const page) {
+  //struct pb_trivial_list *trivial_list = (struct pb_trivial_list*)list;
+
+
+
+  return page->data_vec.len;
+}
+
+/*******************************************************************************
+ */
 uint64_t pb_trivial_list_reserve(struct pb_list * const list,
     uint64_t len) {
   struct pb_trivial_list *trivial_list = (struct pb_trivial_list*)list;
@@ -373,16 +387,11 @@ uint64_t pb_trivial_list_reserve(struct pb_list * const list,
 
     pb_data_put(data);
 
-    page->prev = trivial_list->page_end.prev;
-    page->next = &trivial_list->page_end;
-
-    trivial_list->page_end.prev->next = page;
-    trivial_list->page_end.prev = page;
+    reserved +=
+      trivial_list->list.insert(
+        &trivial_list->list, NULL, 0, page);
 
     len -= reserve_len;
-    reserved += reserve_len;
-
-    trivial_list->data_size += reserve_len;
   }
 
   return reserved;
@@ -482,8 +491,6 @@ uint64_t pb_trivial_list_rewind(struct pb_list * const list,
 
     len -= reserve_len;
     rewinded += reserve_len;
-
-    trivial_list->data_size += reserve_len;
   }
 
   return rewinded;

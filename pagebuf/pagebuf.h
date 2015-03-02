@@ -281,6 +281,13 @@ struct pb_list_strategy {
    *                    in size.
    */
   bool fragment_as_target;
+
+  /** Indicates whether the pb_list supports insertion into the middle.
+   *
+   * supports (false): Insertion into the middle of a pb_list is supported.
+   * rejects (true):   Insertion into the middle of a pb_list is not supported.
+   */
+  bool no_insertion;
 };
 
 /** Get a built in, trivial list strategy.
@@ -290,6 +297,8 @@ struct pb_list_strategy {
  * clone_on_write is false
  *
  * fragment_as_source is false
+ *
+ * no_insertion is false;
  */
 const struct pb_list_strategy *pb_get_trivial_list_strategy(void);
 
@@ -320,6 +329,32 @@ struct pb_list {
    */
   uint64_t (*get_data_revision)(struct pb_list * const list);
 
+  /** Append a pb_page instance to the pb_list.
+   *
+   * list_iterator is the position in the list to update the pb_list.  The
+   *               pb_page will be inserted in front of the iterator position.
+   * offset is the offset within the iterator page to insert the new pb_page
+   *        into.
+   * page is the page to insert.  The data base and len values must be set
+   *      before this operation is called.
+   *
+   * If the offset is zero, the new pb_page will be inserted before the
+   * iterator page.  If the offset is non zero, then the iterator page may be
+   * split according to the pb_list instances internal implementation.
+   * If the offset is greater than or equal to the iterator page len, then the
+   * new pb_page will be inserted after the iterator page, or at the head of
+   * the pb_list if the iterator is an end iterator.
+   *
+   * This operation will affect the data size of the pb_list instance.
+   *
+   * The return value is the amount of data actually inserted to the
+   * pb_list instance.  Users of the insert operation must reflect the value
+   * returned back to their own callers.
+   */
+  uint64_t (*insert)(struct pb_list * const list,
+                     struct pb_list_iterator * const list_iterator,
+                     size_t offset,
+                     struct pb_page * const page);
   /** Increase the size of the list by adding len bytes of data to the end.
    *
    * len indicates the amount of data to add in bytes.
@@ -459,6 +494,12 @@ uint64_t pb_trivial_list_get_data_size(struct pb_list * const list);
 
 uint64_t pb_trivial_list_get_data_revision(struct pb_list * const list);
 
+uint64_t pb_trivial_list_insert(struct pb_list * const list,
+                                struct pb_list_iterator * const list_iterator,
+                                size_t offset,
+                                struct pb_page * const page);
+uint64_t pb_trivial_list_append(struct pb_list * const list,
+                                struct pb_page * const page);
 uint64_t pb_trivial_list_reserve(struct pb_list * const list,
                                  uint64_t len);
 uint64_t pb_trivial_list_seek(struct pb_list * const list,
