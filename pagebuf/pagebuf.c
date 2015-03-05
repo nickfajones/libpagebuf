@@ -337,12 +337,52 @@ uint64_t pb_trivial_list_get_data_revision(struct pb_list * const list) {
 /*******************************************************************************
  */
 uint64_t pb_trivial_list_insert(struct pb_list * const list,
+    struct pb_page * const page,
     struct pb_list_iterator * const list_iterator,
-    size_t offset,
-    struct pb_page * const page) {
-  //struct pb_trivial_list *trivial_list = (struct pb_trivial_list*)list;
+    size_t offset) {
+  struct pb_trivial_list *trivial_list = (struct pb_trivial_list*)list;
 
+  while (offset >= list_iterator->page->data_vec.len) {
+    trivial_list->list.iterator_next(&trivial_list->list, list_iterator);
 
+    if (list_iterator->page != &trivial_list->page_end)
+      offset -= list_iterator->page->data_vec.len;
+    else
+      offset = 0;
+  }
+
+  struct pb_page *page1;
+  struct pb_page *page2;
+
+  if (offset != 0) {
+    page1 = list_iterator->page;
+    page2 =
+      pb_page_transfer(
+        page1, page1->data_vec.len, 0,
+        trivial_list->list.allocator);
+    if (!page2)
+      return 0;
+
+    page2->data_vec.base += offset;
+    page2->data_vec.len -= offset;
+    page2->prev = page1;
+    page2->next = page1->next;
+
+    page1->data_vec.len = offset;
+    page1->next->prev = page2;
+    page1->next = page2;
+  } else {
+    page1 = list_iterator->page->prev;
+    page2 = list_iterator->page;
+  }
+
+  page->prev = page1;
+  page->next = page2;
+
+  page1->next = page;
+  page2->prev = page;
+
+  trivial_list->data_size += page->data_vec.len;
 
   return page->data_vec.len;
 }
@@ -387,11 +427,10 @@ uint64_t pb_trivial_list_reserve(struct pb_list * const list,
 
     pb_data_put(data);
 
+    len -= reserve_len;
     reserved +=
       trivial_list->list.insert(
-        &trivial_list->list, NULL, 0, page);
-
-    len -= reserve_len;
+        &trivial_list->list, page, NULL, 0);
   }
 
   return reserved;
@@ -483,14 +522,10 @@ uint64_t pb_trivial_list_rewind(struct pb_list * const list,
 
     pb_data_put(data);
 
-    page->prev = trivial_list->page_end.prev;
-    page->next = trivial_list->page_end.next;
-
-    trivial_list->page_end.next->prev = page;
-    trivial_list->page_end.next = page;
-
     len -= reserve_len;
-    rewinded += reserve_len;
+    rewinded +=
+      trivial_list->list.insert(
+        &trivial_list->list, page, NULL, 0);
   }
 
   return rewinded;
@@ -560,8 +595,6 @@ uint64_t pb_trivial_list_write_data(struct pb_list * const list,
     written += write_len;
     offset += write_len;
 
-    trivial_list->data_size += write_len;
-
     if (offset == itr.page->data_vec.len) {
       trivial_list->list.iterator_next(&trivial_list->list, &itr);
 
@@ -614,8 +647,6 @@ uint64_t pb_trivial_list_write_data2(struct pb_list * const list,
     len -= write_len;
     written += write_len;
     offset += write_len;
-
-    trivial_list->data_size += write_len;
 
     if (offset == itr.page->data_vec.len) {
       trivial_list->list.iterator_next(&trivial_list->list, &itr);

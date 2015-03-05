@@ -352,9 +352,10 @@ struct pb_list {
    * returned back to their own callers.
    */
   uint64_t (*insert)(struct pb_list * const list,
+                     struct pb_page * const page,
                      struct pb_list_iterator * const list_iterator,
-                     size_t offset,
-                     struct pb_page * const page);
+                     size_t offset);
+
   /** Increase the size of the list by adding len bytes of data to the end.
    *
    * len indicates the amount of data to add in bytes.
@@ -495,9 +496,10 @@ uint64_t pb_trivial_list_get_data_size(struct pb_list * const list);
 uint64_t pb_trivial_list_get_data_revision(struct pb_list * const list);
 
 uint64_t pb_trivial_list_insert(struct pb_list * const list,
+                                struct pb_page * const page,
                                 struct pb_list_iterator * const list_iterator,
-                                size_t offset,
-                                struct pb_page * const page);
+                                size_t offset);
+
 uint64_t pb_trivial_list_append(struct pb_list * const list,
                                 struct pb_page * const page);
 uint64_t pb_trivial_list_reserve(struct pb_list * const list,
