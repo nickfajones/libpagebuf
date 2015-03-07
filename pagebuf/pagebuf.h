@@ -281,13 +281,6 @@ struct pb_list_strategy {
    *                    in size.
    */
   bool fragment_as_target;
-
-  /** Indicates whether the pb_list supports insertion into the middle.
-   *
-   * supports (false): Insertion into the middle of a pb_list is supported.
-   * rejects (true):   Insertion into the middle of a pb_list is not supported.
-   */
-  bool no_insertion;
 };
 
 /** Get a built in, trivial list strategy.
@@ -311,6 +304,9 @@ const struct pb_list_strategy *pb_get_trivial_list_strategy(void);
  * data buffers.
  */
 struct pb_list {
+  /** The strategy used by the pb_list instance. */
+  struct pb_list_strategy strategy;
+
   /** Return the amount of data in the list, in bytes. */
   uint64_t (*get_data_size)(struct pb_list * const list);
 
@@ -471,9 +467,6 @@ struct pb_list {
 
   /** Destroy a pb_list. */
   void (*destroy)(struct pb_list * const list);
-
-  /** The strategy used by the pb_list instance. */
-  const struct pb_list_strategy *strategy;
 
   const struct pb_allocator *allocator;
 };
@@ -663,6 +656,7 @@ void pb_trivial_line_reader_terminate_line(
 
 void pb_trivial_line_reader_reset(struct pb_line_reader * const line_reader);
 void pb_trivial_line_reader_destroy(struct pb_line_reader * const line_reader);
+
 
 
 #ifdef __cplusplus
