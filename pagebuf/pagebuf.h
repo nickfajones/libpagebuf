@@ -462,6 +462,17 @@ struct pb_list {
                              const uint8_t *buf,
                              uint64_t len);
 
+  /** Read data from the start of a pb_list instance to a data region.
+   *
+   * buf indicates the start of the target memory region.
+   * len indicates the amount of data to read, in bytes.
+   *
+   * returns the amount of data read into the target buffer.
+   */
+  uint64_t (*read_data)(struct pb_list * const list,
+                        uint8_t * const buf,
+                        uint64_t len);
+
   /** Clear all data in the list. */
   void (*clear)(struct pb_list * const list);
 
@@ -520,6 +531,10 @@ uint64_t pb_trivial_list_write_list(struct pb_list * const list,
 uint64_t pb_trivial_list_overwrite_data(struct pb_list * const list,
                                         const uint8_t *buf,
                                         uint64_t len);
+
+uint64_t pb_trivial_list_read_data(struct pb_list * const list,
+                                   uint8_t * const buf,
+                                   uint64_t len);
 
 void pb_trivial_list_clear(struct pb_list * const list);
 void pb_trivial_list_destroy(struct pb_list * const list);

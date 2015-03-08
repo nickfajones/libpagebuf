@@ -307,6 +307,8 @@ struct pb_list *pb_trivial_list_create_with_strategy_with_alloc(
 
   trivial_list->list.overwrite_data = &pb_trivial_list_overwrite_data;
 
+  trivial_list->list.read_data = &pb_trivial_list_read_data;
+
   trivial_list->list.clear = &pb_trivial_list_clear;
   trivial_list->list.destroy = &pb_trivial_list_destroy;
 
@@ -937,6 +939,25 @@ uint64_t pb_trivial_list_overwrite_data(struct pb_list * const list,
 
   return written;
 }
+
+uint64_t pb_trivial_list_read_data(struct pb_list * const list,
+    uint8_t * const buf,
+    uint64_t len) {
+  struct pb_trivial_list *trivial_list = (struct pb_trivial_list*)list;
+
+  struct pb_list_iterator itr;
+  itr.page = trivial_list->page_end.next;
+
+  uint64_t readed = 0;
+
+  while ((len > 0) &&
+         (!trivial_list->list.is_iterator_end(&trivial_list->list, &itr))) {
+
+  }
+
+  return readed;
+}
+
 
 /*******************************************************************************
  */
