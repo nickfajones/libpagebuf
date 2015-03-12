@@ -395,7 +395,6 @@ struct pb_list {
      */
   void (*get_iterator_end)(struct pb_list * const list,
                            struct pb_list_iterator * const list_iterator);
-
   /** Indicates whether an iterator has traversed to the end of a lists
    *  internal chain of pages.
    *
@@ -405,6 +404,7 @@ struct pb_list {
    */
   bool (*is_iterator_end)(struct pb_list * const list,
                           struct pb_list_iterator * const list_iterator);
+
   /** Increments an iterator to the next pb_page in a list's internal chain. */
   void (*iterator_next)(struct pb_list * const list,
                         struct pb_list_iterator * const list_iterator);
@@ -515,12 +515,16 @@ uint64_t pb_trivial_list_rewind(struct pb_list * const list,
 
 void pb_trivial_list_get_iterator(struct pb_list * const list,
                                   struct pb_list_iterator * const iterator);
+void pb_trivial_list_get_iterator_end(
+                                     struct pb_list * const list,
+                                     struct pb_list_iterator * const iterator);
+bool pb_trivial_list_is_iterator_end(struct pb_list * const list,
+                                     struct pb_list_iterator * const iterator);
+
 void pb_trivial_list_iterator_next(struct pb_list * const list,
                                    struct pb_list_iterator * const iterator);
 void pb_trivial_list_iterator_prev(struct pb_list * const list,
                                    struct pb_list_iterator * const iterator);
-bool pb_trivial_list_is_iterator_end(struct pb_list * const list,
-                                     struct pb_list_iterator * const iterator);
 
 uint64_t pb_trivial_list_write_data(struct pb_list * const list,
                                     const uint8_t *buf,
