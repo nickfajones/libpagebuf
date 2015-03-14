@@ -260,7 +260,7 @@ int main(int argc, char **argv) {
 
   gettimeofday(&start_time, NULL);
 
-  while (iterations < iterations_limit) {
+  while (iterations < 1) {
     size_t write_size = 64 + (random() % (4 * 1024));
     if (write_size > stream_buf_size) {
       delete [] stream_buf;
@@ -290,7 +290,7 @@ int main(int argc, char **argv) {
       assert(written == write_size);
 
       current_size = test_case->buffer1->get_data_size(test_case->buffer1);
-      assert(current_size == (total_write_size + write_size - total_read_size));
+      assert(current_size == (total_write_size + write_size - total_transfer_size));
     }
 
     total_write_size += write_size;
@@ -309,7 +309,7 @@ int main(int argc, char **argv) {
       assert(transferred == transfer_size);
 
       current_size = test_case->buffer2->get_data_size(test_case->buffer2);
-      assert(current_size == (total_transfer_size + transfer_size - total_write_size));
+      assert(current_size == (total_transfer_size + transfer_size - total_read_size));
 
       uint64_t seeked =
         test_case->buffer1->seek(test_case->buffer1, transfer_size);
@@ -366,12 +366,14 @@ int main(int argc, char **argv) {
     assert(transferred == transfer_size);
 
     current_size = test_case->buffer2->get_data_size(test_case->buffer2);
-    assert(current_size == (transfer_size + transferred));
+    assert(current_size == (total_transfer_size + transfer_size - total_read_size));
 
     uint64_t seeked =
       test_case->buffer1->seek(test_case->buffer1, transfer_size);
     assert(seeked == transfer_size);
   }
+
+  total_transfer_size += transfer_size;
 
   read_size = (total_transfer_size - total_read_size);
   read_buf = new uint8_t[read_size];
