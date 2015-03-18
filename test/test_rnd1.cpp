@@ -260,7 +260,7 @@ int main(int argc, char **argv) {
 
   gettimeofday(&start_time, NULL);
 
-  while (iterations < 1) {
+  while (iterations < iterations_limit) {
     size_t write_size = 64 + (random() % (4 * 1024));
     if (write_size > stream_buf_size) {
       delete [] stream_buf;
@@ -404,6 +404,11 @@ int main(int argc, char **argv) {
     assert(current_size == 0);
   }
 
+  total_read_size += read_size;
+
+  assert(total_write_size == total_transfer_size);
+  assert(total_transfer_size == total_read_size);
+
   delete [] read_buf;
   read_buf = NULL;
 
@@ -414,6 +419,10 @@ int main(int argc, char **argv) {
     ((end_time.tv_sec - start_time.tv_sec) * 1000000) -
     start_time.tv_usec +
     end_time.tv_usec;
+  if (millisecs == 0)
+    {
+    millisecs = 1;
+    }
 
   printf("Done...\nControl digest: ");
   for (unsigned int i = 0; i < control_digest_len; i++)
@@ -443,9 +452,10 @@ int main(int argc, char **argv) {
       retval = -1;
   }
 
-  printf("Total bytes transferred: %ld Bytes (%ld bps)\n",
-    (total_read_size * test_cases.size()),
-    (total_read_size * test_cases.size() * 8 * 1000000) / millisecs);
+  printf(
+    "Total bytes transferred: %ld Bytes (%ld bps)\n",
+      (total_read_size * test_cases.size()),
+      (total_read_size * test_cases.size() * 8 * 1000000) / millisecs);
 
   while (!test_cases.empty()) {
     delete test_cases.back();
