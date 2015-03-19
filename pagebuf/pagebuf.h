@@ -283,6 +283,14 @@ struct pb_list_strategy {
   bool fragment_as_target;
 };
 
+
+
+/** The page size of the default pb_list strategy.
+ */
+#define PB_TRIVIAL_LIST_DEFAULT_PAGE_SIZE                 4096
+
+
+
 /** Get a built in, trivial list strategy.
  *
  * page_size is 4096

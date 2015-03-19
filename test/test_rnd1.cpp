@@ -92,15 +92,16 @@ void read_stream(
  */
 class TestCase {
   public:
-    TestCase(const std::string& description) :
+    TestCase(
+        const std::string& description, const pb_list_strategy& strategy) :
       description(description),
       buffer1(NULL),
       buffer2(NULL),
       md5ctx(NULL),
       digest(NULL),
       digest_len(0) {
-      buffer1 = pb_trivial_list_create();
-      buffer2 = pb_trivial_list_create();
+      buffer1 = pb_trivial_list_create_with_strategy(&strategy);
+      buffer2 = pb_trivial_list_create_with_strategy(&strategy);
 
       md5ctx = new EVP_MD_CTX;
 
@@ -224,7 +225,7 @@ int main(int argc, char **argv) {
         seed = atol(optarg);
         break;
       default:
-        printf("Usage: %s [-i iterations_min] [-r iterations_max] [-s seed]\n", argv[0]);
+        printf("Usage: %s [-i iterations_min] [-r iterations_range] [-s seed]\n", argv[0]);
         return -1;
     }
   }
@@ -256,7 +257,43 @@ int main(int argc, char **argv) {
   EVP_MD_CTX_init(&control_mdctx);
   EVP_DigestInit_ex(&control_mdctx, EVP_md5(), NULL);
 
-  test_cases.push_back(new TestCase("Standard heap sourced pb_buffer"));
+  struct pb_list_strategy strategy;
+
+  strategy.page_size = PB_TRIVIAL_LIST_DEFAULT_PAGE_SIZE;
+  strategy.clone_on_write = false;
+  strategy.fragment_as_target = false;
+
+  test_cases.push_back(
+    new TestCase(
+      "Standard heap sourced pb_buffer                                       ",
+      strategy));
+
+  strategy.page_size = PB_TRIVIAL_LIST_DEFAULT_PAGE_SIZE;
+  strategy.clone_on_write = false;
+  strategy.fragment_as_target = true;
+
+  test_cases.push_back(
+    new TestCase(
+      "Standard heap sourced pb_buffer, fragment_as_target                   ",
+      strategy));
+
+  strategy.page_size = PB_TRIVIAL_LIST_DEFAULT_PAGE_SIZE;
+  strategy.clone_on_write = true;
+  strategy.fragment_as_target = false;
+
+  test_cases.push_back(
+    new TestCase(
+      "Standard heap sourced pb_buffer, clone_on_Write                       ",
+      strategy));
+
+  strategy.page_size = PB_TRIVIAL_LIST_DEFAULT_PAGE_SIZE;
+  strategy.clone_on_write = true;
+  strategy.fragment_as_target = true;
+
+  test_cases.push_back(
+    new TestCase(
+      "Standard heap sourced pb_buffer, clone_on_Write and fragment_on_target",
+      strategy));
 
   gettimeofday(&start_time, NULL);
 
@@ -416,9 +453,8 @@ int main(int argc, char **argv) {
 
   gettimeofday(&end_time, NULL);
   millisecs =
-    ((end_time.tv_sec - start_time.tv_sec) * 1000000) -
-    start_time.tv_usec +
-    end_time.tv_usec;
+    ((end_time.tv_sec - start_time.tv_sec) * 1000) +
+    ((end_time.tv_usec + start_time.tv_usec) / 1000);
   if (millisecs == 0)
     {
     millisecs = 1;
@@ -455,7 +491,7 @@ int main(int argc, char **argv) {
   printf(
     "Total bytes transferred: %ld Bytes (%ld bps)\n",
       (total_read_size * test_cases.size()),
-      (total_read_size * test_cases.size() * 8 * 1000000) / millisecs);
+      (total_read_size * test_cases.size() * 8) / (millisecs / 1000));
 
   while (!test_cases.empty()) {
     delete test_cases.back();
