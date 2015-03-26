@@ -1118,7 +1118,7 @@ struct pb_line_reader *pb_trivial_line_reader_create_with_alloc(
 
   pb_trivial_line_reader_reset(&trivial_line_reader->line_reader);
 
-  return NULL;
+  return &trivial_line_reader->line_reader;
 }
 
 /*******************************************************************************
