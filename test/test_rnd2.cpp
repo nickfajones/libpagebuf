@@ -194,21 +194,21 @@ class LineProfile {
   public:
     LineProfile(size_t len, bool has_cr) :
       len(len),
+      full_len(len  + ((has_cr) ? 2 : 1)),
       has_cr(has_cr) {
-    }
-
-  private:
-    LineProfile(const LineProfile& rvalue) {
     }
 
   public:
     ~LineProfile() {
       len = 0;
+      full_len = 0;
       has_cr = false;
     }
 
   public:
     size_t len;
+    size_t full_len;
+
     bool has_cr;
 };
 
@@ -269,7 +269,7 @@ uint64_t read_lines(
       test_case->line_reader->get_line_len(test_case->line_reader);
     assert(line_len == line_profile->len);
 
-    assert(test_case->line_reader->is_line_crlf(test_case->line_reader) == line_profile->has_cr);
+    assert(test_case->line_reader->is_crlf(test_case->line_reader) == line_profile->has_cr);
 
     assert(stream_buf_size >= line_profile->len);
 
@@ -279,10 +279,10 @@ uint64_t read_lines(
 
     uint64_t seeked =
       test_case->line_reader->seek_line(test_case->line_reader);
-    assert(seeked == (line_profile->len + (line_profile->has_cr) ? 2 : 1));
+    assert(seeked == line_profile->full_len);
 
     current_size = test_case->buffer2->get_data_size(test_case->buffer2);
-    assert(current_size == (total_transfer_size - total_read_size - seeked));
+    assert(current_size == (total_transfer_size - total_read_size - seek_size - seeked));
 
     delete line_profile;
 
@@ -376,6 +376,7 @@ int main(int argc, char **argv) {
       "Standard heap sourced pb_buffer                                       ",
       strategy));
 
+  /*
   strategy.page_size = PB_TRIVIAL_LIST_DEFAULT_PAGE_SIZE;
   strategy.clone_on_write = false;
   strategy.fragment_as_target = true;
@@ -402,6 +403,7 @@ int main(int argc, char **argv) {
     new TestCase(
       "Standard heap sourced pb_buffer, clone_on_Write and fragment_on_target",
       strategy));
+*/
 
   EVP_MD_CTX control_mdctx;
 
@@ -417,12 +419,12 @@ int main(int argc, char **argv) {
   gettimeofday(&start_time, NULL);
 
   while (iterations < iterations_limit) {
-    bool write_has_cr = ((random() % 2) == 1);
+    line_profiles.push_back(
+      new LineProfile((random() % 1024), ((random() % 2) == 1)));
 
-    size_t write_size = random() % 128;
-    size_t full_write_size = (write_has_cr) ? 2 : 1;
-
-    line_profiles.push_back(new LineProfile(write_size, write_has_cr));
+    size_t write_size = line_profiles.back()->len;
+    size_t full_write_size = line_profiles.back()->full_len;
+    bool write_has_cr = line_profiles.back()->has_cr;
 
     if ((full_write_size) > stream_buf_size) {
       if (stream_buf)
@@ -479,23 +481,28 @@ int main(int argc, char **argv) {
       LineProfile *line_profile = *itr;
 
       if ((total_transfer_size - total_read_size) <
-          (line_profile->len + read_size)) {
+          (line_profile->full_len + read_size)) {
         break;
       }
 
-      read_size += line_profile->len + ((line_profile->has_cr) ? 2 : 1);
+      read_size += line_profile->full_len;
     }
+
+    if (iterations == 370)
+      printf("dude\n");
 
     for (test_itr = test_cases.begin();
          test_itr != test_cases.end();
          ++test_itr) {
       test_case = *test_itr;
 
-      read_lines(
+      uint64_t seek_size = read_lines(
         test_case,
         line_profiles,
         stream_buf, stream_buf_size,
         total_transfer_size, total_read_size);
+
+      assert(seek_size == read_size);
     }
 
     total_read_size += read_size;

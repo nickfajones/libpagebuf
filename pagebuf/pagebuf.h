@@ -639,11 +639,11 @@ struct pb_line_reader {
 
   /** Indicates whether the line discovered in has_line is:
    *    LF (false) or CRLF (true) */
-  bool (*is_line_crlf)(struct pb_line_reader * const line_reader);
+  bool (*is_crlf)(struct pb_line_reader * const line_reader);
   /** Indicates whether the line discovery has reached the end of the list.
    *
    * Buffer end may be used as line end if terminate_line is called. */
-  bool (*is_list_end)(struct pb_line_reader * const line_reader);
+  bool (*is_end)(struct pb_line_reader * const line_reader);
 
   /** Reset the current line discovery back to an initial state. */
   void (*reset)(struct pb_line_reader * const line_reader);

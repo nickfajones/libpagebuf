@@ -1100,12 +1100,19 @@ struct pb_line_reader *pb_trivial_line_reader_create_with_alloc(
     return NULL;
 
   trivial_line_reader->line_reader.has_line = &pb_trivial_line_reader_has_line;
+
   trivial_line_reader->line_reader.get_line_len =
     &pb_trivial_line_reader_get_line_len;
   trivial_line_reader->line_reader.get_line_data =
     &pb_trivial_line_reader_get_line_data;
+
   trivial_line_reader->line_reader.seek_line =
     &pb_trivial_line_reader_seek_line;
+
+  trivial_line_reader->line_reader.is_crlf =
+    &pb_trivial_line_reader_is_crlf;
+  trivial_line_reader->line_reader.is_end =
+    &pb_trivial_line_reader_is_end;
 
   trivial_line_reader->line_reader.terminate_line =
     &pb_trivial_line_reader_terminate_line;
@@ -1128,6 +1135,7 @@ bool pb_trivial_line_reader_has_line(
   struct pb_trivial_line_reader *trivial_line_reader =
     (struct pb_trivial_line_reader*)line_reader;
   struct pb_list *list = trivial_line_reader->line_reader.list;
+  struct pb_list_iterator *itr = &trivial_line_reader->list_iterator;
 
   if (trivial_line_reader->list_data_revision != list->get_data_revision(list))
     pb_trivial_line_reader_reset(&trivial_line_reader->line_reader);
@@ -1135,10 +1143,10 @@ bool pb_trivial_line_reader_has_line(
   if (trivial_line_reader->has_line)
     return true;
 
-  if (list->is_iterator_end(list, &trivial_line_reader->list_iterator))
-    list->iterator_prev(list, &trivial_line_reader->list_iterator);
+  if (list->is_iterator_end(list, itr))
+    list->iterator_prev(list, itr);
 
-  while (!list->is_iterator_end(list, &trivial_line_reader->list_iterator)) {
+  while (!list->is_iterator_end(list, itr)) {
     const struct pb_data_vec *data_vec =
       &trivial_line_reader->list_iterator.page->data_vec;
 
@@ -1154,14 +1162,19 @@ bool pb_trivial_line_reader_has_line(
       ++trivial_line_reader->page_offset;
     }
 
-    list->iterator_next(list, &trivial_line_reader->list_iterator);
+    list->iterator_next(list, itr);
 
     trivial_line_reader->page_offset = 0;
   }
 
-  if (list->is_iterator_end(list, &trivial_line_reader->list_iterator) &&
-      trivial_line_reader->is_terminated)
-    return (trivial_line_reader->has_line = true);
+  if (list->is_iterator_end(list, itr)) {
+    list->iterator_prev(list, itr);
+
+    trivial_line_reader->page_offset = itr->page->data_vec.len;
+
+    if (trivial_line_reader->is_terminated)
+      return (trivial_line_reader->has_line = true);
+  }
 
   return false;
 }
@@ -1180,10 +1193,10 @@ uint64_t pb_trivial_line_reader_get_line_len(
   if (!trivial_line_reader->has_line)
     return 0;
 
-  if (!trivial_line_reader->has_cr)
-    return trivial_line_reader->list_offset;
+  if (trivial_line_reader->has_cr)
+    return (trivial_line_reader->list_offset - 1);
 
-  return (trivial_line_reader->list_offset - 1);
+  return trivial_line_reader->list_offset;
 }
 
 /*******************************************************************************
@@ -1247,7 +1260,11 @@ uint64_t pb_trivial_line_reader_seek_line(
   if (!trivial_line_reader->has_line)
     return 0;
 
-  uint64_t to_seek = trivial_line_reader->list_offset;
+  uint64_t to_seek =
+    (trivial_line_reader->is_terminated) ?
+       trivial_line_reader->list_offset :
+       trivial_line_reader->list_offset + 1;
+
   list->seek(list, to_seek);
 
   pb_trivial_line_reader_reset(&trivial_line_reader->line_reader);
@@ -1262,6 +1279,14 @@ bool pb_trivial_line_reader_is_crlf(struct pb_line_reader * const line_reader) {
     (struct pb_trivial_line_reader*)line_reader;
 
   return trivial_line_reader->has_cr;
+}
+
+bool pb_trivial_line_reader_is_end(struct pb_line_reader * const line_reader) {
+  struct pb_trivial_line_reader *trivial_line_reader =
+      (struct pb_trivial_line_reader*)line_reader;
+  struct pb_list *list = trivial_line_reader->line_reader.list;
+
+  return list->is_iterator_end(list, &trivial_line_reader->list_iterator);
 }
 
 /*******************************************************************************
@@ -1286,6 +1311,7 @@ void pb_trivial_line_reader_reset(struct pb_line_reader * const line_reader) {
   trivial_line_reader->list_data_revision = list->get_data_revision(list);
 
   trivial_line_reader->list_offset = 0;
+  trivial_line_reader->page_offset = 0;
 
   trivial_line_reader->has_line = false;
   trivial_line_reader->has_cr = false;
