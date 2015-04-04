@@ -576,12 +576,14 @@ void pb_trivial_list_iterator_prev(struct pb_list * const list,
 }
 
 /*******************************************************************************
- * fragment_as_target: false,true
  */
 uint64_t pb_trivial_list_write_data(struct pb_list * const list,
     const uint8_t *buf,
     uint64_t len) {
   struct pb_trivial_list *trivial_list = (struct pb_trivial_list*)list;
+
+  if (trivial_list->list.get_data_size(&trivial_list->list) == 0)
+    ++trivial_list->data_revision;
 
   struct pb_list_iterator itr;
   trivial_list->list.get_iterator_end(&trivial_list->list, &itr);
@@ -627,6 +629,9 @@ uint64_t pb_trivial_list_write_list1(struct pb_list * const list,
     uint64_t len) {
   struct pb_trivial_list *trivial_list = (struct pb_trivial_list*)list;
 
+  if (trivial_list->list.get_data_size(&trivial_list->list) == 0)
+    ++trivial_list->data_revision;
+
   struct pb_list_iterator itr;
   trivial_list->list.get_iterator_end(&trivial_list->list, &itr);
 
@@ -647,7 +652,7 @@ uint64_t pb_trivial_list_write_list1(struct pb_list * const list,
     if (!page)
       return written;
 
-    trivial_list->list.insert(&trivial_list->list, page, &itr, 0);
+    write_len = trivial_list->list.insert(&trivial_list->list, page, &itr, 0);
 
     len -= write_len;
     written += write_len;
@@ -670,6 +675,9 @@ uint64_t pb_trivial_list_write_list2(struct pb_list * const list,
     struct pb_list * const src_list,
     uint64_t len) {
   struct pb_trivial_list *trivial_list = (struct pb_trivial_list*)list;
+
+  if (trivial_list->list.get_data_size(&trivial_list->list) == 0)
+    ++trivial_list->data_revision;
 
   struct pb_list_iterator itr;
   trivial_list->list.get_iterator_end(&trivial_list->list, &itr);
@@ -726,6 +734,9 @@ uint64_t pb_trivial_list_write_list3(struct pb_list * const list,
     struct pb_list * const src_list,
     uint64_t len) {
   struct pb_trivial_list *trivial_list = (struct pb_trivial_list*)list;
+
+  if (trivial_list->list.get_data_size(&trivial_list->list) == 0)
+    ++trivial_list->data_revision;
 
   struct pb_list_iterator itr;
   trivial_list->list.get_iterator_end(&trivial_list->list, &itr);
@@ -788,6 +799,9 @@ uint64_t pb_trivial_list_write_list4(struct pb_list * const list,
     struct pb_list * const src_list,
     uint64_t len) {
   struct pb_trivial_list *trivial_list = (struct pb_trivial_list*)list;
+
+  if (trivial_list->list.get_data_size(&trivial_list->list) == 0)
+    ++trivial_list->data_revision;
 
   struct pb_list_iterator itr;
   trivial_list->list.get_iterator_end(&trivial_list->list, &itr);
@@ -1265,7 +1279,7 @@ uint64_t pb_trivial_line_reader_seek_line(
        trivial_line_reader->list_offset :
        trivial_line_reader->list_offset + 1;
 
-  list->seek(list, to_seek);
+  to_seek = list->seek(list, to_seek);
 
   pb_trivial_line_reader_reset(&trivial_line_reader->line_reader);
 

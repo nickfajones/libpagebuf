@@ -141,10 +141,10 @@ class TestCase {
     }
 
     ~TestCase() {
-      if (buffer1) {
-        buffer1->destroy(buffer1);
+      if (line_reader) {
+        line_reader->destroy(line_reader);
 
-        buffer1 = NULL;
+        line_reader = NULL;
       }
 
       if (buffer2) {
@@ -153,10 +153,11 @@ class TestCase {
         buffer2 = NULL;
       }
 
-      if (line_reader) {
-        line_reader->destroy(line_reader);
 
-        line_reader = NULL;
+      if (buffer1) {
+        buffer1->destroy(buffer1);
+
+        buffer1 = NULL;
       }
 
       if (md5ctx) {
@@ -376,7 +377,6 @@ int main(int argc, char **argv) {
       "Standard heap sourced pb_buffer                                       ",
       strategy));
 
-  /*
   strategy.page_size = PB_TRIVIAL_LIST_DEFAULT_PAGE_SIZE;
   strategy.clone_on_write = false;
   strategy.fragment_as_target = true;
@@ -403,7 +403,6 @@ int main(int argc, char **argv) {
     new TestCase(
       "Standard heap sourced pb_buffer, clone_on_Write and fragment_on_target",
       strategy));
-*/
 
   EVP_MD_CTX control_mdctx;
 
@@ -460,6 +459,9 @@ int main(int argc, char **argv) {
 
     total_write_size += full_write_size;
 
+    if (iterations == 370)
+          printf("dude\n");
+
     for (test_itr = test_cases.begin();
          test_itr != test_cases.end();
          ++test_itr) {
@@ -487,9 +489,6 @@ int main(int argc, char **argv) {
 
       read_size += line_profile->full_len;
     }
-
-    if (iterations == 370)
-      printf("dude\n");
 
     for (test_itr = test_cases.begin();
          test_itr != test_cases.end();
@@ -581,6 +580,9 @@ int main(int argc, char **argv) {
     assert(test_case->buffer1->get_data_size(test_case->buffer1) == 0);
     assert(test_case->buffer2->get_data_size(test_case->buffer2) == 0);
 
+    EVP_DigestFinal_ex(
+      test_case->md5ctx, test_case->digest, &test_case->digest_len);
+
     assert(test_case->digest_len == control_digest_len);
 
     bool digest_match =
@@ -600,7 +602,7 @@ int main(int argc, char **argv) {
   printf(
     "Total bytes transferred: %ld Bytes (%ld bps)\n",
       (total_read_size * test_cases.size()),
-      (total_read_size * test_cases.size() * 8) / (millisecs / 1000));
+      (total_read_size * test_cases.size() * 8 * 1000) / millisecs);
 
   while (!test_cases.empty()) {
     delete test_cases.back();
