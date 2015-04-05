@@ -90,57 +90,37 @@ void read_stream(
 
 /*******************************************************************************
  */
-class TestState {
-  public:
-    TestState() :
-      total_write_size(0),
-      total_transfer_size(0),
-      total_read_size(0),
-      stream_buf_size(0),
-      stream_buf(NULL) {
-    }
-
-  public:
-    uint64_t total_write_size;
-    uint64_t total_transfer_size;
-    uint64_t total_read_size;
-
-    uint64_t stream_buf_size;
-
-    uint8_t *stream_buf;
-};
-
-
-
-/*******************************************************************************
- */
 class TestCase {
   public:
     TestCase(
         const std::string& description, const pb_list_strategy& strategy) :
       description(description),
-      buffer1(NULL),
-      buffer2(NULL),
-      line_reader(NULL),
-      md5ctx(NULL),
-      digest(NULL),
+      buffer1(pb_trivial_list_create_with_strategy(&strategy)),
+      buffer2(pb_trivial_list_create_with_strategy(&strategy)),
+      line_reader(pb_trivial_line_reader_create(buffer2)),
+      md5ctx(new EVP_MD_CTX),
+      digest(new unsigned char[EVP_MAX_MD_SIZE]),
       digest_len(0) {
-      buffer1 = pb_trivial_list_create_with_strategy(&strategy);
-      buffer2 = pb_trivial_list_create_with_strategy(&strategy);
-      line_reader = pb_trivial_line_reader_create(buffer2);
-
-      md5ctx = new EVP_MD_CTX;
-
       EVP_MD_CTX_init(md5ctx);
       EVP_DigestInit_ex(md5ctx, EVP_md5(), NULL);
 
-      digest = new unsigned char[EVP_MAX_MD_SIZE];
       memset(digest, 0, EVP_MAX_MD_SIZE);
-
-      digest_len = 0;
     }
 
     ~TestCase() {
+      digest_len = 0;
+
+      if (digest) {
+        delete [] digest;
+      }
+
+      if (md5ctx) {
+        EVP_MD_CTX_cleanup(md5ctx);
+
+        delete md5ctx;
+        md5ctx = NULL;
+      }
+
       if (line_reader) {
         line_reader->destroy(line_reader);
 
@@ -153,25 +133,11 @@ class TestCase {
         buffer2 = NULL;
       }
 
-
       if (buffer1) {
         buffer1->destroy(buffer1);
 
         buffer1 = NULL;
       }
-
-      if (md5ctx) {
-        EVP_MD_CTX_cleanup(md5ctx);
-
-        delete md5ctx;
-        md5ctx = NULL;
-      }
-
-      if (digest) {
-        delete [] digest;
-      }
-
-      digest_len = 0;
     }
 
   public:
@@ -256,15 +222,16 @@ void transfer_data(
 uint64_t read_lines(
     TestCase* test_case,
     std::list<LineProfile*>& line_profiles,
-    uint8_t *stream_buf, uint64_t stream_buf_size,
+    uint8_t *read_buf, uint64_t read_buf_size,
     uint64_t total_transfer_size, uint64_t total_read_size) {
   uint64_t seek_size = 0;
 
   uint64_t current_size = test_case->buffer2->get_data_size(test_case->buffer2);
 
+  std::list<LineProfile*>::iterator profiles_itr = line_profiles.begin();
+
   while (test_case->line_reader->has_line(test_case->line_reader)) {
-    LineProfile *line_profile = line_profiles.front();
-    line_profiles.pop_front();
+    LineProfile *line_profile = *profiles_itr;
 
     uint64_t line_len =
       test_case->line_reader->get_line_len(test_case->line_reader);
@@ -272,11 +239,11 @@ uint64_t read_lines(
 
     assert(test_case->line_reader->is_crlf(test_case->line_reader) == line_profile->has_cr);
 
-    assert(stream_buf_size >= line_profile->len);
+    assert(read_buf_size >= line_profile->len);
 
     test_case->line_reader->get_line_data(
-      test_case->line_reader, stream_buf, line_profile->len);
-    EVP_DigestUpdate(test_case->md5ctx, stream_buf, line_profile->len);
+      test_case->line_reader, read_buf, line_profile->len);
+    EVP_DigestUpdate(test_case->md5ctx, read_buf, line_profile->len);
 
     uint64_t seeked =
       test_case->line_reader->seek_line(test_case->line_reader);
@@ -285,9 +252,9 @@ uint64_t read_lines(
     current_size = test_case->buffer2->get_data_size(test_case->buffer2);
     assert(current_size == (total_transfer_size - total_read_size - seek_size - seeked));
 
-    delete line_profile;
-
     seek_size += seeked;
+
+    ++profiles_itr;
   }
 
   return seek_size;
@@ -459,9 +426,6 @@ int main(int argc, char **argv) {
 
     total_write_size += full_write_size;
 
-    if (iterations == 370)
-          printf("dude\n");
-
     for (test_itr = test_cases.begin();
          test_itr != test_cases.end();
          ++test_itr) {
@@ -476,11 +440,12 @@ int main(int argc, char **argv) {
     total_transfer_size += transfer_size;
 
     uint64_t read_size = 0;
+    size_t complete_counter = 0;
 
-    for (std::list<LineProfile*>::iterator itr = line_profiles.begin();
-         itr != line_profiles.end();
-         ++itr) {
-      LineProfile *line_profile = *itr;
+    for (std::list<LineProfile*>::iterator profiles_itr = line_profiles.begin();
+         profiles_itr != line_profiles.end();
+         ++profiles_itr) {
+      LineProfile *line_profile = *profiles_itr;
 
       if ((total_transfer_size - total_read_size) <
           (line_profile->full_len + read_size)) {
@@ -488,6 +453,8 @@ int main(int argc, char **argv) {
       }
 
       read_size += line_profile->full_len;
+
+      ++complete_counter;
     }
 
     for (test_itr = test_cases.begin();
@@ -505,6 +472,15 @@ int main(int argc, char **argv) {
     }
 
     total_read_size += read_size;
+
+    while (complete_counter > 0) {
+      LineProfile *line_profile = line_profiles.front();
+      line_profiles.pop_front();
+
+      delete line_profile;
+
+      --complete_counter;
+    }
 
     ++iterations;
   }
@@ -529,6 +505,22 @@ int main(int argc, char **argv) {
     total_transfer_size += transfer_size;
 
     uint64_t read_size = 0;
+    size_t complete_counter = 0;
+
+    for (std::list<LineProfile*>::iterator profiles_itr = line_profiles.begin();
+        profiles_itr != line_profiles.end();
+         ++profiles_itr) {
+      LineProfile *line_profile = *profiles_itr;
+
+      if ((total_transfer_size - total_read_size) <
+          (line_profile->full_len + read_size)) {
+        break;
+      }
+
+      read_size += line_profile->full_len;
+
+      ++complete_counter;
+    }
 
     for (test_itr = test_cases.begin();
          test_itr != test_cases.end();
@@ -541,10 +533,16 @@ int main(int argc, char **argv) {
         stream_buf, stream_buf_size,
         total_transfer_size, total_read_size);
 
-      if (read_size != 0)
-        assert(seek_size == read_size);
-      else
-        read_size = seek_size;
+      assert(seek_size == read_size);
+    }
+
+    while (complete_counter > 0) {
+      LineProfile *line_profile = line_profiles.front();
+      line_profiles.pop_front();
+
+      delete line_profile;
+
+      --complete_counter;
     }
 
     total_read_size += read_size;

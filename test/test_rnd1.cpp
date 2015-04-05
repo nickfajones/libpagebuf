@@ -95,23 +95,15 @@ class TestCase {
     TestCase(
         const std::string& description, const pb_list_strategy& strategy) :
       description(description),
-      buffer1(NULL),
-      buffer2(NULL),
-      md5ctx(NULL),
-      digest(NULL),
+      buffer1(pb_trivial_list_create_with_strategy(&strategy)),
+      buffer2(pb_trivial_list_create_with_strategy(&strategy)),
+      md5ctx(new EVP_MD_CTX),
+      digest(new unsigned char[EVP_MAX_MD_SIZE]),
       digest_len(0) {
-      buffer1 = pb_trivial_list_create_with_strategy(&strategy);
-      buffer2 = pb_trivial_list_create_with_strategy(&strategy);
-
-      md5ctx = new EVP_MD_CTX;
-
       EVP_MD_CTX_init(md5ctx);
       EVP_DigestInit_ex(md5ctx, EVP_md5(), NULL);
 
-      digest = new unsigned char[EVP_MAX_MD_SIZE];
       memset(digest, 0, EVP_MAX_MD_SIZE);
-
-      digest_len = 0;
     }
 
   private:
@@ -120,16 +112,10 @@ class TestCase {
 
   public:
     ~TestCase() {
-      if (buffer1) {
-        buffer1->destroy(buffer1);
+      digest_len = 0;
 
-        buffer1 = NULL;
-      }
-
-      if (buffer2) {
-        buffer2->destroy(buffer2);
-
-        buffer2 = NULL;
+      if (digest) {
+        delete [] digest;
       }
 
       if (md5ctx) {
@@ -139,11 +125,17 @@ class TestCase {
         md5ctx = NULL;
       }
 
-      if (digest) {
-        delete [] digest;
+      if (buffer2) {
+        buffer2->destroy(buffer2);
+
+        buffer2 = NULL;
       }
 
-      digest_len = 0;
+      if (buffer1) {
+        buffer1->destroy(buffer1);
+
+        buffer1 = NULL;
+      }
     }
 
   private:
@@ -167,49 +159,85 @@ class TestCase {
 
 /*******************************************************************************
  */
+void write_line(
+    TestCase* test_case,
+    uint8_t *stream_buf, uint64_t full_write_size,
+    uint64_t total_write_size, uint64_t total_transfer_size) {
+  uint64_t current_size = test_case->buffer1->get_data_size(test_case->buffer1);
+  assert(current_size == (total_write_size - total_transfer_size));
+
+  uint64_t written =
+    test_case->buffer1->write_data(
+      test_case->buffer1, stream_buf, full_write_size);
+  assert(written == full_write_size);
+
+  current_size = test_case->buffer1->get_data_size(test_case->buffer1);
+  assert(current_size == (total_write_size + full_write_size - total_transfer_size));
+}
+
+void transfer_data(
+    TestCase* test_case,
+    uint64_t transfer_size,
+    uint64_t total_transfer_size, uint64_t total_read_size) {
+  uint64_t current_size = test_case->buffer2->get_data_size(test_case->buffer2);
+  assert(current_size == (total_transfer_size - total_read_size));
+
+  uint64_t transferred =
+    test_case->buffer2->write_list(
+      test_case->buffer2, test_case->buffer1, transfer_size);
+  assert(transferred == transfer_size);
+
+  current_size = test_case->buffer2->get_data_size(test_case->buffer2);
+  assert(current_size == (total_transfer_size + transfer_size - total_read_size));
+
+  uint64_t seeked =
+    test_case->buffer1->seek(test_case->buffer1, transfer_size);
+  assert(seeked == transfer_size);
+}
+
+uint64_t read_data(
+    TestCase* test_case,
+    uint8_t *read_buf, uint64_t read_size,
+    uint64_t total_transfer_size, uint64_t total_read_size) {
+  uint64_t current_size = test_case->buffer2->get_data_size(test_case->buffer2);
+  assert(current_size >= read_size);
+
+  uint64_t readed =
+    test_case->buffer2->read_data(
+      test_case->buffer2, read_buf, read_size);
+  assert(readed == read_size);
+
+  EVP_DigestUpdate(test_case->md5ctx, read_buf, read_size);
+
+  uint64_t seeked =
+    test_case->buffer2->seek(test_case->buffer2, read_size);
+  assert(seeked == read_size);
+
+  current_size = test_case->buffer2->get_data_size(test_case->buffer2);
+  assert(current_size == (total_transfer_size - total_read_size - read_size));
+
+  return seeked;
+}
+
+
+
+/*******************************************************************************
+ */
 #define STREAM_BUF_SIZE                                   (1024 * 32)
 
 int main(int argc, char **argv) {
-  char opt;
-  uint32_t seed = (UINT16_MAX + 1);
-
-  uint8_t *stream_source_buf;
-  uint8_t *stream_buf;
-  uint64_t stream_buf_size;
-
-  long val;
-  uint32_t iterations_limit;
-  uint32_t iterations_min = 50000;
-  uint32_t iterations_range = 50000;
-  uint32_t iterations = 0;
-
-  uint64_t current_size;
-  uint64_t transfer_size;
-  uint64_t read_size;
-
-  uint64_t total_write_size = 0;
-  uint64_t total_transfer_size = 0;
-  uint64_t total_read_size = 0;
-
-  uint8_t *read_buf;
-
-  struct timeval start_time;
-  struct timeval end_time;
-  uint64_t millisecs;
-
-  std::list<TestCase*> test_cases;
-  std::list<TestCase*>::iterator test_itr;
-
-  TestCase *test_case;
-
-  EVP_MD_CTX control_mdctx;
-
-  unsigned char control_digest[EVP_MAX_MD_SIZE];
-  unsigned int control_digest_len = 0;
-
   int retval = 0;
 
+  uint32_t seed = (UINT32_MAX + 1);
+
+  uint32_t iterations = 0;
+  uint32_t iterations_min = 50000;
+  uint32_t iterations_range = 50000;
+
+  char opt;
   while ((opt = getopt(argc, argv, "i:r:s:")) != -1) {
+    long val;
+
     switch (opt) {
       case 'i':
         val = atol(optarg);
@@ -230,7 +258,7 @@ int main(int argc, char **argv) {
     }
   }
 
-  if (seed == (UINT16_MAX + 1)) {
+  if (seed == (UINT32_MAX + 1)) {
     seed = generate_seed();
     if (seed == (UINT16_MAX + 1))
       return -1;
@@ -244,18 +272,23 @@ int main(int argc, char **argv) {
 
   srandom(seed);
 
-  stream_source_buf = new uint8_t[STREAM_BUF_SIZE + 1];
-  stream_buf = new uint8_t[STREAM_BUF_SIZE + 1];
-  stream_buf_size = STREAM_BUF_SIZE;
-
-  generate_stream_source_buf(stream_source_buf, STREAM_BUF_SIZE);
-
-  iterations_limit = iterations_min + (random() % iterations_range);
+  uint32_t iterations_limit = iterations_min + (random() % iterations_range);
 
   printf("Iterations to run: %d\n", iterations_limit);
 
-  EVP_MD_CTX_init(&control_mdctx);
-  EVP_DigestInit_ex(&control_mdctx, EVP_md5(), NULL);
+  uint8_t *stream_source_buf = new uint8_t[STREAM_BUF_SIZE + 1];
+  generate_stream_source_buf(stream_source_buf, STREAM_BUF_SIZE);
+
+  uint8_t *stream_buf = NULL;
+  uint64_t stream_buf_size = 0;
+
+  uint64_t total_write_size = 0;
+  uint64_t total_transfer_size = 0;
+  uint64_t total_read_size = 0;
+
+  std::list<TestCase*> test_cases;
+  std::list<TestCase*>::iterator test_itr;
+  TestCase *test_case;
 
   struct pb_list_strategy strategy;
 
@@ -295,6 +328,17 @@ int main(int argc, char **argv) {
       "Standard heap sourced pb_buffer, clone_on_Write and fragment_on_target",
       strategy));
 
+  EVP_MD_CTX control_mdctx;
+
+  unsigned char control_digest[EVP_MAX_MD_SIZE];
+  unsigned int control_digest_len = 0;
+
+  EVP_MD_CTX_init(&control_mdctx);
+  EVP_DigestInit_ex(&control_mdctx, EVP_md5(), NULL);
+
+  struct timeval start_time;
+  struct timeval end_time;
+
   gettimeofday(&start_time, NULL);
 
   while (iterations < iterations_limit) {
@@ -309,25 +353,21 @@ int main(int argc, char **argv) {
 
     EVP_DigestUpdate(&control_mdctx, stream_buf, write_size);
 
-    transfer_size = random() % (total_write_size + write_size - total_transfer_size);
+    uint64_t transfer_size =
+      random() % (total_write_size + write_size - total_transfer_size);
 
-    read_size = random() & (total_transfer_size + transfer_size- total_read_size);
+    uint64_t read_size =
+      random() & (total_transfer_size + transfer_size- total_read_size);
 
     for (test_itr = test_cases.begin();
          test_itr != test_cases.end();
          ++test_itr) {
       test_case = *test_itr;
 
-      current_size = test_case->buffer1->get_data_size(test_case->buffer1);
-      assert(current_size == (total_write_size - total_transfer_size));
-
-      uint64_t written =
-        test_case->buffer1->write_data(
-          test_case->buffer1, stream_buf, write_size);
-      assert(written == write_size);
-
-      current_size = test_case->buffer1->get_data_size(test_case->buffer1);
-      assert(current_size == (total_write_size + write_size - total_transfer_size));
+      write_line(
+        test_case,
+        stream_buf, write_size,
+        total_write_size, total_transfer_size);
     }
 
     total_write_size += write_size;
@@ -337,47 +377,25 @@ int main(int argc, char **argv) {
          ++test_itr) {
       test_case = *test_itr;
 
-      current_size = test_case->buffer2->get_data_size(test_case->buffer2);
-      assert(current_size == (total_transfer_size - total_read_size));
-
-      uint64_t transferred =
-        test_case->buffer2->write_list(
-          test_case->buffer2, test_case->buffer1, transfer_size);
-      assert(transferred == transfer_size);
-
-      current_size = test_case->buffer2->get_data_size(test_case->buffer2);
-      assert(current_size == (total_transfer_size + transfer_size - total_read_size));
-
-      uint64_t seeked =
-        test_case->buffer1->seek(test_case->buffer1, transfer_size);
-      assert(seeked == transfer_size);
+      transfer_data(
+        test_case,
+        transfer_size,
+        total_transfer_size, total_read_size);
     }
 
     total_transfer_size += transfer_size;
 
-    read_buf = new uint8_t[read_size];
+    uint8_t *read_buf = new uint8_t[read_size];
 
     for (test_itr = test_cases.begin();
          test_itr != test_cases.end();
          ++test_itr) {
       test_case = *test_itr;
 
-      current_size = test_case->buffer2->get_data_size(test_case->buffer2);
-      assert(current_size >= read_size);
-
-      uint64_t readed =
-        test_case->buffer2->read_data(
-          test_case->buffer2, read_buf, read_size);
-      assert(readed == read_size);
-
-      EVP_DigestUpdate(test_case->md5ctx, read_buf, read_size);
-
-      uint64_t seeked =
-        test_case->buffer2->seek(test_case->buffer2, read_size);
-      assert(seeked == read_size);
-
-      current_size = test_case->buffer2->get_data_size(test_case->buffer2);
-      assert(current_size == (total_transfer_size - total_read_size - read_size));
+      read_data(
+        test_case,
+        read_buf, read_size,
+        total_transfer_size, total_read_size);
     }
 
     total_read_size += read_size;
@@ -387,72 +405,58 @@ int main(int argc, char **argv) {
     ++iterations;
   }
 
-  transfer_size = (total_write_size - total_transfer_size);
+  while (total_transfer_size < total_write_size) {
+    uint64_t transfer_size =
+      random() % (total_write_size - total_transfer_size);
 
-  for (test_itr = test_cases.begin();
-       test_itr != test_cases.end();
-       ++test_itr) {
-    test_case = *test_itr;
+    uint64_t read_size =
+      random() & (total_transfer_size + transfer_size- total_read_size);
 
-    current_size = test_case->buffer1->get_data_size(test_case->buffer1);
-    assert(current_size == transfer_size);
+    if (transfer_size < 1024) {
+      transfer_size = (total_write_size - total_transfer_size);
 
-    uint64_t transferred =
-      test_case->buffer2->write_list(
-        test_case->buffer2, test_case->buffer1, transfer_size);
-    assert(transferred == transfer_size);
+      read_size = (total_transfer_size + transfer_size - total_read_size);
+    }
 
-    current_size = test_case->buffer2->get_data_size(test_case->buffer2);
-    assert(current_size == (total_transfer_size + transfer_size - total_read_size));
+    for (test_itr = test_cases.begin();
+         test_itr != test_cases.end();
+         ++test_itr) {
+      test_case = *test_itr;
 
-    uint64_t seeked =
-      test_case->buffer1->seek(test_case->buffer1, transfer_size);
-    assert(seeked == transfer_size);
+      transfer_data(
+        test_case,
+        transfer_size,
+        total_transfer_size, total_read_size);
+    }
+
+    total_transfer_size += transfer_size;
+
+    uint8_t *read_buf = new uint8_t[read_size];
+
+    for (test_itr = test_cases.begin();
+         test_itr != test_cases.end();
+         ++test_itr) {
+      test_case = *test_itr;
+
+      read_data(
+        test_case,
+        read_buf, read_size,
+        total_transfer_size, total_read_size);
+    }
+
+    total_read_size += read_size;
+
+    delete [] read_buf;
   }
-
-  total_transfer_size += transfer_size;
-
-  read_size = (total_transfer_size - total_read_size);
-  read_buf = new uint8_t[read_size];
-
-  for (test_itr = test_cases.begin();
-       test_itr != test_cases.end();
-       ++test_itr) {
-    test_case = *test_itr;
-
-    current_size = test_case->buffer2->get_data_size(test_case->buffer2);
-    assert(current_size >= read_size);
-
-    uint64_t readed =
-      test_case->buffer2->read_data(
-        test_case->buffer2, read_buf, read_size);
-    assert(readed == read_size);
-
-    EVP_DigestUpdate(test_case->md5ctx, read_buf, read_size);
-
-    EVP_DigestFinal_ex(
-      test_case->md5ctx, test_case->digest, &test_case->digest_len);
-
-    uint64_t seeked =
-      test_case->buffer2->seek(test_case->buffer2, read_size);
-    assert(seeked == read_size);
-
-    current_size = test_case->buffer2->get_data_size(test_case->buffer2);
-    assert(current_size == 0);
-  }
-
-  total_read_size += read_size;
 
   assert(total_write_size == total_transfer_size);
   assert(total_transfer_size == total_read_size);
 
-  delete [] read_buf;
-  read_buf = NULL;
-
   EVP_DigestFinal_ex(&control_mdctx, control_digest, &control_digest_len);
 
   gettimeofday(&end_time, NULL);
-  millisecs =
+
+  uint64_t millisecs =
     ((end_time.tv_sec - start_time.tv_sec) * 1000) +
     ((end_time.tv_usec + start_time.tv_usec) / 1000);
   if (millisecs == 0)
@@ -471,6 +475,12 @@ int main(int argc, char **argv) {
        test_itr != test_cases.end();
        ++test_itr) {
     test_case = *test_itr;
+
+    assert(test_case->buffer1->get_data_size(test_case->buffer1) == 0);
+    assert(test_case->buffer2->get_data_size(test_case->buffer2) == 0);
+
+    EVP_DigestFinal_ex(
+      test_case->md5ctx, test_case->digest, &test_case->digest_len);
 
     assert(test_case->digest_len == control_digest_len);
 
@@ -491,7 +501,7 @@ int main(int argc, char **argv) {
   printf(
     "Total bytes transferred: %ld Bytes (%ld bps)\n",
       (total_read_size * test_cases.size()),
-      (total_read_size * test_cases.size() * 8) / (millisecs / 1000));
+      (total_read_size * test_cases.size() * 8 * 1000) / millisecs);
 
   while (!test_cases.empty()) {
     delete test_cases.back();
