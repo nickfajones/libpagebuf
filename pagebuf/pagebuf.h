@@ -179,7 +179,7 @@ void pb_data_put(struct pb_data *data);
  * Multiple pb_page instances may refer to one pb_data instance, each
  * increasing the usage count.
  *
- * Because a page stays always within the boundary of its owner list, it
+ * Because a page stays always within the boundary of its owner buffer, it
  * needn't carry an allocator with it.
  */
 struct pb_page {
@@ -189,9 +189,9 @@ struct pb_page {
   /** The reference to the pb_data instance. */
   struct pb_data *data;
 
-  /** Previous page in a list structure. */
+  /** Previous page in a buffer structure. */
   struct pb_page *prev;
-  /** Next page in a list structure */
+  /** Next page in a buffer structure */
   struct pb_page *next;
 };
 
@@ -232,21 +232,21 @@ void pb_page_destroy(struct pb_page *page,
 
 
 
-/** A structure used to iterate over list data.
+/** A structure used to iterate over buffer data.
  */
-struct pb_list_iterator {
+struct pb_buffer_iterator {
   struct pb_page *page;
 };
 
 
 
-/** A structure that describes the internal strategy of a pb_list.
+/** A structure that describes the internal strategy of a pb_buffer.
  *
- * A list strategy controls the way that a list will carry out actions such
+ * A buffer strategy controls the way that a buffer will carry out actions such
  * as writing of data, or management of memory regions.
  */
-struct pb_list_strategy {
-  /** The size of data regions that the pb_list will internally dynamically
+struct pb_buffer_strategy {
+  /** The size of data regions that the pb_buffer will internally dynamically
    *  allocate.
    *
    * If this value is zero, there will be no limit on fragment size,
@@ -254,7 +254,7 @@ struct pb_list_strategy {
    * to the length of the source data. */
   size_t page_size;
 
-  /** Indicates whether data written to the list from another list is:
+  /** Indicates whether data written to the buffer from another buffer is:
    *
    * not_cloned (false): reference to the pb_data instance is incremented.
    *
@@ -262,7 +262,7 @@ struct pb_list_strategy {
    */
   bool clone_on_write;
 
-  /** Indicates how data written to the pb_list will be fragmented.
+  /** Indicates how data written to the pb_buffer will be fragmented.
    *
    * as source (false): source data fragmentation takes precedence.
    *                    When clone_on_write is false, source pages are
@@ -273,7 +273,7 @@ struct pb_list_strategy {
    *                    fragmented according to the lower of the source
    *                    fragment size, and the target page_size, which may be
    *                    zero, in which case the source fragment size is used.
-   * as target (true):  target pb_list page_size takes precedence.
+   * as target (true):  target pb_buffer page_size takes precedence.
    *                    When clone_on_write is false, source fragments that
    *                    are greater than the target page_size limit are split.
    *                    When clone_on_write is true, source fragments will be
@@ -285,13 +285,13 @@ struct pb_list_strategy {
 
 
 
-/** The page size of the default pb_list strategy.
+/** The page size of the default pb_buffer strategy.
  */
 #define PB_TRIVIAL_LIST_DEFAULT_PAGE_SIZE                 4096
 
 
 
-/** Get a built in, trivial list strategy.
+/** Get a built in, trivial buffer strategy.
  *
  * page_size is 4096
  *
@@ -301,41 +301,41 @@ struct pb_list_strategy {
  *
  * no_insertion is false;
  */
-const struct pb_list_strategy *pb_get_trivial_list_strategy(void);
+const struct pb_buffer_strategy *pb_get_trivial_buffer_strategy(void);
 
 
 
-/** Represents a list of pages, and operations for the manipulation of the
+/** Represents a buffer of pages, and operations for the manipulation of the
  * pages and the buffers of data therein.
  *
- * The list also represents the strategy for allocation and freeing of
+ * The buffer also represents the strategy for allocation and freeing of
  * data buffers.
  */
-struct pb_list {
-  /** The strategy used by the pb_list instance. */
-  struct pb_list_strategy strategy;
+struct pb_buffer {
+  /** The strategy used by the pb_buffer instance. */
+  struct pb_buffer_strategy strategy;
 
-  /** Return the amount of data in the list, in bytes. */
-  uint64_t (*get_data_size)(struct pb_list * const list);
+  /** Return the amount of data in the buffer, in bytes. */
+  uint64_t (*get_data_size)(struct pb_buffer * const buffer);
 
   /** Return a revision stamp of the data.
    *
-   * This value is incremented by pb_list implementations whenever the
-   * pb_list is:
+   * This value is incremented by pb_buffer implementations whenever the
+   * pb_buffer is:
    * - seek'd
    * - rewind'd
    * - overwritten
    * - cleared
    *
    * External users such as line readers can retain and compare this value
-   * to determine whether the pb_list instance has been invalidated since
+   * to determine whether the pb_buffer instance has been invalidated since
    * last use, and therefore needs to be re-processed.
    */
-  uint64_t (*get_data_revision)(struct pb_list * const list);
+  uint64_t (*get_data_revision)(struct pb_buffer * const buffer);
 
-  /** Append a pb_page instance to the pb_list.
+  /** Append a pb_page instance to the pb_buffer.
    *
-   * list_iterator is the position in the list to update the pb_list.  The
+   * buffer_iterator is the position in the buffer to update the pb_buffer.  The
    *               pb_page will be inserted in front of the iterator position.
    * offset is the offset within the iterator page to insert the new pb_page
    *        into.
@@ -344,247 +344,249 @@ struct pb_list {
    *
    * If the offset is zero, the new pb_page will be inserted before the
    * iterator page.  If the offset is non zero, then the iterator page may be
-   * split according to the pb_list instances internal implementation.
+   * split according to the pb_buffer instances internal implementation.
    * If the offset is greater than or equal to the iterator page len, then the
    * new pb_page will be inserted after the iterator page, or at the head of
-   * the pb_list if the iterator is an end iterator.
+   * the pb_buffer if the iterator is an end iterator.
    *
-   * This operation will affect the data size of the pb_list instance.
+   * This operation will affect the data size of the pb_buffer instance.
    *
    * The return value is the amount of data actually inserted to the
-   * pb_list instance.  Users of the insert operation must reflect the value
+   * pb_buffer instance.  Users of the insert operation must reflect the value
    * returned back to their own callers.
    */
-  uint64_t (*insert)(struct pb_list * const list,
+  uint64_t (*insert)(struct pb_buffer * const buffer,
                      struct pb_page * const page,
-                     struct pb_list_iterator * const list_iterator,
+                     struct pb_buffer_iterator * const buffer_iterator,
                      size_t offset);
 
-  /** Increase the size of the list by adding len bytes of data to the end.
+  /** Increase the size of the buffer by adding len bytes of data to the end.
    *
    * len indicates the amount of data to add in bytes.
    *
-   * Depending on the list implementation details, the total len may be split
+   * Depending on the buffer implementation details, the total len may be split
    * across multiple pages.
    */
-  uint64_t (*reserve)(struct pb_list * const list,
+  uint64_t (*reserve)(struct pb_buffer * const buffer,
                       uint64_t len);
-  /** Seek the list by len bytes.
-   *
-   * len indicates the amount of data to seek, in bytes.
-   *
-   * The seek operation may cause internal pages to be consumed depending on
-   * the list implementation details.  These pb_pages will be destroyed during
-   * the seek operation and their respective data 'put'd.
-   */
-  uint64_t (*seek)(struct pb_list * const list,
-                   uint64_t len);
-  /** Increases the size of the list by adding len bytes of data to the head.
+  /** Increases the size of the buffer by adding len bytes of data to the head.
    *
    * len indicates the amount of data to ad in bytes.
    *
-   * Depending on the list implementation details, the total len may be split
+   * Depending on the buffer implementation details, the total len may be split
    * across multiple pages.
    */
-  uint64_t (*rewind)(struct pb_list * const list,
+  uint64_t (*rewind)(struct pb_buffer * const buffer,
                      uint64_t len);
+  /** Seek the buffer by len bytes.
+     *
+     * len indicates the amount of data to seek, in bytes.
+     *
+     * The seek operation may cause internal pages to be consumed depending on
+     * the buffer implementation details.  These pb_pages will be destroyed during
+     * the seek operation and their respective data 'put'd.
+     */
+  uint64_t (*seek)(struct pb_buffer * const buffer,
+                   uint64_t len);
 
-  /** Initialise an iterator to the start of the pb_list instance data.
+  /** Initialise an iterator to the start of the pb_buffer instance data.
    *
    * The iterator should be a pointer to an object on the stack that should
-   * be manipulated only by the iterator methods of the same list instance.
+   * be manipulated only by the iterator methods of the same buffer instance.
    */
-  void (*get_iterator)(struct pb_list * const list,
-                       struct pb_list_iterator * const list_iterator);
-  /** Initialise an iterator to the end of the pb_list instance data.
+  void (*get_iterator)(struct pb_buffer * const buffer,
+                       struct pb_buffer_iterator * const buffer_iterator);
+  /** Initialise an iterator to the end of the pb_buffer instance data.
      *
      * The iterator should be a pointer to an object on the stack that should
-     * be manipulated only by the iterator methods of the same list instance.
+     * be manipulated only by the iterator methods of the same buffer instance.
      */
-  void (*get_iterator_end)(struct pb_list * const list,
-                           struct pb_list_iterator * const list_iterator);
-  /** Indicates whether an iterator has traversed to the end of a lists
+  void (*get_iterator_end)(struct pb_buffer * const buffer,
+                           struct pb_buffer_iterator * const buffer_iterator);
+  /** Indicates whether an iterator has traversed to the end of a buffers
    *  internal chain of pages.
    *
    * This function must always be called, and return false, before the data
    * vector of the pb_page of the iterator can be used.  The value of the
    * pb_page pointer is undefined when the iterator end function returns true.
    */
-  bool (*is_iterator_end)(struct pb_list * const list,
-                          struct pb_list_iterator * const list_iterator);
+  bool (*is_iterator_end)(struct pb_buffer * const buffer,
+                          struct pb_buffer_iterator * const buffer_iterator);
 
-  /** Increments an iterator to the next pb_page in a list's internal chain. */
-  void (*iterator_next)(struct pb_list * const list,
-                        struct pb_list_iterator * const list_iterator);
-  /** Decrements an iterator to the previous pb_page in a list's internal
+  /** Increments an iterator to the next pb_page in a buffer's internal chain. */
+  void (*iterator_next)(struct pb_buffer * const buffer,
+                        struct pb_buffer_iterator * const buffer_iterator);
+  /** Decrements an iterator to the previous pb_page in a buffer's internal
    *  chain.
    *
    * It is valid to call this function on an iterator that is the end
    * iterator, according to is_iterator_end.  If this function is called on such
-   * an iterator, the list implementation must correctly decrement back to the
+   * an iterator, the buffer implementation must correctly decrement back to the
    * position before end in this case. */
-  void (*iterator_prev)(struct pb_list * const list,
-                        struct pb_list_iterator * const list_iterator);
+  void (*iterator_prev)(struct pb_buffer * const buffer,
+                        struct pb_buffer_iterator * const buffer_iterator);
 
-  /** Write data from a memory region to the pb_list instance.
+  /** Write data from a memory region to the pb_buffer instance.
    *
    * buf indicates the start of the source memory region.
    * len indicates the amount of data to write, in bytes.
    *
    * returns the amount of data written.
    *
-   * Data is appended to the tail of the list, allocating new storage if
+   * Data is appended to the tail of the buffer, allocating new storage if
    * necessary.
    */
-  uint64_t (*write_data)(struct pb_list * const list,
+  uint64_t (*write_data)(struct pb_buffer * const buffer,
                          const uint8_t *buf,
                          uint64_t len);
-  /** Write data from a source pb_list instance to the pb_list instance.
+  /** Write data from a source pb_buffer instance to the pb_buffer instance.
    *
-   * src_list is the list to write from.  This pb_list instance will not have
+   * src_buffer is the buffer to write from.  This pb_buffer instance will not have
    *          it's data modified, but it is not const because iterator
-   *          operations of this pb_list may cause internal state changes.
+   *          operations of this pb_buffer may cause internal state changes.
    * len indicates the amount of data to write, in bytes.
    *
-   * returns the amount of data written.  This list will not be altered by
+   * returns the amount of data written.  This buffer will not be altered by
    * this operation.
    *
-   * Data is appended to the tail of the list, allocating new storage if
+   * Data is appended to the tail of the buffer, allocating new storage if
    * necessary.
    */
-  uint64_t (*write_list)(struct pb_list * const list,
-                         struct pb_list * const src_list,
+  uint64_t (*write_buffer)(struct pb_buffer * const buffer,
+                         struct pb_buffer * const src_buffer,
                          uint64_t len);
 
-  /** Write data from a memory region to the pb_list instance.
+  /** Write data from a memory region to the pb_buffer instance.
    *
    * buf indicates the start of the source memory region.
    * len indicates the amount of data to write, in bytes.
    *
    * returns the amount of data written.
    *
-   * Data is written from the head of the source pb_list.  No new storage will
-   * be allocated if len is greater than the size of the target pb_list.
+   * Data is written from the head of the source pb_buffer.  No new storage will
+   * be allocated if len is greater than the size of the target pb_buffer.
    */
-  uint64_t (*overwrite_data)(struct pb_list * const list,
+  uint64_t (*overwrite_data)(struct pb_buffer * const buffer,
                              const uint8_t *buf,
                              uint64_t len);
 
-  /** Read data from the start of a pb_list instance to a data region.
+  /** Read data from the start of a pb_buffer instance to a data region.
    *
    * buf indicates the start of the target memory region.
    * len indicates the amount of data to read, in bytes.
    *
    * returns the amount of data read into the target buffer.
    */
-  uint64_t (*read_data)(struct pb_list * const list,
+  uint64_t (*read_data)(struct pb_buffer * const buffer,
                         uint8_t * const buf,
                         uint64_t len);
 
-  /** Clear all data in the list. */
-  void (*clear)(struct pb_list * const list);
+  /** Clear all data in the buffer. */
+  void (*clear)(struct pb_buffer * const buffer);
 
-  /** Destroy a pb_list. */
-  void (*destroy)(struct pb_list * const list);
+  /** Destroy a pb_buffer. */
+  void (*destroy)(struct pb_buffer * const buffer);
 
   const struct pb_allocator *allocator;
 };
 
-/** A trivial list implementation using builtin or supplied allocator.
+/** A trivial buffer implementation using builtin or supplied allocator.
  *
  * Default page size: 4096 bytes
  */
-struct pb_list *pb_trivial_list_create(void);
-struct pb_list *pb_trivial_list_create_with_strategy(
-                                      const struct pb_list_strategy *strategy);
-struct pb_list *pb_trivial_list_create_with_alloc(
-                                      const struct pb_allocator *allocator);
-struct pb_list *pb_trivial_list_create_with_strategy_with_alloc(
-                                      const struct pb_list_strategy *strategy,
-                                      const struct pb_allocator *allocator);
+struct pb_buffer *pb_trivial_buffer_create(void);
+struct pb_buffer *pb_trivial_buffer_create_with_strategy(
+                                     const struct pb_buffer_strategy *strategy);
+struct pb_buffer *pb_trivial_buffer_create_with_alloc(
+                                     const struct pb_allocator *allocator);
+struct pb_buffer *pb_trivial_buffer_create_with_strategy_with_alloc(
+                                     const struct pb_buffer_strategy *strategy,
+                                     const struct pb_allocator *allocator);
 
-uint64_t pb_trivial_list_get_data_size(struct pb_list * const list);
+uint64_t pb_trivial_buffer_get_data_size(struct pb_buffer * const buffer);
 
-uint64_t pb_trivial_list_get_data_revision(struct pb_list * const list);
+uint64_t pb_trivial_buffer_get_data_revision(struct pb_buffer * const buffer);
 
-uint64_t pb_trivial_list_insert(struct pb_list * const list,
-                                struct pb_page * const page,
-                                struct pb_list_iterator * const list_iterator,
-                                size_t offset);
+uint64_t pb_trivial_buffer_insert(struct pb_buffer * const buffer,
+                                  struct pb_page * const page,
+                                  struct pb_buffer_iterator * const iterator,
+                                  size_t offset);
 
-uint64_t pb_trivial_list_append(struct pb_list * const list,
-                                struct pb_page * const page);
-uint64_t pb_trivial_list_reserve(struct pb_list * const list,
-                                 uint64_t len);
-uint64_t pb_trivial_list_seek(struct pb_list * const list,
-                              uint64_t len);
-uint64_t pb_trivial_list_rewind(struct pb_list * const list,
-                                uint64_t len);
-
-void pb_trivial_list_get_iterator(struct pb_list * const list,
-                                  struct pb_list_iterator * const iterator);
-void pb_trivial_list_get_iterator_end(
-                                     struct pb_list * const list,
-                                     struct pb_list_iterator * const iterator);
-bool pb_trivial_list_is_iterator_end(struct pb_list * const list,
-                                     struct pb_list_iterator * const iterator);
-
-void pb_trivial_list_iterator_next(struct pb_list * const list,
-                                   struct pb_list_iterator * const iterator);
-void pb_trivial_list_iterator_prev(struct pb_list * const list,
-                                   struct pb_list_iterator * const iterator);
-
-uint64_t pb_trivial_list_write_data(struct pb_list * const list,
-                                    const uint8_t *buf,
-                                    uint64_t len);
-uint64_t pb_trivial_list_write_list(struct pb_list * const list,
-                                    struct pb_list * const src_list,
-                                    uint64_t len);
-uint64_t pb_trivial_list_overwrite_data(struct pb_list * const list,
-                                        const uint8_t *buf,
-                                        uint64_t len);
-
-uint64_t pb_trivial_list_read_data(struct pb_list * const list,
-                                   uint8_t * const buf,
+uint64_t pb_trivial_buffer_append(struct pb_buffer * const buffer,
+                                  struct pb_page * const page);
+uint64_t pb_trivial_buffer_reserve(struct pb_buffer * const buffer,
                                    uint64_t len);
+uint64_t pb_trivial_buffer_seek(struct pb_buffer * const buffer,
+                                uint64_t len);
+uint64_t pb_trivial_buffer_rewind(struct pb_buffer * const buffer,
+                                  uint64_t len);
 
-void pb_trivial_list_clear(struct pb_list * const list);
-void pb_trivial_list_destroy(struct pb_list * const list);
+void pb_trivial_buffer_get_iterator(struct pb_buffer * const buffer,
+                                    struct pb_buffer_iterator * const iterator);
+void pb_trivial_buffer_get_iterator_end(
+                                    struct pb_buffer * const buffer,
+                                    struct pb_buffer_iterator * const iterator);
+bool pb_trivial_buffer_is_iterator_end(struct pb_buffer * const buffer,
+                                    struct pb_buffer_iterator * const iterator);
+
+void pb_trivial_buffer_iterator_next(
+                                    struct pb_buffer * const buffer,
+                                    struct pb_buffer_iterator * const iterator);
+void pb_trivial_buffer_iterator_prev(
+                                    struct pb_buffer * const buffer,
+                                    struct pb_buffer_iterator * const iterator);
+
+uint64_t pb_trivial_buffer_write_data(struct pb_buffer * const buffer,
+                                      const uint8_t *buf,
+                                      uint64_t len);
+uint64_t pb_trivial_buffer_write_buffer(struct pb_buffer * const buffer,
+                                        struct pb_buffer * const src_buffer,
+                                        uint64_t len);
+uint64_t pb_trivial_buffer_overwrite_data(struct pb_buffer * const buffer,
+                                          const uint8_t *buf,
+                                          uint64_t len);
+
+uint64_t pb_trivial_buffer_read_data(struct pb_buffer * const buffer,
+                                     uint8_t * const buf,
+                                     uint64_t len);
+
+void pb_trivial_buffer_clear(struct pb_buffer * const buffer);
+void pb_trivial_buffer_destroy(struct pb_buffer * const buffer);
 
 
 
-/** An interface for reading data from a pb_list.
+/** An interface for reading data from a pb_buffer.
  *
  * Through this interface, a
  */
 struct pb_data_reader {
-  /** Read data from the pb_list instance, into a memory region.
+  /** Read data from the pb_buffer instance, into a memory region.
    *
    * buf indicates the start of the target memory region.
    * len indicates the amount of data to read, in bytes.
    *
    * returns the amount of data read.
    *
-   * Data is read from the head of the source pb_list.  The amount of data read
-   * is the lower of the size of the source pb_list and the value of len.
+   * Data is read from the head of the source pb_buffer.  The amount of data read
+   * is the lower of the size of the source pb_buffer and the value of len.
    *
    * Following a data read, the data reader will retain the position of the
-   * end of the read, thus, a subsequent call to read_list will continue from
+   * end of the read, thus, a subsequent call to read_buffer will continue from
    * where the last read left off.
    *
-   * However, if the pb_list undergoes an operation that alters its data
-   * revision, a subsequent call to read_list will read from the beginning
+   * However, if the pb_buffer undergoes an operation that alters its data
+   * revision, a subsequent call to read_buffer will read from the beginning
    */
   uint64_t (*read)(struct pb_data_reader * const data_reader,
                    uint8_t * const buf, uint64_t len);
 
-  /** Reset the data reader back to the beginning of the pb_list instance. */
+  /** Reset the data reader back to the beginning of the pb_buffer instance. */
   void (*reset)(struct pb_data_reader * const data_reader);
 
   /** Destroy the pb_data_reader instance. */
   void (*destroy)(struct pb_data_reader * const data_reader);
 
-  struct pb_list *list;
+  struct pb_buffer *buffer;
 
   const struct pb_allocator *allocator;
 };
@@ -592,9 +594,9 @@ struct pb_data_reader {
 /** A trivial data reader implementation that reads data via iterators
  */
 struct pb_data_reader *pb_trivial_data_reader_create(
-                                          struct pb_list * const list);
+                                          struct pb_buffer * const buffer);
 struct pb_data_reader *pb_trivial_data_reader_create_with_alloc(
-                                          struct pb_list * const list,
+                                          struct pb_buffer * const buffer,
                                           const struct pb_allocator *allocator);
 
 uint64_t pb_trivial_data_reader_read(struct pb_data_reader * const data_reader,
@@ -607,10 +609,10 @@ void pb_trivial_data_reader_destroy(struct pb_data_reader * const data_reader);
 
 
 /** An interface for discovering, reading and consuming LF or CRLF terminated
- *  lines in pb_list instances.
+ *  lines in pb_buffer instances.
  */
 struct pb_line_reader {
-  /** Indicates whether a line exists at the head of a pb_list instance. */
+  /** Indicates whether a line exists at the head of a pb_buffer instance. */
   bool (*has_line)(struct pb_line_reader * const line_reader);
 
   /** Returns the length of the line discovered by has_line. */
@@ -640,7 +642,7 @@ struct pb_line_reader {
   /** Indicates whether the line discovered in has_line is:
    *    LF (false) or CRLF (true) */
   bool (*is_crlf)(struct pb_line_reader * const line_reader);
-  /** Indicates whether the line discovery has reached the end of the list.
+  /** Indicates whether the line discovery has reached the end of the buffer.
    *
    * Buffer end may be used as line end if terminate_line is called. */
   bool (*is_end)(struct pb_line_reader * const line_reader);
@@ -651,7 +653,7 @@ struct pb_line_reader {
   /** Destroy a line reader instance. */
   void (*destroy)(struct pb_line_reader * const line_reader);
 
-  struct pb_list *list;
+  struct pb_buffer *buffer;
 
   const struct pb_allocator *allocator;
 };
@@ -659,9 +661,9 @@ struct pb_line_reader {
 /** A trivial line reader implementation that searches for lines via iterators.
  */
 struct pb_line_reader *pb_trivial_line_reader_create(
-                                          struct pb_list *list);
+                                          struct pb_buffer *buffer);
 struct pb_line_reader *pb_trivial_line_reader_create_with_alloc(
-                                          struct pb_list *list,
+                                          struct pb_buffer *buffer,
                                           const struct pb_allocator *allocator);
 
 bool pb_trivial_line_reader_has_line(struct pb_line_reader * const line_reader);

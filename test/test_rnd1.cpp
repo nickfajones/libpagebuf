@@ -93,10 +93,10 @@ void read_stream(
 class TestCase {
   public:
     TestCase(
-        const std::string& description, const pb_list_strategy& strategy) :
+        const std::string& description, const pb_buffer_strategy& strategy) :
       description(description),
-      buffer1(pb_trivial_list_create_with_strategy(&strategy)),
-      buffer2(pb_trivial_list_create_with_strategy(&strategy)),
+      buffer1(pb_trivial_buffer_create_with_strategy(&strategy)),
+      buffer2(pb_trivial_buffer_create_with_strategy(&strategy)),
       md5ctx(new EVP_MD_CTX),
       digest(new unsigned char[EVP_MAX_MD_SIZE]),
       digest_len(0) {
@@ -146,8 +146,8 @@ class TestCase {
   public:
     std::string description;
 
-    struct pb_list *buffer1;
-    struct pb_list *buffer2;
+    struct pb_buffer *buffer1;
+    struct pb_buffer *buffer2;
 
     EVP_MD_CTX *md5ctx;
 
@@ -183,7 +183,7 @@ void transfer_data(
   assert(current_size == (total_transfer_size - total_read_size));
 
   uint64_t transferred =
-    test_case->buffer2->write_list(
+    test_case->buffer2->write_buffer(
       test_case->buffer2, test_case->buffer1, transfer_size);
   assert(transferred == transfer_size);
 
@@ -290,7 +290,7 @@ int main(int argc, char **argv) {
   std::list<TestCase*>::iterator test_itr;
   TestCase *test_case;
 
-  struct pb_list_strategy strategy;
+  struct pb_buffer_strategy strategy;
 
   strategy.page_size = PB_TRIVIAL_LIST_DEFAULT_PAGE_SIZE;
   strategy.clone_on_write = false;
