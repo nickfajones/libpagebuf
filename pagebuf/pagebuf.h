@@ -52,8 +52,8 @@ struct pb_allocator {
    *
    * size indicates the size of the memory region to allocate.
    */
-  void *(*alloc)(enum pb_allocator_type type, size_t size,
-                 const struct pb_allocator *allocator);
+  void *(*alloc)(const struct pb_allocator *allocator,
+                 enum pb_allocator_type type, size_t size);
   /** Free a memory region.
    *
    * type indicates whether the memory allocated was used for a data
@@ -63,8 +63,8 @@ struct pb_allocator {
    *
    * size indicates the size of the memory region that was allocated.
    */
-  void  (*free)(enum pb_allocator_type type, void *obj, size_t size,
-                const struct pb_allocator *allocator);
+  void  (*free)(const struct pb_allocator *allocator,
+                enum pb_allocator_type type, void *obj, size_t size);
 };
 
 /** Get a built in, trivial heap based allocator. */

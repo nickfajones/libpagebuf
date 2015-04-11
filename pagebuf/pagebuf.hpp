@@ -37,9 +37,6 @@ namespace pb
  */
 class block_allocator {
   public:
-    struct pb_allocator allocator_;
-
-  public:
     struct block_profile {
       block_profile(size_t size, size_t count);
       block_profile(const block_profile& rvalue);
@@ -76,6 +73,20 @@ class block_allocator {
   private:
     void *alloc(enum pb_allocator_type type, size_t size);
     void free(enum pb_allocator_type type, void *obj, size_t size);
+
+  private:
+    struct block {
+      uint8_t *base;
+      size_t size;
+      size_t count;
+
+      std::set<size_t> reserved;
+
+      struct block *next;
+    };
+
+  private:
+    struct pb_allocator allocator_;
   };
 
 
@@ -97,7 +108,7 @@ class buffer {
         }
 
       private:
-        explicit iterator(struct pb_buffer * const buffer, bool at_end) :
+        iterator(struct pb_buffer * const buffer, bool at_end) :
           itr_({}),
           buffer_(buffer) {
           if (!at_end)
@@ -172,6 +183,22 @@ class buffer {
   public:
     buffer() :
       buf_(pb_trivial_buffer_create()) {
+    }
+
+    explicit buffer(const struct pb_buffer_strategy *strategy) :
+      buf_(pb_trivial_buffer_create_with_strategy(strategy)) {
+    }
+
+    explicit buffer(const struct pb_allocator *allocator) :
+      buf_(pb_trivial_buffer_create_with_alloc(allocator)) {
+    }
+
+    buffer(
+        const struct pb_buffer_strategy *strategy,
+        const struct pb_allocator *allocator) :
+      buf_(
+        pb_trivial_buffer_create_with_strategy_with_alloc(
+          strategy, allocator)) {
     }
 
   protected:
