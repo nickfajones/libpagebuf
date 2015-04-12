@@ -166,7 +166,7 @@ struct pb_page *pb_page_transfer(const struct pb_page *src_page,
     size_t len, size_t src_off,
     const struct pb_allocator *allocator) {
   struct pb_page *page =
-    allocator->alloc(pb_alloc_type_struct, sizeof(struct pb_page), allocator);
+    allocator->alloc(allocator, pb_alloc_type_struct, sizeof(struct pb_page));
   if (!page)
     return NULL;
 
@@ -733,13 +733,13 @@ uint64_t pb_trivial_buffer_write_buffer3(struct pb_buffer * const buffer,
       (src_itr.page->data_vec.len - src_offset < write_len) ?
        src_itr.page->data_vec.len - src_offset : write_len;
 
-    write_len = trivial_buffer->buffer.reserve(&trivial_buffer->buffer, write_len);
+    write_len =
+      trivial_buffer->buffer.reserve(&trivial_buffer->buffer, write_len);
 
-    if (!trivial_buffer->buffer.is_iterator_end(&trivial_buffer->buffer, &itr)) {
+    if (!trivial_buffer->buffer.is_iterator_end(&trivial_buffer->buffer, &itr))
       trivial_buffer->buffer.iterator_next(&trivial_buffer->buffer, &itr);
-    } else {
+    else
       trivial_buffer->buffer.get_iterator(&trivial_buffer->buffer, &itr);
-    }
 
     memcpy(
       itr.page->data_vec.base,
@@ -796,7 +796,8 @@ uint64_t pb_trivial_buffer_write_buffer4(struct pb_buffer * const buffer,
   size_t src_offset = 0;
 
   while ((len > 0) &&
-         (!trivial_buffer->buffer.is_iterator_end(&trivial_buffer->buffer, &itr)) &&
+         (!trivial_buffer->buffer.is_iterator_end(
+            &trivial_buffer->buffer, &itr)) &&
          (!src_buffer->is_iterator_end(src_buffer, &src_itr))) {
     uint64_t write_len =
       (itr.page->data_vec.len - offset < len) ?
@@ -865,7 +866,8 @@ uint64_t pb_trivial_buffer_overwrite_data(struct pb_buffer * const buffer,
   uint64_t written = 0;
 
   while ((len > 0) &&
-         (!trivial_buffer->buffer.is_iterator_end(&trivial_buffer->buffer, &itr))) {
+         (!trivial_buffer->buffer.is_iterator_end(
+            &trivial_buffer->buffer, &itr))) {
     uint64_t write_len =
       (itr.page->data_vec.len < len) ?
        itr.page->data_vec.len : len;
@@ -892,7 +894,8 @@ uint64_t pb_trivial_buffer_read_data(struct pb_buffer * const buffer,
   uint64_t readed = 0;
 
   while ((len > 0) &&
-         (!trivial_buffer->buffer.is_iterator_end(&trivial_buffer->buffer, &itr))) {
+         (!trivial_buffer->buffer.is_iterator_end(
+            &trivial_buffer->buffer, &itr))) {
     size_t read_len =
       (itr.page->data_vec.len < len) ?
        itr.page->data_vec.len : len;
@@ -913,7 +916,8 @@ uint64_t pb_trivial_buffer_read_data(struct pb_buffer * const buffer,
 void pb_trivial_buffer_clear(struct pb_buffer * const buffer) {
   struct pb_trivial_buffer *trivial_buffer = (struct pb_trivial_buffer*)buffer;
 
-  uint64_t data_size = trivial_buffer->buffer.get_data_size(&trivial_buffer->buffer);
+  uint64_t data_size =
+    trivial_buffer->buffer.get_data_size(&trivial_buffer->buffer);
 
   trivial_buffer->buffer.seek(&trivial_buffer->buffer, data_size);
 }
@@ -922,10 +926,9 @@ void pb_trivial_buffer_clear(struct pb_buffer * const buffer) {
  */
 void pb_trivial_buffer_destroy(struct pb_buffer * const buffer) {
   struct pb_trivial_buffer *trivial_buffer = (struct pb_trivial_buffer*)buffer;
+  const struct pb_allocator *allocator = trivial_buffer->buffer.allocator;
 
   pb_trivial_buffer_clear(&trivial_buffer->buffer);
-
-  const struct pb_allocator *allocator = trivial_buffer->buffer.allocator;
 
   allocator->free(
     allocator,
@@ -945,6 +948,7 @@ struct pb_trivial_data_reader {
 
   uint64_t page_offset;
 };
+
 /*******************************************************************************
  */
 struct pb_data_reader *pb_trivial_data_reader_create(
@@ -1311,11 +1315,10 @@ void pb_trivial_line_reader_reset(struct pb_line_reader * const line_reader) {
 void pb_trivial_line_reader_destroy(struct pb_line_reader * const line_reader) {
   struct pb_trivial_line_reader *trivial_line_reader =
     (struct pb_trivial_line_reader*)line_reader;
-
-  pb_trivial_line_reader_reset(&trivial_line_reader->line_reader);
-
   const struct pb_allocator *allocator =
     trivial_line_reader->line_reader.allocator;
+
+  pb_trivial_line_reader_reset(&trivial_line_reader->line_reader);
 
   allocator->free(
     allocator,
