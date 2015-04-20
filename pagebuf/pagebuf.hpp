@@ -20,76 +20,9 @@
 
 #include <pagebuf/pagebuf.h>
 
-#include <cstddef>
-#include <cstdint>
-#include <cstdbool>
-
-#include <set>
-
 
 namespace pb
 {
-
-/** pb_allocator implementation in c++
- *
- * Slab style interface supporting memory block re-use, dynamic resizing and
- * fast free block lookup.
- */
-class block_allocator {
-  public:
-    struct block_profile {
-      block_profile(size_t size, size_t count);
-      block_profile(const block_profile& rvalue);
-      ~block_profile();
-
-      block_profile& operator=(const block_profile& rvalue);
-      bool operator<(const block_profile& rvalue) const;
-
-      size_t block_size;
-      size_t block_count;
-    };
-
-    typedef std::set<struct block_profile> profile_set;
-
-  public:
-    block_allocator();
-    explicit block_allocator(const profile_set& block_profiles);
-
-  private:
-    block_allocator(const block_allocator& rvalue);
-
-  public:
-    ~block_allocator();
-
-  private:
-    block_allocator& operator=(const block_allocator& rvalue);
-
-  public:
-    const struct pb_allocator *get_allocator();
-
-  private:
-    void initialise(const profile_set& block_profiles);
-
-  private:
-    void *alloc(enum pb_allocator_type type, size_t size);
-    void free(enum pb_allocator_type type, void *obj, size_t size);
-
-  private:
-    struct block {
-      uint8_t *base;
-      size_t size;
-      size_t count;
-
-      std::set<size_t> reserved;
-
-      struct block *next;
-    };
-
-  private:
-    struct pb_allocator allocator_;
-  };
-
-
 
 /** C++ wrapper around pb_buffer, using trivial buffer in the base class.
  */
@@ -225,10 +158,19 @@ class buffer {
     }
 
   public:
-    struct pb_buffer_strategy& get_strategy() const {
+    const struct pb_buffer_strategy& get_strategy() const {
       return buf_->strategy;
     }
 
+    const struct pb_allocator& get_allocator() const {
+      return *buf_->allocator;
+    }
+
+    struct pb_buffer& get_implementation() const {
+      return *buf_;
+    }
+
+  public:
     uint64_t get_data_size() {
       return buf_->get_data_size(buf_);
     }

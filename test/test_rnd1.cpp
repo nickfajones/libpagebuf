@@ -292,7 +292,7 @@ int main(int argc, char **argv) {
 
   struct pb_buffer_strategy strategy;
 
-  strategy.page_size = PB_TRIVIAL_LIST_DEFAULT_PAGE_SIZE;
+  strategy.page_size = PB_TRIVIAL_BUFFER_DEFAULT_PAGE_SIZE;
   strategy.clone_on_write = false;
   strategy.fragment_as_target = false;
 
@@ -301,7 +301,7 @@ int main(int argc, char **argv) {
       "Standard heap sourced pb_buffer                                       ",
       strategy));
 
-  strategy.page_size = PB_TRIVIAL_LIST_DEFAULT_PAGE_SIZE;
+  strategy.page_size = PB_TRIVIAL_BUFFER_DEFAULT_PAGE_SIZE;
   strategy.clone_on_write = false;
   strategy.fragment_as_target = true;
 
@@ -310,7 +310,7 @@ int main(int argc, char **argv) {
       "Standard heap sourced pb_buffer, fragment_as_target                   ",
       strategy));
 
-  strategy.page_size = PB_TRIVIAL_LIST_DEFAULT_PAGE_SIZE;
+  strategy.page_size = PB_TRIVIAL_BUFFER_DEFAULT_PAGE_SIZE;
   strategy.clone_on_write = true;
   strategy.fragment_as_target = false;
 
@@ -319,7 +319,7 @@ int main(int argc, char **argv) {
       "Standard heap sourced pb_buffer, clone_on_Write                       ",
       strategy));
 
-  strategy.page_size = PB_TRIVIAL_LIST_DEFAULT_PAGE_SIZE;
+  strategy.page_size = PB_TRIVIAL_BUFFER_DEFAULT_PAGE_SIZE;
   strategy.clone_on_write = true;
   strategy.fragment_as_target = true;
 

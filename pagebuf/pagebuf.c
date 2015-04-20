@@ -200,7 +200,7 @@ void pb_page_destroy(struct pb_page *page,
 /*******************************************************************************
  */
 static struct pb_buffer_strategy pb_trivial_buffer_strategy = {
-  .page_size = PB_TRIVIAL_LIST_DEFAULT_PAGE_SIZE,
+  .page_size = PB_TRIVIAL_BUFFER_DEFAULT_PAGE_SIZE,
   .clone_on_write = false,
   .fragment_as_target = false,
 };
@@ -253,9 +253,12 @@ struct pb_buffer *pb_trivial_buffer_create_with_strategy_with_alloc(
   if (!trivial_buffer)
     return NULL;
 
-  trivial_buffer->buffer.strategy.page_size = strategy->page_size;
-  trivial_buffer->buffer.strategy.clone_on_write = strategy->clone_on_write;
-  trivial_buffer->buffer.strategy.fragment_as_target = strategy->fragment_as_target;
+  ((struct pb_buffer_strategy*)&trivial_buffer->buffer.strategy)->
+    page_size = strategy->page_size;
+  ((struct pb_buffer_strategy*)&trivial_buffer->buffer.strategy)->
+    clone_on_write = strategy->clone_on_write;
+  ((struct pb_buffer_strategy*)&trivial_buffer->buffer.strategy)->
+    fragment_as_target = strategy->fragment_as_target;
 
   trivial_buffer->buffer.get_data_size = &pb_trivial_buffer_get_data_size;
   trivial_buffer->buffer.get_data_revision = &pb_trivial_buffer_get_data_revision;

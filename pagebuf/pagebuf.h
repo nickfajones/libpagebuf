@@ -287,7 +287,7 @@ struct pb_buffer_strategy {
 
 /** The page size of the default pb_buffer strategy.
  */
-#define PB_TRIVIAL_LIST_DEFAULT_PAGE_SIZE                 4096
+#define PB_TRIVIAL_BUFFER_DEFAULT_PAGE_SIZE               4096
 
 
 
@@ -313,7 +313,7 @@ const struct pb_buffer_strategy *pb_get_trivial_buffer_strategy(void);
  */
 struct pb_buffer {
   /** The strategy used by the pb_buffer instance. */
-  struct pb_buffer_strategy strategy;
+  const struct pb_buffer_strategy strategy;
 
   /** Return the amount of data in the buffer, in bytes. */
   uint64_t (*get_data_size)(struct pb_buffer * const buffer);
