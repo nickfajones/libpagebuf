@@ -551,8 +551,55 @@ void pb_trivial_buffer_iterator_prev(struct pb_buffer * const buffer,
 }
 
 /*******************************************************************************
+ * fragment_as_target: false
  */
-uint64_t pb_trivial_buffer_write_data(struct pb_buffer * const buffer,
+static
+#ifdef NDEBUG
+inline
+#endif
+uint64_t pb_trivial_buffer_write_data1(struct pb_buffer * const buffer,
+    const uint8_t *buf,
+    uint64_t len) {
+  struct pb_trivial_buffer *trivial_buffer = (struct pb_trivial_buffer*)buffer;
+
+  if (trivial_buffer->buffer.get_data_size(&trivial_buffer->buffer) == 0)
+    ++trivial_buffer->data_revision;
+
+  struct pb_buffer_iterator itr;
+  trivial_buffer->buffer.get_iterator_end(&trivial_buffer->buffer, &itr);
+  trivial_buffer->buffer.iterator_prev(&trivial_buffer->buffer, &itr);
+
+  uint64_t written = 0;
+
+  while (len > 0) {
+    uint64_t write_len =
+      (trivial_buffer->buffer.strategy.page_size != 0) ?
+      (trivial_buffer->buffer.strategy.page_size < len) ?
+       trivial_buffer->buffer.strategy.page_size : len :
+       len;
+
+    write_len =
+      trivial_buffer->buffer.reserve(&trivial_buffer->buffer, write_len);
+
+    memcpy(itr.page->data_vec.base, buf + written, write_len);
+
+    len -= write_len;
+    written += write_len;
+
+    trivial_buffer->buffer.iterator_next(&trivial_buffer->buffer, &itr);
+  }
+
+  return written;
+}
+
+/*
+ * fragment_as_target: true
+ */
+static
+#ifdef NDEBUG
+inline
+#endif
+uint64_t pb_trivial_buffer_write_data2(struct pb_buffer * const buffer,
     const uint8_t *buf,
     uint64_t len) {
   struct pb_trivial_buffer *trivial_buffer = (struct pb_trivial_buffer*)buffer;
@@ -588,6 +635,15 @@ uint64_t pb_trivial_buffer_write_data(struct pb_buffer * const buffer,
   }
 
   return written;
+}
+
+uint64_t pb_trivial_buffer_write_data(struct pb_buffer * const buffer,
+    const uint8_t *buf,
+    uint64_t len) {
+  if (!buffer->strategy.fragment_as_target)
+    return pb_trivial_buffer_write_data1(buffer, buf, len);
+
+  return pb_trivial_buffer_write_data2(buffer, buf, len);
 }
 
 /*******************************************************************************
