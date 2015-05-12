@@ -14,8 +14,8 @@ dnl -----------------------------------------------
 
 GENERIC_LIBRARY_NAME=pagebuf
 
-GENERIC_MAJOR_VERSION=0
-GENERIC_MINOR_VERSION=1
+GENERIC_MAJOR_VERSION=1
+GENERIC_MINOR_VERSION=0
 GENERIC_MICRO_VERSION=0
 
 # API version (often = GENERIC_MAJOR_VERSION.GENERIC_MINOR_VERSION)
@@ -24,24 +24,11 @@ AC_SUBST(GENERIC_API_VERSION)
 
 # Shared library versioning
 GENERIC_LIBRARY_VERSION=$GENERIC_MAJOR_VERSION:$GENERIC_MINOR_VERSION:$GENERIC_MICRO_VERSION
-#                       | | |
-#                +------+ | +---+
-#                |        |     |
-#             current:revision:age
-#                |        |     |
-#                |        |     +- increment if interfaces have been added
-#                |        |        set to zero if interfaces have been removed
-#                                  or changed
-#                |        +- increment if source code has changed
-#                |           set to zero if current is incremented
-#                +- increment if interfaces have been added, removed or changed
-
+AC_SUBST(GENERIC_LIBRARY_VERSION)
 
 dnl --------------------------------
 dnl Package name and version number
 dnl --------------------------------
-
-AC_SUBST(GENERIC_LIBRARY_VERSION)
 
 PACKAGE=$GENERIC_LIBRARY_NAME
 AC_SUBST(GENERIC_LIBRARY_NAME)
@@ -52,7 +39,6 @@ AC_SUBST(GENERIC_VERSION)
 AC_SUBST(GENERIC_RELEASE)
 
 VERSION=$GENERIC_VERSION
-
 
 AC_CONFIG_MACRO_DIR([m4])
 
