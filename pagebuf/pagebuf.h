@@ -439,6 +439,20 @@ struct pb_buffer {
   uint64_t (*write_data)(struct pb_buffer * const buffer,
                          const uint8_t *buf,
                          uint64_t len);
+  /** Write data from a referenced memory region to the pb_buffer instance.
+   *
+   * buf indicates the start of the source referenced memory region.
+   * len indicates the amount of data to write, in bytes.
+   *
+   * returns the amount of data written.
+   *
+   * Data is appended to the tail of the buffer.  As the memory region is
+   * referenced, no storage needs to be allocated unless the buffer strategy
+   * indicates clone_on_write or fragment_as_target is true.
+   */
+  uint64_t (*write_data_ref)(struct pb_buffer * const buffer,
+                             const uint8_t *buf,
+                             uint64_t len);
   /** Write data from a source pb_buffer instance to the pb_buffer instance.
    *
    * src_buffer is the buffer to write from.  This pb_buffer instance will not have
@@ -556,8 +570,6 @@ void pb_trivial_buffer_destroy(struct pb_buffer * const buffer);
 
 
 /** An interface for reading data from a pb_buffer.
- *
- * Through this interface, a
  */
 struct pb_data_reader {
   /** Read data from the pb_buffer instance, into a memory region.
@@ -605,6 +617,71 @@ uint64_t pb_trivial_data_reader_read(struct pb_data_reader * const data_reader,
 void pb_trivial_data_reader_reset(struct pb_data_reader * const data_reader);
 
 void pb_trivial_data_reader_destroy(struct pb_data_reader * const data_reader);
+
+
+
+/** An interface for reading data from a pb_buffer byte by byte.
+ *
+ * If the pb_buffer instance data revision increases during the lifetime of
+ * the byte reader, then the byte reader is returned to the new start position.
+ */
+struct pb_byte_reader {
+  /** Gets a byte of data at the current reader position.
+   *
+   * If the buffer is empty, the byte returned will be the NULL byte (\0)
+   * If the
+   */
+  uint8_t (*get_current_byte)(struct pb_byte_reader * const byte_reader);
+
+  /** Advances the current byte position by one.
+   *
+   * If the current byte is already at the end of the buffer, then advancing
+   * will set the current offset to past-the-end, and the byte returned by
+   * get_current_byte will be the NULL byte (\0).
+   */
+  void (*next)(struct pb_byte_reader * const byte_reader);
+
+  /** Retreats the current byte position by one.
+   *
+   * If the current byte is already at the beginning of the buffer, then
+   * retreating will have no effect and the curent byte will remain at the
+   * beginning.
+   */
+  void (*prev)(struct pb_byte_reader * const byte_reader);
+
+  /** Indicates whether the byte reader is at the end of the buffer.
+   */
+  bool (*is_end)(struct pb_byte_reader * const byte_reader);
+
+  void (*reset)(struct pb_byte_reader * const byte_reader);
+
+  void (*destroy)(struct pb_byte_reader * const byte_reader);
+
+  struct pb_buffer *buffer;
+
+  const struct pb_allocator *allocator;
+};
+
+/** A trivial byte reader implementation that reads data via iterators.
+ */
+struct pb_byte_reader *pb_trivial_byte_reader_create(
+                                          struct pb_buffer * const buffer);
+struct pb_byte_reader *pb_trivial_byte_reader_create_with_alloc(
+                                          struct pb_buffer * const buffer,
+                                          const struct pb_allocator *allocator);
+
+uint8_t pb_trivial_byte_reader_get_current_byte(
+                                 struct pb_byte_reader * const byte_reader);
+
+void pb_trivial_byte_reader_next(struct pb_byte_reader * const byte_reader);
+
+void pb_trivial_byte_reader_prev(struct pb_byte_reader * const byte_reader);
+
+bool pb_trivial_byte_reader_is_end(struct pb_byte_reader * const byte_reader);
+
+void pb_trivial_byte_reader_reset(struct pb_byte_reader * const byte_reader);
+
+void pb_trivial_byte_reader_destroy(struct pb_byte_reader * const byte_reader);
 
 
 
@@ -661,9 +738,9 @@ struct pb_line_reader {
 /** A trivial line reader implementation that searches for lines via iterators.
  */
 struct pb_line_reader *pb_trivial_line_reader_create(
-                                          struct pb_buffer *buffer);
+                                          struct pb_buffer * const buffer);
 struct pb_line_reader *pb_trivial_line_reader_create_with_alloc(
-                                          struct pb_buffer *buffer,
+                                          struct pb_buffer * const buffer,
                                           const struct pb_allocator *allocator);
 
 bool pb_trivial_line_reader_has_line(struct pb_line_reader * const line_reader);
