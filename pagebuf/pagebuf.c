@@ -277,6 +277,7 @@ struct pb_buffer *pb_trivial_buffer_create_with_strategy_with_alloc(
   trivial_buffer->buffer.iterator_prev = &pb_trivial_buffer_iterator_prev;
 
   trivial_buffer->buffer.write_data = &pb_trivial_buffer_write_data;
+  trivial_buffer->buffer.write_data_ref = &pb_trivial_buffer_write_data_ref;
   trivial_buffer->buffer.write_buffer = &pb_trivial_buffer_write_buffer;
 
   trivial_buffer->buffer.overwrite_data = &pb_trivial_buffer_overwrite_data;
@@ -409,10 +410,12 @@ uint64_t pb_trivial_buffer_reserve(struct pb_buffer * const buffer,
     struct pb_buffer_iterator end_itr;
     trivial_buffer->buffer.get_iterator_end(&trivial_buffer->buffer, &end_itr);
 
-    len -= reserve_len;
-    reserved +=
+    reserve_len =
       trivial_buffer->buffer.insert(
         &trivial_buffer->buffer, page, &end_itr, 0);
+
+    len -= reserve_len;
+    reserved += reserve_len;
   }
 
   return reserved;
@@ -643,6 +646,110 @@ uint64_t pb_trivial_buffer_write_data(struct pb_buffer * const buffer,
   if (!buffer->strategy.fragment_as_target)
     return pb_trivial_buffer_write_data1(buffer, buf, len);
 
+  return pb_trivial_buffer_write_data2(buffer, buf, len);
+}
+
+/*******************************************************************************
+ * clone_on_write: false
+ * fragment_as_target: false
+ */
+static
+#ifdef NDEBUG
+inline
+#endif
+uint64_t pb_trivial_buffer_write_data_ref1(struct pb_buffer * const buffer,
+    const uint8_t *buf,
+    uint64_t len) {
+  struct pb_trivial_buffer *trivial_buffer = (struct pb_trivial_buffer*)buffer;
+  const struct pb_allocator *allocator = trivial_buffer->buffer.allocator;
+
+  struct pb_data *data = pb_data_create_ref(buf, len, allocator);
+  if (!data)
+    return 0;
+
+  struct pb_page *page = pb_page_create(data, allocator);
+  if (!page) {
+    pb_data_put(data);
+
+    return 0;
+  }
+
+  pb_data_put(data);
+
+  struct pb_buffer_iterator end_itr;
+  trivial_buffer->buffer.get_iterator_end(&trivial_buffer->buffer, &end_itr);
+
+  return
+    trivial_buffer->buffer.insert(
+      &trivial_buffer->buffer, page, &end_itr, 0);
+}
+
+/*
+ * clone_on_write: false
+ * fragment_as_target: true
+ */
+static
+#ifdef NDEBUG
+inline
+#endif
+uint64_t pb_trivial_buffer_write_data_ref2(struct pb_buffer * const buffer,
+    const uint8_t *buf,
+    uint64_t len) {
+  struct pb_trivial_buffer *trivial_buffer = (struct pb_trivial_buffer*)buffer;
+  const struct pb_allocator *allocator = trivial_buffer->buffer.allocator;
+
+  uint64_t written = 0;
+
+  while (len > 0) {
+    uint64_t write_len =
+      (trivial_buffer->buffer.strategy.page_size != 0) ?
+      (trivial_buffer->buffer.strategy.page_size < len) ?
+       trivial_buffer->buffer.strategy.page_size : len :
+       len;
+
+    struct pb_data *data =
+      pb_data_create_ref(buf + written, write_len, allocator);
+    if (!data)
+      return written;
+
+    struct pb_page *page = pb_page_create(data, allocator);
+    if (!page) {
+      pb_data_put(data);
+
+      return written;
+    }
+
+    pb_data_put(data);
+
+    struct pb_buffer_iterator end_itr;
+    trivial_buffer->buffer.get_iterator_end(&trivial_buffer->buffer, &end_itr);
+
+    write_len =
+      trivial_buffer->buffer.insert(
+        &trivial_buffer->buffer, page, &end_itr, 0);
+
+    len -= write_len;
+    written += write_len;
+  }
+
+  return written;
+}
+
+uint64_t pb_trivial_buffer_write_data_ref(struct pb_buffer * const buffer,
+    const uint8_t *buf,
+    uint64_t len) {
+  if ((!buffer->strategy.clone_on_write) &&
+      (!buffer->strategy.fragment_as_target)) {
+    return pb_trivial_buffer_write_data_ref1(buffer, buf, len);
+  } else if ((!buffer->strategy.clone_on_write) &&
+             (buffer->strategy.fragment_as_target)) {
+    return pb_trivial_buffer_write_data_ref2(buffer, buf, len);
+  } else if ((buffer->strategy.clone_on_write) &&
+             (!buffer->strategy.fragment_as_target)) {
+    return pb_trivial_buffer_write_data1(buffer, buf, len);
+  }
+  /*else if ((buffer->strategy->clone_on_write) &&
+             (buffer->strategy->fragment_as_target)) {*/
   return pb_trivial_buffer_write_data2(buffer, buf, len);
 }
 

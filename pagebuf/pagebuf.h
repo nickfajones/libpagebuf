@@ -553,6 +553,9 @@ void pb_trivial_buffer_iterator_prev(
 uint64_t pb_trivial_buffer_write_data(struct pb_buffer * const buffer,
                                       const uint8_t *buf,
                                       uint64_t len);
+uint64_t pb_trivial_buffer_write_data_ref(struct pb_buffer * const buffer,
+                                          const uint8_t *buf,
+                                          uint64_t len);
 uint64_t pb_trivial_buffer_write_buffer(struct pb_buffer * const buffer,
                                         struct pb_buffer * const src_buffer,
                                         uint64_t len);
