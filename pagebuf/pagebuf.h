@@ -602,17 +602,12 @@ struct pb_data_reader {
   void (*destroy)(struct pb_data_reader * const data_reader);
 
   struct pb_buffer *buffer;
-
-  const struct pb_allocator *allocator;
 };
 
 /** A trivial data reader implementation that reads data via iterators
  */
 struct pb_data_reader *pb_trivial_data_reader_create(
                                           struct pb_buffer * const buffer);
-struct pb_data_reader *pb_trivial_data_reader_create_with_alloc(
-                                          struct pb_buffer * const buffer,
-                                          const struct pb_allocator *allocator);
 
 uint64_t pb_trivial_data_reader_read(struct pb_data_reader * const data_reader,
                                      uint8_t * const buf, uint64_t len);
@@ -661,17 +656,12 @@ struct pb_byte_reader {
   void (*destroy)(struct pb_byte_reader * const byte_reader);
 
   struct pb_buffer *buffer;
-
-  const struct pb_allocator *allocator;
 };
 
 /** A trivial byte reader implementation that reads data via iterators.
  */
 struct pb_byte_reader *pb_trivial_byte_reader_create(
                                           struct pb_buffer * const buffer);
-struct pb_byte_reader *pb_trivial_byte_reader_create_with_alloc(
-                                          struct pb_buffer * const buffer,
-                                          const struct pb_allocator *allocator);
 
 uint8_t pb_trivial_byte_reader_get_current_byte(
                                  struct pb_byte_reader * const byte_reader);
@@ -734,8 +724,6 @@ struct pb_line_reader {
   void (*destroy)(struct pb_line_reader * const line_reader);
 
   struct pb_buffer *buffer;
-
-  const struct pb_allocator *allocator;
 };
 
 /** A trivial line reader implementation that searches for lines via iterators.

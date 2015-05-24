@@ -1119,12 +1119,8 @@ struct pb_trivial_data_reader {
  */
 struct pb_data_reader *pb_trivial_data_reader_create(
     struct pb_buffer * const buffer) {
-  return
-    pb_trivial_data_reader_create_with_alloc(buffer, pb_get_trivial_allocator());
-}
+  const struct pb_allocator *allocator = buffer->allocator;
 
-struct pb_data_reader *pb_trivial_data_reader_create_with_alloc(
-    struct pb_buffer * const buffer, const struct pb_allocator *allocator) {
   struct pb_trivial_data_reader *trivial_data_reader =
     allocator->alloc(
       allocator, pb_alloc_type_struct, sizeof(struct pb_trivial_data_reader));
@@ -1137,7 +1133,6 @@ struct pb_data_reader *pb_trivial_data_reader_create_with_alloc(
   trivial_data_reader->data_reader.destroy = &pb_trivial_data_reader_destroy;
 
   trivial_data_reader->data_reader.buffer = buffer;
-  trivial_data_reader->data_reader.allocator = allocator;
 
   trivial_data_reader->data_reader.reset(&trivial_data_reader->data_reader);
 
@@ -1210,7 +1205,7 @@ void pb_trivial_data_reader_destroy(struct pb_data_reader * const data_reader) {
   struct pb_trivial_data_reader *trivial_data_reader =
     (struct pb_trivial_data_reader*)data_reader;
   const struct pb_allocator *allocator =
-    trivial_data_reader->data_reader.allocator;
+    trivial_data_reader->data_reader.buffer->allocator;
 
   allocator->free(
     allocator,
@@ -1236,14 +1231,8 @@ struct pb_trivial_byte_reader {
  */
 struct pb_byte_reader *pb_trivial_byte_reader_create(
     struct pb_buffer * const buffer) {
-  return
-    pb_trivial_byte_reader_create_with_alloc(
-      buffer, pb_get_trivial_allocator());
-}
+  const struct pb_allocator *allocator = buffer->allocator;
 
-struct pb_byte_reader *pb_trivial_byte_reader_create_with_alloc(
-    struct pb_buffer * const buffer,
-    const struct pb_allocator *allocator) {
   struct pb_trivial_byte_reader *trivial_byte_reader =
     allocator->alloc(
       allocator, pb_alloc_type_struct, sizeof(struct pb_trivial_byte_reader));
@@ -1268,8 +1257,6 @@ struct pb_byte_reader *pb_trivial_byte_reader_create_with_alloc(
     &pb_trivial_byte_reader_reset;
 
   trivial_byte_reader->byte_reader.buffer = buffer;
-
-  trivial_byte_reader->byte_reader.allocator = allocator;
 
   pb_trivial_byte_reader_reset(&trivial_byte_reader->byte_reader);
 
@@ -1367,7 +1354,7 @@ void pb_trivial_byte_reader_destroy(struct pb_byte_reader * const byte_reader) {
   struct pb_trivial_byte_reader *trivial_byte_reader =
     (struct pb_trivial_byte_reader*)byte_reader;
   const struct pb_allocator *allocator =
-    trivial_byte_reader->byte_reader.allocator;
+    trivial_byte_reader->byte_reader.buffer->allocator;
 
   allocator->free(
     allocator,
@@ -1399,14 +1386,8 @@ struct pb_trivial_line_reader {
  */
 struct pb_line_reader *pb_trivial_line_reader_create(
     struct pb_buffer * const buffer) {
-  return
-    pb_trivial_line_reader_create_with_alloc(
-      buffer, pb_get_trivial_allocator());
-}
+  const struct pb_allocator *allocator = buffer->allocator;
 
-struct pb_line_reader *pb_trivial_line_reader_create_with_alloc(
-    struct pb_buffer * const buffer,
-    const struct pb_allocator *allocator) {
   struct pb_trivial_line_reader *trivial_line_reader =
     allocator->alloc(
       allocator, pb_alloc_type_struct, sizeof(struct pb_trivial_line_reader));
@@ -1434,8 +1415,6 @@ struct pb_line_reader *pb_trivial_line_reader_create_with_alloc(
   trivial_line_reader->line_reader.destroy = &pb_trivial_line_reader_destroy;
 
   trivial_line_reader->line_reader.buffer = buffer;
-
-  trivial_line_reader->line_reader.allocator = allocator;
 
   pb_trivial_line_reader_reset(&trivial_line_reader->line_reader);
 
@@ -1639,7 +1618,7 @@ void pb_trivial_line_reader_destroy(struct pb_line_reader * const line_reader) {
   struct pb_trivial_line_reader *trivial_line_reader =
     (struct pb_trivial_line_reader*)line_reader;
   const struct pb_allocator *allocator =
-    trivial_line_reader->line_reader.allocator;
+    trivial_line_reader->line_reader.buffer->allocator;
 
   pb_trivial_line_reader_reset(&trivial_line_reader->line_reader);
 
