@@ -24,9 +24,22 @@
 namespace pb
 {
 
+/** Pre-declare some friends
+ */
+class data_reader;
+class byte_reader;
+class line_reader;
+
+
+
 /** C++ wrapper around pb_buffer, using trivial buffer in the base class.
  */
 class buffer {
+  public:
+    friend class data_reader;
+    friend class byte_reader;
+    friend class line_reader;
+
   public:
     /** C++ wrapper around pb_buffer_iterator.
      */
@@ -157,6 +170,11 @@ class buffer {
       }
     }
 
+  private:
+    buffer& operator=(const buffer& rvalue) {
+      return *this;
+    }
+
   public:
     const struct pb_buffer_strategy& get_strategy() const {
       return buf_->strategy;
@@ -206,6 +224,10 @@ class buffer {
       return buf_->write_data(buf_, buf, len);
     }
 
+    uint64_t write_ref(const uint8_t *buf, uint64_t len) {
+      return buf_->write_data_ref(buf_, buf, len);
+    }
+
     uint64_t write(const buffer& src_buf, uint64_t len) {
       return buf_->write_buffer(buf_, src_buf.buf_, len);
     }
@@ -227,6 +249,53 @@ class buffer {
 
   protected:
     struct pb_buffer *buf_;
+};
+
+
+
+/** C++ Wrapper around pb_byte_reader as a Bidirectional byte iterator
+ */
+class byte_reader {
+  public:
+    byte_reader() :
+      reader_(0) {
+    }
+
+    explicit byte_reader(buffer& buf) :
+      reader_(pb_trivial_byte_reader_create(buf.buf_)) {
+    }
+
+    byte_reader(const byte_reader& rvalue) :
+      reader_(0) {
+      *this = rvalue;
+    }
+
+    byte_reader(byte_reader&& rvalue) :
+      reader_(rvalue.reader_) {
+      rvalue.reader_ = 0;
+    }
+
+    virtual ~byte_reader() {
+      if (reader_) {
+        reader_->destroy(reader_);
+        reader_ = 0;
+      }
+    }
+
+  public:
+    byte_reader& operator=(const byte_reader& rvalue) {
+      reader_ = rvalue.reader_;
+
+      return *this;
+    }
+
+  public:
+    virtual bool operator==(const byte_reader& rvalue) {
+      return false;
+    }
+
+  protected:
+    struct pb_byte_reader *reader_;
 };
 
 }; /* namespace pagebuf */
