@@ -261,7 +261,8 @@ struct pb_buffer *pb_trivial_buffer_create_with_strategy_with_alloc(
     fragment_as_target = strategy->fragment_as_target;
 
   trivial_buffer->buffer.get_data_size = &pb_trivial_buffer_get_data_size;
-  trivial_buffer->buffer.get_data_revision = &pb_trivial_buffer_get_data_revision;
+  trivial_buffer->buffer.get_data_revision =
+    &pb_trivial_buffer_get_data_revision;
 
   trivial_buffer->buffer.insert = &pb_trivial_buffer_insert;
 
@@ -272,6 +273,7 @@ struct pb_buffer *pb_trivial_buffer_create_with_strategy_with_alloc(
   trivial_buffer->buffer.get_iterator = &pb_trivial_buffer_get_iterator;
   trivial_buffer->buffer.get_iterator_end = &pb_trivial_buffer_get_iterator_end;
   trivial_buffer->buffer.is_iterator_end = &pb_trivial_buffer_is_iterator_end;
+  trivial_buffer->buffer.cmp_iterator = &pb_trivial_buffer_cmp_iterator;
 
   trivial_buffer->buffer.iterator_next = &pb_trivial_buffer_iterator_next;
   trivial_buffer->buffer.iterator_prev = &pb_trivial_buffer_iterator_prev;
@@ -540,6 +542,14 @@ bool pb_trivial_buffer_is_iterator_end(struct pb_buffer * const buffer,
 
   return (iterator->page == &trivial_buffer->page_end);
 }
+
+bool pb_trivial_buffer_cmp_iterator(struct pb_buffer * const buffer,
+    const struct pb_buffer_iterator *lvalue,
+    const struct pb_buffer_iterator *rvalue) {
+
+  return (lvalue->page == rvalue->page);
+}
+
 
 /*******************************************************************************
  */
@@ -1139,6 +1149,8 @@ struct pb_data_reader *pb_trivial_data_reader_create(
   return &trivial_data_reader->data_reader;
 }
 
+/*******************************************************************************
+ */
 uint64_t pb_trivial_data_reader_read(
     struct pb_data_reader * const data_reader,
     uint8_t * const buf,
@@ -1189,6 +1201,8 @@ uint64_t pb_trivial_data_reader_read(
   return readed;
 }
 
+/*******************************************************************************
+ */
 void pb_trivial_data_reader_reset(struct pb_data_reader * const data_reader) {
   struct pb_trivial_data_reader *trivial_data_reader =
     (struct pb_trivial_data_reader*)data_reader;
@@ -1242,19 +1256,24 @@ struct pb_byte_reader *pb_trivial_byte_reader_create(
   trivial_byte_reader->byte_reader.get_current_byte =
     &pb_trivial_byte_reader_get_current_byte;
 
+  trivial_byte_reader->byte_reader.is_end =
+    &pb_trivial_byte_reader_is_end;
+  trivial_byte_reader->byte_reader.cmp =
+    &pb_trivial_byte_reader_cmp;
+
   trivial_byte_reader->byte_reader.next =
     &pb_trivial_byte_reader_next;
   trivial_byte_reader->byte_reader.prev =
     &pb_trivial_byte_reader_prev;
 
-  trivial_byte_reader->byte_reader.is_end =
-    &pb_trivial_byte_reader_is_end;
-
-  trivial_byte_reader->byte_reader.destroy =
-    &pb_trivial_byte_reader_destroy;
+  trivial_byte_reader->byte_reader.clone =
+    &pb_trivial_byte_reader_clone;
 
   trivial_byte_reader->byte_reader.reset =
     &pb_trivial_byte_reader_reset;
+
+  trivial_byte_reader->byte_reader.destroy =
+    &pb_trivial_byte_reader_destroy;
 
   trivial_byte_reader->byte_reader.buffer = buffer;
 
@@ -1263,6 +1282,8 @@ struct pb_byte_reader *pb_trivial_byte_reader_create(
   return &trivial_byte_reader->byte_reader;
 }
 
+/*******************************************************************************
+ */
 uint8_t pb_trivial_byte_reader_get_current_byte(
     struct pb_byte_reader * const byte_reader) {
   struct pb_trivial_byte_reader *trivial_byte_reader =
@@ -1279,6 +1300,42 @@ uint8_t pb_trivial_byte_reader_get_current_byte(
   return itr->page->data_vec.base[trivial_byte_reader->page_offset];
 }
 
+/*******************************************************************************
+ */
+bool pb_trivial_byte_reader_is_end(struct pb_byte_reader * const byte_reader) {
+  struct pb_trivial_byte_reader *trivial_byte_reader =
+    (struct pb_trivial_byte_reader*)byte_reader;
+  struct pb_buffer *buffer = trivial_byte_reader->byte_reader.buffer;
+
+  if (buffer->get_data_revision(buffer) != trivial_byte_reader->buffer_data_revision)
+    trivial_byte_reader->byte_reader.reset(&trivial_byte_reader->byte_reader);
+
+  return buffer->is_iterator_end(buffer, &trivial_byte_reader->buffer_iterator);
+}
+
+/*******************************************************************************
+ */
+bool pb_trivial_byte_reader_cmp(struct pb_byte_reader * const byte_reader,
+    const struct pb_byte_reader *rvalue) {
+  if (byte_reader->buffer != rvalue->buffer)
+    return false;
+
+  const struct pb_trivial_byte_reader *trivial_byte_reader =
+    (struct pb_trivial_byte_reader*)byte_reader;
+  const struct pb_trivial_byte_reader *trivial_rvalue =
+    (const struct pb_trivial_byte_reader*)rvalue;
+
+  if (!trivial_byte_reader->byte_reader.buffer->cmp_iterator(
+        trivial_byte_reader->byte_reader.buffer,
+        &trivial_byte_reader->buffer_iterator,
+        &trivial_rvalue->buffer_iterator))
+    return false;
+
+  return true;
+}
+
+/*******************************************************************************
+ */
 void pb_trivial_byte_reader_next(struct pb_byte_reader * const byte_reader) {
   struct pb_trivial_byte_reader *trivial_byte_reader =
     (struct pb_trivial_byte_reader*)byte_reader;
@@ -1303,6 +1360,8 @@ void pb_trivial_byte_reader_next(struct pb_byte_reader * const byte_reader) {
   }
 }
 
+/*******************************************************************************
+ */
 void pb_trivial_byte_reader_prev(struct pb_byte_reader * const byte_reader) {
   struct pb_trivial_byte_reader *trivial_byte_reader =
     (struct pb_trivial_byte_reader*)byte_reader;
@@ -1327,17 +1386,18 @@ void pb_trivial_byte_reader_prev(struct pb_byte_reader * const byte_reader) {
   --trivial_byte_reader->page_offset;
 }
 
-bool pb_trivial_byte_reader_is_end(struct pb_byte_reader * const byte_reader) {
-  struct pb_trivial_byte_reader *trivial_byte_reader =
-    (struct pb_trivial_byte_reader*)byte_reader;
-  struct pb_buffer *buffer = trivial_byte_reader->byte_reader.buffer;
+/*******************************************************************************
+ */
+struct pb_byte_reader *pb_trivial_byte_reader_clone(
+    struct pb_byte_reader * const byte_reader) {
+//  struct pb_trivial_byte_reader *trivial_byte_reader =
+//    (struct pb_trivial_byte_reader*)byte_reader;
 
-  if (buffer->get_data_revision(buffer) != trivial_byte_reader->buffer_data_revision)
-    trivial_byte_reader->byte_reader.reset(&trivial_byte_reader->byte_reader);
-
-  return buffer->is_iterator_end(buffer, &trivial_byte_reader->buffer_iterator);
+  return NULL;
 }
 
+/*******************************************************************************
+ */
 void pb_trivial_byte_reader_reset(struct pb_byte_reader * const byte_reader) {
   struct pb_trivial_byte_reader *trivial_byte_reader =
     (struct pb_trivial_byte_reader*)byte_reader;
@@ -1350,6 +1410,8 @@ void pb_trivial_byte_reader_reset(struct pb_byte_reader * const byte_reader) {
   trivial_byte_reader->page_offset = 0;
 }
 
+/*******************************************************************************
+ */
 void pb_trivial_byte_reader_destroy(struct pb_byte_reader * const byte_reader) {
   struct pb_trivial_byte_reader *trivial_byte_reader =
     (struct pb_trivial_byte_reader*)byte_reader;
@@ -1412,6 +1474,9 @@ struct pb_line_reader *pb_trivial_line_reader_create(
   trivial_line_reader->line_reader.terminate_line =
     &pb_trivial_line_reader_terminate_line;
 
+  trivial_line_reader->line_reader.clone = &pb_trivial_line_reader_clone;
+
+  trivial_line_reader->line_reader.reset = &pb_trivial_line_reader_reset;
   trivial_line_reader->line_reader.destroy = &pb_trivial_line_reader_destroy;
 
   trivial_line_reader->line_reader.buffer = buffer;
@@ -1591,6 +1656,16 @@ void pb_trivial_line_reader_terminate_line(
     (struct pb_trivial_line_reader*)line_reader;
 
   trivial_line_reader->is_terminated = true;
+}
+
+/*******************************************************************************
+ */
+struct pb_line_reader *pb_trivial_line_reader_clone(
+    struct pb_line_reader * const line_reader) {
+//  struct pb_trivial_line_reader *trivial_line_reader =
+//    (struct pb_trivial_line_reader*)line_reader;
+
+  return NULL;
 }
 
 /*******************************************************************************

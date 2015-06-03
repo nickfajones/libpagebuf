@@ -413,6 +413,10 @@ struct pb_buffer {
   bool (*is_iterator_end)(struct pb_buffer * const buffer,
                           struct pb_buffer_iterator * const buffer_iterator);
 
+  bool (*cmp_iterator)(struct pb_buffer * const buffer,
+                       const struct pb_buffer_iterator *lvalue,
+                       const struct pb_buffer_iterator *rvalue);
+
   /** Increments an iterator to the next pb_page in a buffer's internal chain. */
   void (*iterator_next)(struct pb_buffer * const buffer,
                         struct pb_buffer_iterator * const buffer_iterator);
@@ -540,8 +544,12 @@ void pb_trivial_buffer_get_iterator(struct pb_buffer * const buffer,
 void pb_trivial_buffer_get_iterator_end(
                                     struct pb_buffer * const buffer,
                                     struct pb_buffer_iterator * const iterator);
-bool pb_trivial_buffer_is_iterator_end(struct pb_buffer * const buffer,
+bool pb_trivial_buffer_is_iterator_end(
+                                    struct pb_buffer * const buffer,
                                     struct pb_buffer_iterator * const iterator);
+bool pb_trivial_buffer_cmp_iterator(struct pb_buffer * const buffer,
+                                    const struct pb_buffer_iterator *lvalue,
+                                    const struct pb_buffer_iterator *rvalue);
 
 void pb_trivial_buffer_iterator_next(
                                     struct pb_buffer * const buffer,
@@ -631,6 +639,18 @@ struct pb_byte_reader {
    */
   uint8_t (*get_current_byte)(struct pb_byte_reader * const byte_reader);
 
+  /** Indicates whether the byte reader is at the end of the buffer.
+   */
+  bool (*is_end)(struct pb_byte_reader * const byte_reader);
+
+  /** Compare two pb_byte_reader instances.
+   *
+   * Should only be called on byte readers created from the same pb_buffer,
+   * otherwise undefined behaviour will occur.
+   */
+  bool (*cmp)(struct pb_byte_reader * const byte_reader,
+              const struct pb_byte_reader *rvalue);
+
   /** Advances the current byte position by one.
    *
    * If the current byte is already at the end of the buffer, then advancing
@@ -647,12 +667,13 @@ struct pb_byte_reader {
    */
   void (*prev)(struct pb_byte_reader * const byte_reader);
 
-  /** Indicates whether the byte reader is at the end of the buffer.
-   */
-  bool (*is_end)(struct pb_byte_reader * const byte_reader);
+  /** Clone the state of the byte reader into a new instance. */
+  struct pb_byte_reader *(*clone)(struct pb_byte_reader * const byte_reader);
 
+  /** Reset the byte reader back to the beginning byte of the pb_buffer. */
   void (*reset)(struct pb_byte_reader * const byte_reader);
 
+  /** Destroy a byte reader instance. */
   void (*destroy)(struct pb_byte_reader * const byte_reader);
 
   struct pb_buffer *buffer;
@@ -662,18 +683,23 @@ struct pb_byte_reader {
  */
 struct pb_byte_reader *pb_trivial_byte_reader_create(
                                           struct pb_buffer * const buffer);
+struct pb_byte_reader *pb_trivial_byte_reader_create_end(
+                                          struct pb_buffer * const buffer);
 
 uint8_t pb_trivial_byte_reader_get_current_byte(
                                  struct pb_byte_reader * const byte_reader);
 
-void pb_trivial_byte_reader_next(struct pb_byte_reader * const byte_reader);
+bool pb_trivial_byte_reader_is_end(struct pb_byte_reader * const byte_reader);
+bool pb_trivial_byte_reader_cmp(struct pb_byte_reader * const byte_reader,
+                                const struct pb_byte_reader *rvalue);
 
+void pb_trivial_byte_reader_next(struct pb_byte_reader * const byte_reader);
 void pb_trivial_byte_reader_prev(struct pb_byte_reader * const byte_reader);
 
-bool pb_trivial_byte_reader_is_end(struct pb_byte_reader * const byte_reader);
+struct pb_byte_reader *pb_trivial_byte_reader_clone(
+                                 struct pb_byte_reader * const byte_reader);
 
 void pb_trivial_byte_reader_reset(struct pb_byte_reader * const byte_reader);
-
 void pb_trivial_byte_reader_destroy(struct pb_byte_reader * const byte_reader);
 
 
@@ -717,6 +743,9 @@ struct pb_line_reader {
    * Buffer end may be used as line end if terminate_line is called. */
   bool (*is_end)(struct pb_line_reader * const line_reader);
 
+  /** Clone the state of the line reader into a new instance. */
+  struct pb_line_reader *(*clone)(struct pb_line_reader * const line_reader);
+
   /** Reset the current line discovery back to an initial state. */
   void (*reset)(struct pb_line_reader * const line_reader);
 
@@ -730,9 +759,6 @@ struct pb_line_reader {
  */
 struct pb_line_reader *pb_trivial_line_reader_create(
                                           struct pb_buffer * const buffer);
-struct pb_line_reader *pb_trivial_line_reader_create_with_alloc(
-                                          struct pb_buffer * const buffer,
-                                          const struct pb_allocator *allocator);
 
 bool pb_trivial_line_reader_has_line(struct pb_line_reader * const line_reader);
 
@@ -749,6 +775,9 @@ bool pb_trivial_line_reader_is_crlf(struct pb_line_reader * const line_reader);
 bool pb_trivial_line_reader_is_end(struct pb_line_reader * const line_reader);
 
 void pb_trivial_line_reader_terminate_line(
+                                     struct pb_line_reader * const line_reader);
+
+struct pb_line_reader *pb_trivial_line_reader_clone(
                                      struct pb_line_reader * const line_reader);
 
 void pb_trivial_line_reader_reset(struct pb_line_reader * const line_reader);

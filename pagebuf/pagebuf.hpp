@@ -86,7 +86,8 @@ class buffer {
       public:
         bool operator==(const iterator& rvalue) {
           return
-            ((itr_.page == rvalue.itr_.page) && (buffer_ == rvalue.buffer_));
+            ((buffer_ == rvalue.buffer_) &&
+             (buffer_->cmp_iterator(buffer_, &itr_, &rvalue.itr_)));
         }
 
       public:
@@ -96,7 +97,7 @@ class buffer {
           return *this;
         }
 
-        iterator  operator++(int) {
+        iterator operator++(int) {
            iterator temp(*this);
            ++(*this);
            return temp;
@@ -109,7 +110,7 @@ class buffer {
           return *this;
         }
 
-        iterator  operator--(int) {
+        iterator operator--(int) {
           iterator temp(*this);
           --(*this);
           return temp;
@@ -284,18 +285,65 @@ class byte_reader {
 
   public:
     byte_reader& operator=(const byte_reader& rvalue) {
-      reader_ = rvalue.reader_;
+      reader_ = rvalue.reader_->clone(rvalue.reader_);
 
       return *this;
     }
 
   public:
     virtual bool operator==(const byte_reader& rvalue) {
-      return false;
+      return reader_->cmp(reader_, rvalue.reader_);
+    }
+
+    bool operator!=(const byte_reader& rvalue) {
+      return !(*this == rvalue);
     }
 
   protected:
     struct pb_byte_reader *reader_;
+};
+
+
+
+/** C++ Wrapper around pb_line_reader
+ */
+class line_reader {
+  public:
+    line_reader() :
+      reader_(0) {
+    }
+
+    explicit line_reader(buffer& buf) :
+      reader_(pb_trivial_line_reader_create(buf.buf_)) {
+    }
+
+  private:
+    line_reader(const byte_reader& rvalue) :
+      reader_(0) {
+      *this = rvalue;
+    }
+
+  public:
+    line_reader(line_reader&& rvalue) :
+      reader_(rvalue.reader_) {
+      rvalue.reader_ = 0;
+    }
+
+    virtual ~line_reader() {
+      if (reader_) {
+        reader_->destroy(reader_);
+        reader_ = 0;
+      }
+    }
+
+  public:
+    line_reader& operator=(const line_reader& rvalue) {
+      reader_ = rvalue.reader_->clone(rvalue.reader_);
+
+      return *this;
+    }
+  private:
+    struct pb_line_reader *reader_;
 };
 
 }; /* namespace pagebuf */
