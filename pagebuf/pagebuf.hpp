@@ -272,8 +272,8 @@ class byte_reader {
     }
 
     byte_reader(byte_reader&& rvalue) :
-      reader_(rvalue.reader_) {
-      rvalue.reader_ = 0;
+      reader_(0) {
+      *this = rvalue;
     }
 
     virtual ~byte_reader() {
@@ -286,6 +286,13 @@ class byte_reader {
   public:
     byte_reader& operator=(const byte_reader& rvalue) {
       reader_ = rvalue.reader_->clone(rvalue.reader_);
+
+      return *this;
+    }
+
+    byte_reader& operator=(byte_reader&& rvalue) {
+      reader_ = rvalue.reader_;
+      rvalue.reader_ = 0;
 
       return *this;
     }
@@ -317,16 +324,14 @@ class line_reader {
       reader_(pb_trivial_line_reader_create(buf.buf_)) {
     }
 
-  private:
     line_reader(const byte_reader& rvalue) :
       reader_(0) {
       *this = rvalue;
     }
 
-  public:
     line_reader(line_reader&& rvalue) :
-      reader_(rvalue.reader_) {
-      rvalue.reader_ = 0;
+      reader_(0) {
+      *this = rvalue;
     }
 
     virtual ~line_reader() {
@@ -336,12 +341,21 @@ class line_reader {
       }
     }
 
-  public:
+  private:
     line_reader& operator=(const line_reader& rvalue) {
       reader_ = rvalue.reader_->clone(rvalue.reader_);
 
       return *this;
     }
+
+  public:
+    line_reader& operator=(line_reader&& rvalue) {
+      reader_ = rvalue.reader_;
+      rvalue.reader_ = 0;
+
+      return *this;
+    }
+
   private:
     struct pb_line_reader *reader_;
 };

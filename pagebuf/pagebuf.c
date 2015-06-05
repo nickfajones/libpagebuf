@@ -1282,6 +1282,16 @@ struct pb_byte_reader *pb_trivial_byte_reader_create(
   return &trivial_byte_reader->byte_reader;
 }
 
+struct pb_byte_reader *pb_trivial_byte_reader_create_end(
+    struct pb_buffer * const buffer) {
+  struct pb_trivial_byte_reader *trivial_byte_reader =
+    (struct pb_trivial_byte_reader*)pb_trivial_byte_reader_create(buffer);
+
+  buffer->get_iterator_end(buffer, &trivial_byte_reader->buffer_iterator);
+
+  return &trivial_byte_reader->byte_reader;
+}
+
 /*******************************************************************************
  */
 uint8_t pb_trivial_byte_reader_get_current_byte(
@@ -1390,10 +1400,23 @@ void pb_trivial_byte_reader_prev(struct pb_byte_reader * const byte_reader) {
  */
 struct pb_byte_reader *pb_trivial_byte_reader_clone(
     struct pb_byte_reader * const byte_reader) {
-//  struct pb_trivial_byte_reader *trivial_byte_reader =
-//    (struct pb_trivial_byte_reader*)byte_reader;
+  struct pb_trivial_byte_reader *trivial_byte_reader =
+    (struct pb_trivial_byte_reader*)byte_reader;
+  const struct pb_allocator *allocator =
+    trivial_byte_reader->byte_reader.buffer->allocator;
 
-  return NULL;
+  struct pb_trivial_byte_reader *trivial_byte_reader_clone =
+    allocator->alloc(
+      allocator, pb_alloc_type_struct, sizeof(struct pb_trivial_byte_reader));
+  if (!trivial_byte_reader_clone)
+    return NULL;
+
+  memcpy(
+    trivial_byte_reader_clone,
+    trivial_byte_reader,
+    sizeof(struct pb_trivial_byte_reader));
+
+  return &trivial_byte_reader_clone->byte_reader;
 }
 
 /*******************************************************************************
@@ -1642,7 +1665,7 @@ bool pb_trivial_line_reader_is_crlf(struct pb_line_reader * const line_reader) {
 
 bool pb_trivial_line_reader_is_end(struct pb_line_reader * const line_reader) {
   struct pb_trivial_line_reader *trivial_line_reader =
-      (struct pb_trivial_line_reader*)line_reader;
+    (struct pb_trivial_line_reader*)line_reader;
   struct pb_buffer *buffer = trivial_line_reader->line_reader.buffer;
 
   return buffer->is_iterator_end(buffer, &trivial_line_reader->buffer_iterator);
@@ -1662,10 +1685,23 @@ void pb_trivial_line_reader_terminate_line(
  */
 struct pb_line_reader *pb_trivial_line_reader_clone(
     struct pb_line_reader * const line_reader) {
-//  struct pb_trivial_line_reader *trivial_line_reader =
-//    (struct pb_trivial_line_reader*)line_reader;
+  struct pb_trivial_line_reader *trivial_line_reader =
+    (struct pb_trivial_line_reader*)line_reader;
+  const struct pb_allocator *allocator =
+    trivial_line_reader->line_reader.buffer->allocator;
 
-  return NULL;
+  struct pb_trivial_line_reader *trivial_line_reader_clone =
+    allocator->alloc(
+      allocator, pb_alloc_type_struct, sizeof(struct pb_trivial_line_reader));
+  if (!trivial_line_reader_clone)
+    return NULL;
+
+  memcpy(
+    trivial_line_reader_clone,
+    trivial_line_reader,
+    sizeof(struct pb_trivial_line_reader));
+
+  return &trivial_line_reader_clone->line_reader;
 }
 
 /*******************************************************************************
