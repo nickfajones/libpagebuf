@@ -594,6 +594,11 @@ uint64_t pb_trivial_buffer_write_data1(struct pb_buffer * const buffer,
     write_len =
       trivial_buffer->buffer.reserve(&trivial_buffer->buffer, write_len);
 
+    if (!trivial_buffer->buffer.is_iterator_end(&trivial_buffer->buffer, &itr))
+      trivial_buffer->buffer.iterator_next(&trivial_buffer->buffer, &itr);
+    else
+      trivial_buffer->buffer.iterator_prev(&trivial_buffer->buffer, &itr);
+
     memcpy(itr.page->data_vec.base, buf + written, write_len);
 
     len -= write_len;
@@ -626,11 +631,10 @@ uint64_t pb_trivial_buffer_write_data2(struct pb_buffer * const buffer,
 
   len = trivial_buffer->buffer.reserve(&trivial_buffer->buffer, len);
 
-  if (!trivial_buffer->buffer.is_iterator_end(&trivial_buffer->buffer, &itr)) {
+  if (!trivial_buffer->buffer.is_iterator_end(&trivial_buffer->buffer, &itr))
     trivial_buffer->buffer.iterator_next(&trivial_buffer->buffer, &itr);
-  } else {
+  else
     trivial_buffer->buffer.get_iterator(&trivial_buffer->buffer, &itr);
-  }
 
   uint64_t written = 0;
 
@@ -961,11 +965,10 @@ uint64_t pb_trivial_buffer_write_buffer4(struct pb_buffer * const buffer,
 
   len = trivial_buffer->buffer.reserve(&trivial_buffer->buffer, len);
 
-  if (!trivial_buffer->buffer.is_iterator_end(&trivial_buffer->buffer, &itr)) {
+  if (!trivial_buffer->buffer.is_iterator_end(&trivial_buffer->buffer, &itr))
     trivial_buffer->buffer.iterator_next(&trivial_buffer->buffer, &itr);
-  } else {
+  else
     trivial_buffer->buffer.get_iterator(&trivial_buffer->buffer, &itr);
-  }
 
   uint64_t written = 0;
   size_t offset = 0;
