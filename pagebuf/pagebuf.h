@@ -706,23 +706,29 @@ void pb_trivial_byte_reader_destroy(struct pb_byte_reader * const byte_reader);
 
 /** An interface for discovering, reading and consuming LF or CRLF terminated
  *  lines in pb_buffer instances.
+ *
+ * Lines in a buffer will be limited by implementations to no longer than
+ * PB_TRIVIAL_LINE_READER_DEFAULT_LINE_MAX bytes.  Any lines that are longer
+ * will be truncated to that length.
  */
+#define PB_TRIVIAL_LINE_READER_DEFAULT_LINE_MAX           16777216L
+
 struct pb_line_reader {
   /** Indicates whether a line exists at the head of a pb_buffer instance. */
   bool (*has_line)(struct pb_line_reader * const line_reader);
 
   /** Returns the length of the line discovered by has_line. */
-  uint64_t (*get_line_len)(struct pb_line_reader * const line_reader);
+  size_t (*get_line_len)(struct pb_line_reader * const line_reader);
   /** Extracts the data of the line discovered by has_line.
    *
-   * buf indicates the start of the destination memory region
+   * base indicates the start of the destination memory region
    * len indicates the shorter of the number of bytes to read or the length of
    *     the memory region.
    */
-  uint64_t (*get_line_data)(struct pb_line_reader * const line_reader,
-                            uint8_t * const base, uint64_t len);
+  size_t (*get_line_data)(struct pb_line_reader * const line_reader,
+                          uint8_t * const base, uint64_t len);
 
-  uint64_t (*seek_line)(struct pb_line_reader * const line_reader);
+  size_t (*seek_line)(struct pb_line_reader * const line_reader);
 
   /** Marks the present position of line discovery as a line end.
    *
@@ -733,7 +739,7 @@ struct pb_line_reader {
    *
    * If the character proceeding the termination point is a cr, it will be
    * considered in the line length calculation. */
-  void (*terminate_line_and_cr)(struct pb_line_reader * const line_reader);
+  void (*terminate_line_check_cr)(struct pb_line_reader * const line_reader);
 
   /** Indicates whether the line discovered in has_line is:
    *    LF (false) or CRLF (true) */
@@ -762,19 +768,21 @@ struct pb_line_reader *pb_trivial_line_reader_create(
 
 bool pb_trivial_line_reader_has_line(struct pb_line_reader * const line_reader);
 
-uint64_t pb_trivial_line_reader_get_line_len(
+size_t pb_trivial_line_reader_get_line_len(
                                      struct pb_line_reader * const line_reader);
-uint64_t pb_trivial_line_reader_get_line_data(
+size_t pb_trivial_line_reader_get_line_data(
                                      struct pb_line_reader * const line_reader,
                                      uint8_t * const buf, uint64_t len);
 
-uint64_t pb_trivial_line_reader_seek_line(
+size_t pb_trivial_line_reader_seek_line(
                                      struct pb_line_reader * const line_reader);
 
 bool pb_trivial_line_reader_is_crlf(struct pb_line_reader * const line_reader);
 bool pb_trivial_line_reader_is_end(struct pb_line_reader * const line_reader);
 
 void pb_trivial_line_reader_terminate_line(
+                                     struct pb_line_reader * const line_reader);
+void pb_trivial_line_reader_terminate_line_check_cr(
                                      struct pb_line_reader * const line_reader);
 
 struct pb_line_reader *pb_trivial_line_reader_clone(

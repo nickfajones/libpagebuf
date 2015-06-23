@@ -18,6 +18,8 @@
 #define PAGEBUF_HPP
 
 
+#include <string>
+
 #include <pagebuf/pagebuf.h>
 
 
@@ -277,20 +279,21 @@ class byte_reader {
     }
 
     virtual ~byte_reader() {
-      if (reader_) {
-        reader_->destroy(reader_);
-        reader_ = 0;
-      }
+      destroy();
     }
 
   public:
     byte_reader& operator=(const byte_reader& rvalue) {
+      destroy();
+
       reader_ = rvalue.reader_->clone(rvalue.reader_);
 
       return *this;
     }
 
     byte_reader& operator=(byte_reader&& rvalue) {
+      destroy();
+
       reader_ = rvalue.reader_;
       rvalue.reader_ = 0;
 
@@ -307,6 +310,14 @@ class byte_reader {
     }
 
   protected:
+    void destroy() {
+      if (reader_) {
+        reader_->destroy(reader_);
+        reader_ = 0;
+      }
+    }
+
+  protected:
     struct pb_byte_reader *reader_;
 };
 
@@ -317,32 +328,39 @@ class byte_reader {
 class line_reader {
   public:
     line_reader() :
-      reader_(0) {
+      reader_(0),
+      has_line_(false),
+      oversize_(false) {
     }
 
     explicit line_reader(buffer& buf) :
-      reader_(pb_trivial_line_reader_create(buf.buf_)) {
+      reader_(pb_trivial_line_reader_create(buf.buf_)),
+      has_line_(false),
+      oversize_(false) {
     }
 
     line_reader(const byte_reader& rvalue) :
-      reader_(0) {
+      reader_(0),
+      has_line_(false),
+      oversize_(false) {
       *this = rvalue;
     }
 
     line_reader(line_reader&& rvalue) :
-      reader_(0) {
+      reader_(0),
+      has_line_(false),
+      oversize_(false) {
       *this = rvalue;
     }
 
     virtual ~line_reader() {
-      if (reader_) {
-        reader_->destroy(reader_);
-        reader_ = 0;
-      }
+      destroy();
     }
 
   private:
     line_reader& operator=(const line_reader& rvalue) {
+      destroy();
+
       reader_ = rvalue.reader_->clone(rvalue.reader_);
 
       return *this;
@@ -350,14 +368,121 @@ class line_reader {
 
   public:
     line_reader& operator=(line_reader&& rvalue) {
+      destroy();
+
       reader_ = rvalue.reader_;
       rvalue.reader_ = 0;
 
       return *this;
     }
 
-  private:
+  public:
+    virtual void reset() {
+      if (reader_)
+        reader_->reset(reader_);
+
+      line_.clear();
+
+      has_line_ = false;
+      oversize_ = false;
+    }
+
+  protected:
+    virtual void destroy() {
+      reset();
+
+      if (reader_) {
+        reader_->destroy(reader_);
+        reader_ = 0;
+      }
+    }
+
+  public:
+    bool has_line() {
+      if (has_line_)
+        return true;
+
+      if (!reader_->has_line(reader_))
+        return false;
+
+      reset();
+
+      has_line_ = true;
+
+      size_t line_len = reader_->get_line_len(reader_);
+      if (line_len > line_.max_size()) {
+        line_len = line_.max_size();
+
+        oversize_ = true;
+      }
+
+      line_.resize(line_len);
+      reader_->get_line_data(
+        reader_,
+        reinterpret_cast<uint8_t*>(const_cast<char*>(line_.data())),
+        line_len);
+
+      return true;
+    }
+
+  public:
+    size_t get_line_len() {
+      if (!has_line_)
+        return 0;
+
+      return reader_->get_line_len(reader_);
+    }
+
+    const std::string& get_line() {
+      return line_;
+    }
+
+  public:
+    size_t seek_line() {
+      if (!has_line_)
+        return 0;
+
+      size_t seeked;
+
+      if (!oversize_)
+        seeked = reader_->seek_line(reader_);
+      else
+        seeked = reader_->buffer->seek(reader_->buffer, line_.size());
+
+      reset();
+
+      return seeked;
+    }
+
+  public:
+    void terminate_line() {
+      terminate_line(false);
+    }
+
+    void terminate_line(bool check_cr) {
+      if (!check_cr)
+        reader_->terminate_line(reader_);
+      else
+        reader_->terminate_line_check_cr(reader_);
+    }
+
+  public:
+    bool is_line_crlf() {
+      return reader_->is_crlf(reader_);
+    }
+
+    bool is_end() {
+      return reader_->is_end(reader_);
+    }
+
+  protected:
     struct pb_line_reader *reader_;
+
+  protected:
+    std::string line_;
+
+    bool has_line_;
+    bool oversize_;
 };
 
 }; /* namespace pagebuf */

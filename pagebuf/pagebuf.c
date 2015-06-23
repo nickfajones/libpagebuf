@@ -1461,13 +1461,14 @@ struct pb_trivial_line_reader {
 
   uint64_t buffer_data_revision;
 
-  uint64_t buffer_offset;
+  size_t buffer_offset;
 
   size_t page_offset;
 
   bool has_line;
   bool has_cr;
   bool is_terminated;
+  bool is_terminated_with_cr;
 };
 
 /*******************************************************************************
@@ -1499,6 +1500,8 @@ struct pb_line_reader *pb_trivial_line_reader_create(
 
   trivial_line_reader->line_reader.terminate_line =
     &pb_trivial_line_reader_terminate_line;
+  trivial_line_reader->line_reader.terminate_line_check_cr =
+    &pb_trivial_line_reader_terminate_line_check_cr;
 
   trivial_line_reader->line_reader.clone = &pb_trivial_line_reader_clone;
 
@@ -1544,6 +1547,13 @@ bool pb_trivial_line_reader_has_line(
 
       ++trivial_line_reader->buffer_offset;
       ++trivial_line_reader->page_offset;
+
+      if (trivial_line_reader->buffer_offset ==
+            PB_TRIVIAL_LINE_READER_DEFAULT_LINE_MAX) {
+        trivial_line_reader->has_cr = false;
+
+        return (trivial_line_reader->has_line = true);
+      }
     }
 
     buffer->iterator_next(buffer, itr);
@@ -1556,8 +1566,14 @@ bool pb_trivial_line_reader_has_line(
 
     trivial_line_reader->page_offset = itr->page->data_vec.len;
 
-    if (trivial_line_reader->is_terminated)
+    if (trivial_line_reader->is_terminated_with_cr)
       return (trivial_line_reader->has_line = true);
+
+    if (trivial_line_reader->is_terminated) {
+      trivial_line_reader->has_cr = false;
+
+      return (trivial_line_reader->has_line = true);
+    }
   }
 
   return false;
@@ -1565,7 +1581,7 @@ bool pb_trivial_line_reader_has_line(
 
 /*******************************************************************************
  */
-uint64_t pb_trivial_line_reader_get_line_len(
+size_t pb_trivial_line_reader_get_line_len(
     struct pb_line_reader * const line_reader) {
   struct pb_trivial_line_reader *trivial_line_reader =
     (struct pb_trivial_line_reader*)line_reader;
@@ -1585,7 +1601,7 @@ uint64_t pb_trivial_line_reader_get_line_len(
 
 /*******************************************************************************
  */
-uint64_t pb_trivial_line_reader_get_line_data(
+size_t pb_trivial_line_reader_get_line_data(
     struct pb_line_reader * const line_reader,
     uint8_t * const buf, uint64_t len) {
   struct pb_trivial_line_reader *trivial_line_reader =
@@ -1598,7 +1614,7 @@ uint64_t pb_trivial_line_reader_get_line_data(
   if (!trivial_line_reader->has_line)
     return 0;
 
-  uint64_t getted = 0;
+  size_t getted = 0;
 
   uint64_t line_len =
     trivial_line_reader->line_reader.get_line_len(
@@ -1684,6 +1700,15 @@ void pb_trivial_line_reader_terminate_line(
   trivial_line_reader->is_terminated = true;
 }
 
+void pb_trivial_line_reader_terminate_line_check_cr(
+    struct pb_line_reader * const line_reader) {
+
+  struct pb_trivial_line_reader *trivial_line_reader =
+    (struct pb_trivial_line_reader*)line_reader;
+
+  trivial_line_reader->is_terminated_with_cr = true;
+}
+
 /*******************************************************************************
  */
 struct pb_line_reader *pb_trivial_line_reader_clone(
@@ -1724,6 +1749,7 @@ void pb_trivial_line_reader_reset(struct pb_line_reader * const line_reader) {
   trivial_line_reader->has_line = false;
   trivial_line_reader->has_cr = false;
   trivial_line_reader->is_terminated = false;
+  trivial_line_reader->is_terminated_with_cr = false;
 }
 
 /*******************************************************************************
