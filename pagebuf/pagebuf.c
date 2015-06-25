@@ -260,6 +260,9 @@ struct pb_buffer *pb_trivial_buffer_create_with_strategy_with_alloc(
   ((struct pb_buffer_strategy*)&trivial_buffer->buffer.strategy)->
     fragment_as_target = strategy->fragment_as_target;
 
+  ((struct pb_buffer_strategy*)&trivial_buffer->buffer.strategy)->
+    supports_insert = true;
+
   trivial_buffer->buffer.get_data_size = &pb_trivial_buffer_get_data_size;
   trivial_buffer->buffer.get_data_revision =
     &pb_trivial_buffer_get_data_revision;
@@ -323,6 +326,9 @@ uint64_t pb_trivial_buffer_insert(struct pb_buffer * const buffer,
     struct pb_buffer_iterator * const buffer_iterator,
     size_t offset) {
   struct pb_trivial_buffer *trivial_buffer = (struct pb_trivial_buffer*)buffer;
+
+  if (!trivial_buffer->buffer.strategy.supports_insert)
+    return 0;
 
   while ((offset > 0) &&
          (offset >= buffer_iterator->page->data_vec.len)) {

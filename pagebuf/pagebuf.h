@@ -259,6 +259,9 @@ struct pb_buffer_strategy {
    * not_cloned (false): reference to the pb_data instance is incremented.
    *
    * cloned (true): new pb_data instance created and memory regions copied.
+   *
+   * If a pb_buffer type doesn't support one mode or another, it must explicitly
+   * set this value in the strategy object that it internally maintains.
    */
   bool clone_on_write;
 
@@ -279,8 +282,18 @@ struct pb_buffer_strategy {
    *                    When clone_on_write is true, source fragments will be
    *                    packed into target fragments up to the target page_size
    *                    in size.
+   *
+   * If a pb_buffer type doesn't support one mode or another, it must explicitly
+   * set this value in the strategy object that it internally maintains.
    */
   bool fragment_as_target;
+
+  /** Indicates whether a pb_buffer supports insert operations.
+   *
+   * This property is not so much used to configure pb_buffer instances, but is
+   * set explicitly by pb_buffer types to describe their capability.
+   */
+  bool supports_insert;
 };
 
 
