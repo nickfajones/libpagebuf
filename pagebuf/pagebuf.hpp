@@ -52,35 +52,35 @@ class buffer {
       public:
         iterator() :
           itr_({}),
-          buffer_(0) {
+          buf_(0) {
         }
 
       private:
         iterator(struct pb_buffer * const buffer, bool at_end) :
           itr_({}),
-          buffer_(buffer) {
+          buf_(buffer) {
           if (!at_end)
-            buffer_->get_iterator(buffer_, &itr_);
+            pb_buffer_get_iterator(buf_, &itr_);
           else
-            buffer_->get_iterator_end(buffer_, &itr_);
+            pb_buffer_get_iterator_end(buf_, &itr_);
         }
 
       public:
         iterator(const iterator& rvalue) :
           itr_({}),
-          buffer_(0) {
+          buf_(0) {
           *this = rvalue;
         }
 
         ~iterator() {
           itr_ = {};
-          buffer_ = 0;
+          buf_ = 0;
         }
 
       public:
         iterator& operator=(const iterator& rvalue) {
           itr_ = rvalue.itr_;
-          buffer_ = rvalue.buffer_;
+          buf_ = rvalue.buf_;
 
           return *this;
         }
@@ -88,13 +88,13 @@ class buffer {
       public:
         bool operator==(const iterator& rvalue) {
           return
-            ((buffer_ == rvalue.buffer_) &&
-             (buffer_->cmp_iterator(buffer_, &itr_, &rvalue.itr_)));
+            ((buf_ == rvalue.buf_) &&
+             (pb_buffer_iterator_cmp(buf_, &itr_, &rvalue.itr_)));
         }
 
       public:
         iterator& operator++() {
-          buffer_->iterator_next(buffer_, &itr_);
+          pb_buffer_iterator_next(buf_, &itr_);
 
           return *this;
         }
@@ -107,7 +107,7 @@ class buffer {
 
       public:
         iterator& operator--() {
-          buffer_->iterator_prev(buffer_, &itr_);
+          pb_buffer_iterator_prev(buf_, &itr_);
 
           return *this;
         }
@@ -126,7 +126,92 @@ class buffer {
       private:
         struct pb_buffer_iterator itr_;
 
-        struct pb_buffer *buffer_;
+        struct pb_buffer *buf_;
+    };
+
+  public:
+    class byte_iterator {
+      public:
+        friend class buffer;
+
+      public:
+        byte_iterator() :
+          itr_({}),
+          buf_(0) {
+        }
+
+      private:
+        byte_iterator(struct pb_buffer * const buffer, bool at_end) :
+          itr_({}),
+          buf_(buffer) {
+          if (!at_end)
+            pb_buffer_get_byte_iterator(buf_, &itr_);
+          else
+            pb_buffer_get_byte_iterator_end(buf_, &itr_);
+        }
+
+      public:
+        byte_iterator(const byte_iterator& rvalue) :
+          itr_({}),
+          buf_(0) {
+          *this = rvalue;
+        }
+
+        ~byte_iterator() {
+          itr_ = {};
+          buf_ = 0;
+        }
+
+      public:
+        byte_iterator& operator=(const byte_iterator& rvalue) {
+          itr_ = rvalue.itr_;
+          buf_ = rvalue.buf_;
+
+          return *this;
+        }
+
+      public:
+        bool operator==(const byte_iterator& rvalue) {
+          return
+            ((buf_ == rvalue.buf_) &&
+             (pb_buffer_byte_iterator_cmp(buf_, &itr_, &rvalue.itr_)));
+        }
+
+      public:
+        byte_iterator& operator++() {
+          pb_buffer_byte_iterator_next(buf_, &itr_);
+
+          return *this;
+        }
+
+        byte_iterator operator++(int) {
+           byte_iterator temp(*this);
+           ++(*this);
+           return temp;
+        }
+
+      public:
+        byte_iterator& operator--() {
+          pb_buffer_byte_iterator_prev(buf_, &itr_);
+
+          return *this;
+        }
+
+        byte_iterator operator--(int) {
+          byte_iterator temp(*this);
+          --(*this);
+          return temp;
+        }
+
+      public:
+        const char* operator*() {
+          return itr_.current_byte;
+        }
+
+      private:
+        struct pb_buffer_byte_iterator itr_;
+
+        struct pb_buffer *buf_;
     };
 
   public:
@@ -168,7 +253,7 @@ class buffer {
 
     ~buffer() {
       if (buf_) {
-        buf_->destroy(buf_);
+        pb_buffer_destroy(buf_);
         buf_ = 0;
       }
     }
@@ -192,25 +277,25 @@ class buffer {
     }
 
   public:
-    uint64_t get_data_size() {
-      return buf_->get_data_size(buf_);
+    uint64_t get_data_revision() {
+      return pb_buffer_get_data_revision(buf_);
     }
 
-    uint64_t get_data_revision() {
-      return buf_->get_data_revision(buf_);
+    uint64_t get_data_size() {
+      return pb_buffer_get_data_size(buf_);
     }
 
   public:
+    uint64_t seek(uint64_t len) {
+      return pb_buffer_seek(buf_, len);
+    }
+
     uint64_t reserve(uint64_t len) {
-      return buf_->reserve(buf_, len);
+      return pb_buffer_reserve(buf_, len);
     }
 
     uint64_t rewind(uint64_t len) {
-      return buf_->rewind(buf_, len);
-    }
-
-    uint64_t seek(uint64_t len) {
-      return buf_->seek(buf_, len);
+      return pb_buffer_rewind(buf_, len);
     }
 
   public:
@@ -224,101 +309,33 @@ class buffer {
 
   public:
     uint64_t write(const uint8_t *buf, uint64_t len) {
-      return buf_->write_data(buf_, buf, len);
+      return pb_buffer_write_data(buf_, buf, len);
     }
 
     uint64_t write_ref(const uint8_t *buf, uint64_t len) {
-      return buf_->write_data_ref(buf_, buf, len);
+      return pb_buffer_write_data_ref(buf_, buf, len);
     }
 
     uint64_t write(const buffer& src_buf, uint64_t len) {
-      return buf_->write_buffer(buf_, src_buf.buf_, len);
+      return pb_buffer_write_buffer(buf_, src_buf.buf_, len);
     }
 
-  public:
     uint64_t overwrite(const uint8_t *buf, uint64_t len) {
-      return buf_->overwrite_data(buf_, buf, len);
+      return pb_buffer_overwrite_data(buf_, buf, len);
     }
 
   public:
     uint64_t read(uint8_t * const buf, uint64_t len) {
-      return buf_->read_data(buf_, buf, len);
+      return pb_buffer_read_data(buf_, buf, len);
     }
 
   public:
     void clear() {
-      buf_->clear(buf_);
+    pb_buffer_clear(buf_);
     }
 
   protected:
     struct pb_buffer *buf_;
-};
-
-
-
-/** C++ Wrapper around pb_byte_reader as a Bidirectional byte iterator
- */
-class byte_reader {
-  public:
-    byte_reader() :
-      reader_(0) {
-    }
-
-    explicit byte_reader(buffer& buf) :
-      reader_(pb_trivial_byte_reader_create(buf.buf_)) {
-    }
-
-    byte_reader(const byte_reader& rvalue) :
-      reader_(0) {
-      *this = rvalue;
-    }
-
-    byte_reader(byte_reader&& rvalue) :
-      reader_(0) {
-      *this = rvalue;
-    }
-
-    virtual ~byte_reader() {
-      destroy();
-    }
-
-  public:
-    byte_reader& operator=(const byte_reader& rvalue) {
-      destroy();
-
-      reader_ = rvalue.reader_->clone(rvalue.reader_);
-
-      return *this;
-    }
-
-    byte_reader& operator=(byte_reader&& rvalue) {
-      destroy();
-
-      reader_ = rvalue.reader_;
-      rvalue.reader_ = 0;
-
-      return *this;
-    }
-
-  public:
-    virtual bool operator==(const byte_reader& rvalue) {
-      return reader_->cmp(reader_, rvalue.reader_);
-    }
-
-    bool operator!=(const byte_reader& rvalue) {
-      return !(*this == rvalue);
-    }
-
-  protected:
-    void destroy() {
-      if (reader_) {
-        reader_->destroy(reader_);
-        reader_ = 0;
-      }
-    }
-
-  protected:
-    struct pb_byte_reader *reader_;
 };
 
 
@@ -447,7 +464,7 @@ class line_reader {
       if (!oversize_)
         seeked = reader_->seek_line(reader_);
       else
-        seeked = reader_->buffer->seek(reader_->buffer, line_.size());
+        seeked = pb_buffer_seek(reader_->buffer, line_.size());
 
       reset();
 

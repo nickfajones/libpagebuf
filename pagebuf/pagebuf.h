@@ -232,11 +232,29 @@ void pb_page_destroy(struct pb_page *page,
 
 
 
-/** A structure used to iterate over buffer data.
- */
+/** The pb_buffer and its supporting classes. */
+struct pb_buffer;
+
+
+
+/** A structure used to iterate over buffer pages. */
 struct pb_buffer_iterator {
   struct pb_page *page;
 };
+
+/** A structure used to iterate over buffer bytes. */
+struct pb_buffer_byte_iterator {
+  struct pb_buffer_iterator buffer_iterator;
+
+  size_t page_offset;
+
+  char *current_byte;
+};
+
+
+
+/** The default page size of pb_buffer pages. */
+#define PB_BUFFER_DEFAULT_PAGE_SIZE                       4096
 
 
 
@@ -259,9 +277,6 @@ struct pb_buffer_strategy {
    * not_cloned (false): reference to the pb_data instance is incremented.
    *
    * cloned (true): new pb_data instance created and memory regions copied.
-   *
-   * If a pb_buffer type doesn't support one mode or another, it must explicitly
-   * set this value in the strategy object that it internally maintains.
    */
   bool clone_on_write;
 
@@ -282,55 +297,39 @@ struct pb_buffer_strategy {
    *                    When clone_on_write is true, source fragments will be
    *                    packed into target fragments up to the target page_size
    *                    in size.
-   *
-   * If a pb_buffer type doesn't support one mode or another, it must explicitly
-   * set this value in the strategy object that it internally maintains.
    */
   bool fragment_as_target;
 
   /** Indicates whether a pb_buffer supports insert operations.
    *
-   * This property is not so much used to configure pb_buffer instances, but is
-   * set explicitly by pb_buffer types to describe their capability.
+   * no support (false): insert operations will immediately return 0.
+   * support    (true):  insert operations can be performed and the buffer
+   *                     update its data view appropriately.
    */
   bool supports_insert;
 };
 
 
 
-/** The page size of the default pb_buffer strategy.
+/** The structure that holds the operations that implement pb_buffer
+ *  functionality.
+ *
+ * A author of pb_buffer subclasses may make a copy of the base
+ * pb_buffer_operations structure, and replace operator functions to customise
+ * the behaviour of their pb_buffer.
+ *
+ * A pb_buffer_operations structure should not embed itself as a non pointer
+ * member of a larger structure, in order to hide implementation details.
+ *
+ * An author should instead embed the pb_buffer structure in order to hide
+ * implementation details of their subclass.
+ *
+ * An author should also define a group of factory functions to opaquely
+ * create their pb_buffer instance and bind it to their customised
+ * pb_buffer_operations structure.  See the pb_buffer_create* group of factory
+ * functions as an example of standard pb_buffer factory functionality.
  */
-#define PB_TRIVIAL_BUFFER_DEFAULT_PAGE_SIZE               4096
-
-
-
-/** Get a built in, trivial buffer strategy.
- *
- * page_size is 4096
- *
- * clone_on_write is false
- *
- * fragment_as_source is false
- *
- * no_insertion is false;
- */
-const struct pb_buffer_strategy *pb_get_trivial_buffer_strategy(void);
-
-
-
-/** Represents a buffer of pages, and operations for the manipulation of the
- * pages and the buffers of data therein.
- *
- * The buffer also represents the strategy for allocation and freeing of
- * data buffers.
- */
-struct pb_buffer {
-  /** The strategy used by the pb_buffer instance. */
-  const struct pb_buffer_strategy strategy;
-
-  /** Return the amount of data in the buffer, in bytes. */
-  uint64_t (*get_data_size)(struct pb_buffer * const buffer);
-
+struct pb_buffer_operations {
   /** Return a revision stamp of the data.
    *
    * This value is incremented by pb_buffer implementations whenever the
@@ -345,6 +344,9 @@ struct pb_buffer {
    * last use, and therefore needs to be re-processed.
    */
   uint64_t (*get_data_revision)(struct pb_buffer * const buffer);
+
+  /** Return the amount of data in the buffer, in bytes. */
+  uint64_t (*get_data_size)(struct pb_buffer * const buffer);
 
   /** Append a pb_page instance to the pb_buffer.
    *
@@ -372,7 +374,16 @@ struct pb_buffer {
                      struct pb_page * const page,
                      struct pb_buffer_iterator * const buffer_iterator,
                      size_t offset);
-
+  /** Seek the buffer by len bytes.
+   *
+   * len indicates the amount of data to seek, in bytes.
+   *
+   * The seek operation may cause internal pages to be consumed depending on
+   * the buffer implementation details.  These pb_pages will be destroyed during
+   * the seek operation and their respective data 'put'd.
+   */
+  uint64_t (*seek)(struct pb_buffer * const buffer,
+                   uint64_t len);
   /** Increase the size of the buffer by adding len bytes of data to the end.
    *
    * len indicates the amount of data to add in bytes.
@@ -391,27 +402,17 @@ struct pb_buffer {
    */
   uint64_t (*rewind)(struct pb_buffer * const buffer,
                      uint64_t len);
-  /** Seek the buffer by len bytes.
-     *
-     * len indicates the amount of data to seek, in bytes.
-     *
-     * The seek operation may cause internal pages to be consumed depending on
-     * the buffer implementation details.  These pb_pages will be destroyed during
-     * the seek operation and their respective data 'put'd.
-     */
-  uint64_t (*seek)(struct pb_buffer * const buffer,
-                   uint64_t len);
 
   /** Initialise an iterator to the start of the pb_buffer instance data.
    *
-   * The iterator should be a pointer to an object on the stack that should
+   * The iterator should be a pointer to an object on the stack that must
    * be manipulated only by the iterator methods of the same buffer instance.
    */
   void (*get_iterator)(struct pb_buffer * const buffer,
                        struct pb_buffer_iterator * const buffer_iterator);
   /** Initialise an iterator to the end of the pb_buffer instance data.
      *
-     * The iterator should be a pointer to an object on the stack that should
+     * The iterator should be a pointer to an object on the stack that must
      * be manipulated only by the iterator methods of the same buffer instance.
      */
   void (*get_iterator_end)(struct pb_buffer * const buffer,
@@ -423,10 +424,10 @@ struct pb_buffer {
    * vector of the pb_page of the iterator can be used.  The value of the
    * pb_page pointer is undefined when the iterator end function returns true.
    */
-  bool (*is_iterator_end)(struct pb_buffer * const buffer,
+  bool (*iterator_is_end)(struct pb_buffer * const buffer,
                           struct pb_buffer_iterator * const buffer_iterator);
 
-  bool (*cmp_iterator)(struct pb_buffer * const buffer,
+  bool (*iterator_cmp)(struct pb_buffer * const buffer,
                        const struct pb_buffer_iterator *lvalue,
                        const struct pb_buffer_iterator *rvalue);
 
@@ -442,6 +443,53 @@ struct pb_buffer {
    * position before end in this case. */
   void (*iterator_prev)(struct pb_buffer * const buffer,
                         struct pb_buffer_iterator * const buffer_iterator);
+
+  /** Initialise a byte iterator to the start of the pb_buffer instance data.
+   *
+   * The byte iterator should be a pointer to an object on the stack that must
+   * be manipulated only by the iterator methods of the same buffer instance.
+   */
+  void (*get_byte_iterator)(struct pb_buffer * const buffer,
+                            struct pb_buffer_byte_iterator * const
+                              buffer_byte_iterator);
+  /** Initialise an iterator to the end of the pb_buffer instance data.
+     *
+     * The iterator should be a pointer to an object on the stack that must
+     * be manipulated only by the iterator methods of the same buffer instance.
+     */
+  void (*get_byte_iterator_end)(struct pb_buffer * const buffer,
+                                struct pb_buffer_byte_iterator * const
+                                  buffer_byte_iterator);
+  /** Indicates whether an iterator has traversed to the end of a buffers
+   *  internal chain of pages.
+   *
+   * This function must always be called, and return false, before the data
+   * vector of the pb_page of the iterator can be used.  The value of the
+   * pb_page pointer is undefined when the iterator end function returns true.
+   */
+  bool (*byte_iterator_is_end)(struct pb_buffer * const buffer,
+                               struct pb_buffer_byte_iterator * const
+                                 buffer_byte_iterator);
+
+  bool (*byte_iterator_cmp)(struct pb_buffer * const buffer,
+                            const struct pb_buffer_byte_iterator *lvalue,
+                            const struct pb_buffer_byte_iterator *rvalue);
+
+  /** Increments an iterator to the next pb_page in a buffer's internal chain. */
+  void (*byte_iterator_next)(struct pb_buffer * const buffer,
+                             struct pb_buffer_byte_iterator * const
+                               buffer_byte_iterator);
+  /** Decrements an iterator to the previous pb_page in a buffer's internal
+   *  chain.
+   *
+   * It is valid to call this function on an iterator that is the end
+   * iterator, according to is_iterator_end.  If this function is called on such
+   * an iterator, the buffer implementation must correctly decrement back to the
+   * position before end in this case. */
+  void (*byte_iterator_prev)(struct pb_buffer * const buffer,
+                             struct pb_buffer_byte_iterator * const
+                               buffer_byte_iterator);
+
 
   /** Write data from a memory region to the pb_buffer instance.
    *
@@ -484,8 +532,8 @@ struct pb_buffer {
    * necessary.
    */
   uint64_t (*write_buffer)(struct pb_buffer * const buffer,
-                         struct pb_buffer * const src_buffer,
-                         uint64_t len);
+                          struct pb_buffer * const src_buffer,
+                          uint64_t len);
 
   /** Write data from a memory region to the pb_buffer instance.
    *
@@ -517,14 +565,135 @@ struct pb_buffer {
 
   /** Destroy a pb_buffer. */
   void (*destroy)(struct pb_buffer * const buffer);
+};
+
+
+
+/** Represents a buffer of pages, and operations for the manipulation of the
+ * pages and the buffers of data therein.
+ *
+ * The buffer also represents the strategy for allocation and freeing of
+ * data buffers.
+ */
+struct pb_buffer {
+  const struct pb_buffer_strategy strategy;
+
+  const struct pb_buffer_operations *operations;
 
   const struct pb_allocator *allocator;
 };
 
-/** A trivial buffer implementation using builtin or supplied allocator.
+
+
+/** Functional infterface for the generic pb_buffer class. */
+uint64_t pb_buffer_get_data_revision(struct pb_buffer * const buffer);
+
+uint64_t pb_buffer_get_data_size(struct pb_buffer * const buffer);
+
+uint64_t pb_buffer_insert(
+                        struct pb_buffer * const buffer,
+                        struct pb_page * const page,
+                        struct pb_buffer_iterator * const iterator,
+                        size_t offset);
+uint64_t pb_buffer_seek(struct pb_buffer * const buffer, uint64_t len);
+uint64_t pb_buffer_reserve(
+                        struct pb_buffer * const buffer, uint64_t len);
+uint64_t pb_buffer_rewind(
+                        struct pb_buffer * const buffer, uint64_t len);
+
+
+void pb_buffer_get_iterator(struct pb_buffer * const buffer,
+                            struct pb_buffer_iterator * const iterator);
+void pb_buffer_get_iterator_end(
+                            struct pb_buffer * const buffer,
+                            struct pb_buffer_iterator * const iterator);
+bool pb_buffer_iterator_is_end(
+                            struct pb_buffer * const buffer,
+                            struct pb_buffer_iterator * const iterator);
+bool pb_buffer_iterator_cmp(struct pb_buffer * const buffer,
+                            const struct pb_buffer_iterator *lvalue,
+                            const struct pb_buffer_iterator *rvalue);
+void pb_buffer_iterator_next(
+                            struct pb_buffer * const buffer,
+                            struct pb_buffer_iterator * const iterator);
+void pb_buffer_iterator_prev(
+                            struct pb_buffer * const buffer,
+                            struct pb_buffer_iterator * const iterator);
+
+
+void pb_buffer_get_byte_iterator(
+                              struct pb_buffer * const buffer,
+                              struct pb_buffer_byte_iterator * const iterator);
+void pb_buffer_get_byte_iterator_end(
+                              struct pb_buffer * const buffer,
+                              struct pb_buffer_byte_iterator * const iterator);
+bool pb_buffer_byte_iterator_is_end(
+                              struct pb_buffer * const buffer,
+                              struct pb_buffer_byte_iterator * const iterator);
+bool pb_buffer_byte_iterator_cmp(
+                              struct pb_buffer * const buffer,
+                              const struct pb_buffer_byte_iterator *lvalue,
+                              const struct pb_buffer_byte_iterator *rvalue);
+void pb_buffer_byte_iterator_next(
+                              struct pb_buffer * const buffer,
+                              struct pb_buffer_byte_iterator * const iterator);
+void pb_buffer_byte_iterator_prev(
+                              struct pb_buffer * const buffer,
+                              struct pb_buffer_byte_iterator * const iterator);
+
+
+uint64_t pb_buffer_write_data(struct pb_buffer * const buffer,
+                              const uint8_t *buf,
+                              uint64_t len);
+uint64_t pb_buffer_write_data_ref(
+                              struct pb_buffer * const buffer,
+                              const uint8_t *buf,
+                              uint64_t len);
+uint64_t pb_buffer_write_buffer(
+                              struct pb_buffer * const buffer,
+                              struct pb_buffer * const src_buffer,
+                              uint64_t len);
+uint64_t pb_buffer_overwrite_data(
+                              struct pb_buffer * const buffer,
+                              const uint8_t *buf,
+                              uint64_t len);
+
+
+uint64_t pb_buffer_read_data(struct pb_buffer * const buffer,
+                             uint8_t * const buf,
+                             uint64_t len);
+
+
+void pb_buffer_clear(struct pb_buffer * const buffer);
+void pb_buffer_destroy(
+                     struct pb_buffer * const buffer);
+
+
+
+/** The trivial buffer and its supporting classes. */
+
+
+
+/** Get a trivial buffer strategy.
  *
- * Default page size: 4096 bytes
+ * page_size is 4096
+ *
+ * clone_on_write is false
+ *
+ * fragment_as_source is false
+ *
+ * supports_insert is true
  */
+const struct pb_buffer_strategy *pb_get_trivial_buffer_strategy(void);
+
+
+
+/** Get a trivial buffer operations structure. */
+const struct pb_buffer_operations *pb_get_trivial_buffer_operations(void);
+
+
+
+/** An implementation of pb_buffer using the default or supplied allocator. */
 struct pb_buffer *pb_trivial_buffer_create(void);
 struct pb_buffer *pb_trivial_buffer_create_with_strategy(
                                      const struct pb_buffer_strategy *strategy);
@@ -534,36 +703,41 @@ struct pb_buffer *pb_trivial_buffer_create_with_strategy_with_alloc(
                                      const struct pb_buffer_strategy *strategy,
                                      const struct pb_allocator *allocator);
 
+
+
+/** Trivial buffer operations. */
+uint64_t pb_trivial_buffer_get_data_revision(
+                                         struct pb_buffer * const buffer);
+
 uint64_t pb_trivial_buffer_get_data_size(struct pb_buffer * const buffer);
 
-uint64_t pb_trivial_buffer_get_data_revision(struct pb_buffer * const buffer);
 
-uint64_t pb_trivial_buffer_insert(struct pb_buffer * const buffer,
-                                  struct pb_page * const page,
-                                  struct pb_buffer_iterator * const iterator,
-                                  size_t offset);
-
-uint64_t pb_trivial_buffer_append(struct pb_buffer * const buffer,
-                                  struct pb_page * const page);
-uint64_t pb_trivial_buffer_reserve(struct pb_buffer * const buffer,
-                                   uint64_t len);
+uint64_t pb_trivial_buffer_insert(
+                                struct pb_buffer * const buffer,
+                                struct pb_page * const page,
+                                struct pb_buffer_iterator * const iterator,
+                                size_t offset);
 uint64_t pb_trivial_buffer_seek(struct pb_buffer * const buffer,
                                 uint64_t len);
-uint64_t pb_trivial_buffer_rewind(struct pb_buffer * const buffer,
-                                  uint64_t len);
+uint64_t pb_trivial_buffer_reserve(
+                                struct pb_buffer * const buffer,
+                                uint64_t len);
+uint64_t pb_trivial_buffer_rewind(
+                                struct pb_buffer * const buffer,
+                                uint64_t len);
+
 
 void pb_trivial_buffer_get_iterator(struct pb_buffer * const buffer,
                                     struct pb_buffer_iterator * const iterator);
 void pb_trivial_buffer_get_iterator_end(
                                     struct pb_buffer * const buffer,
                                     struct pb_buffer_iterator * const iterator);
-bool pb_trivial_buffer_is_iterator_end(
+bool pb_trivial_buffer_iterator_is_end(
                                     struct pb_buffer * const buffer,
                                     struct pb_buffer_iterator * const iterator);
-bool pb_trivial_buffer_cmp_iterator(struct pb_buffer * const buffer,
+bool pb_trivial_buffer_iterator_cmp(struct pb_buffer * const buffer,
                                     const struct pb_buffer_iterator *lvalue,
                                     const struct pb_buffer_iterator *rvalue);
-
 void pb_trivial_buffer_iterator_next(
                                     struct pb_buffer * const buffer,
                                     struct pb_buffer_iterator * const iterator);
@@ -571,25 +745,52 @@ void pb_trivial_buffer_iterator_prev(
                                     struct pb_buffer * const buffer,
                                     struct pb_buffer_iterator * const iterator);
 
+
+void pb_trivial_buffer_get_byte_iterator(
+                                    struct pb_buffer * const buffer,
+                                    struct pb_buffer_byte_iterator * const iterator);
+void pb_trivial_buffer_get_byte_iterator_end(
+                                    struct pb_buffer * const buffer,
+                                    struct pb_buffer_byte_iterator * const iterator);
+bool pb_trivial_buffer_byte_iterator_is_end(
+                                    struct pb_buffer * const buffer,
+                                    struct pb_buffer_byte_iterator * const iterator);
+bool pb_trivial_buffer_byte_iterator_cmp(struct pb_buffer * const buffer,
+                                    const struct pb_buffer_byte_iterator *lvalue,
+                                    const struct pb_buffer_byte_iterator *rvalue);
+void pb_trivial_buffer_byte_iterator_next(
+                                    struct pb_buffer * const buffer,
+                                    struct pb_buffer_byte_iterator * const iterator);
+void pb_trivial_buffer_byte_iterator_prev(
+                                    struct pb_buffer * const buffer,
+                                    struct pb_buffer_byte_iterator * const iterator);
+
+
 uint64_t pb_trivial_buffer_write_data(struct pb_buffer * const buffer,
                                       const uint8_t *buf,
                                       uint64_t len);
-uint64_t pb_trivial_buffer_write_data_ref(struct pb_buffer * const buffer,
-                                          const uint8_t *buf,
-                                          uint64_t len);
-uint64_t pb_trivial_buffer_write_buffer(struct pb_buffer * const buffer,
-                                        struct pb_buffer * const src_buffer,
-                                        uint64_t len);
-uint64_t pb_trivial_buffer_overwrite_data(struct pb_buffer * const buffer,
-                                          const uint8_t *buf,
-                                          uint64_t len);
+uint64_t pb_trivial_buffer_write_data_ref(
+                                      struct pb_buffer * const buffer,
+                                      const uint8_t *buf,
+                                      uint64_t len);
+uint64_t pb_trivial_buffer_write_buffer(
+                                      struct pb_buffer * const buffer,
+                                      struct pb_buffer * const src_buffer,
+                                      uint64_t len);
+uint64_t pb_trivial_buffer_overwrite_data(
+                                      struct pb_buffer * const buffer,
+                                      const uint8_t *buf,
+                                      uint64_t len);
+
 
 uint64_t pb_trivial_buffer_read_data(struct pb_buffer * const buffer,
                                      uint8_t * const buf,
                                      uint64_t len);
 
+
 void pb_trivial_buffer_clear(struct pb_buffer * const buffer);
-void pb_trivial_buffer_destroy(struct pb_buffer * const buffer);
+void pb_trivial_buffer_destroy(
+                             struct pb_buffer * const buffer);
 
 
 
@@ -639,6 +840,7 @@ void pb_trivial_data_reader_destroy(struct pb_data_reader * const data_reader);
 
 
 
+#if 0
 /** An interface for reading data from a pb_buffer byte by byte.
  *
  * If the pb_buffer instance data revision increases during the lifetime of
@@ -714,6 +916,7 @@ struct pb_byte_reader *pb_trivial_byte_reader_clone(
 
 void pb_trivial_byte_reader_reset(struct pb_byte_reader * const byte_reader);
 void pb_trivial_byte_reader_destroy(struct pb_byte_reader * const byte_reader);
+#endif
 
 
 

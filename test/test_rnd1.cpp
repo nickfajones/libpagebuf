@@ -126,13 +126,13 @@ class TestCase {
       }
 
       if (buffer2) {
-        buffer2->destroy(buffer2);
+        pb_buffer_destroy(buffer2);
 
         buffer2 = NULL;
       }
 
       if (buffer1) {
-        buffer1->destroy(buffer1);
+        pb_buffer_destroy(buffer1);
 
         buffer1 = NULL;
       }
@@ -163,15 +163,14 @@ void write_line(
     TestCase* test_case,
     uint8_t *stream_buf, uint64_t full_write_size,
     uint64_t total_write_size, uint64_t total_transfer_size) {
-  uint64_t current_size = test_case->buffer1->get_data_size(test_case->buffer1);
+  uint64_t current_size = pb_buffer_get_data_size(test_case->buffer1);
   assert(current_size == (total_write_size - total_transfer_size));
 
   uint64_t written =
-    test_case->buffer1->write_data(
-      test_case->buffer1, stream_buf, full_write_size);
+    pb_buffer_write_data(test_case->buffer1, stream_buf, full_write_size);
   assert(written == full_write_size);
 
-  current_size = test_case->buffer1->get_data_size(test_case->buffer1);
+  current_size = pb_buffer_get_data_size(test_case->buffer1);
   assert(current_size == (total_write_size + full_write_size - total_transfer_size));
 }
 
@@ -179,19 +178,18 @@ void transfer_data(
     TestCase* test_case,
     uint64_t transfer_size,
     uint64_t total_transfer_size, uint64_t total_read_size) {
-  uint64_t current_size = test_case->buffer2->get_data_size(test_case->buffer2);
+  uint64_t current_size = pb_buffer_get_data_size(test_case->buffer2);
   assert(current_size == (total_transfer_size - total_read_size));
 
   uint64_t transferred =
-    test_case->buffer2->write_buffer(
+    pb_buffer_write_buffer(
       test_case->buffer2, test_case->buffer1, transfer_size);
   assert(transferred == transfer_size);
 
-  current_size = test_case->buffer2->get_data_size(test_case->buffer2);
+  current_size = pb_buffer_get_data_size(test_case->buffer2);
   assert(current_size == (total_transfer_size + transfer_size - total_read_size));
 
-  uint64_t seeked =
-    test_case->buffer1->seek(test_case->buffer1, transfer_size);
+  uint64_t seeked = pb_buffer_seek(test_case->buffer1, transfer_size);
   assert(seeked == transfer_size);
 }
 
@@ -199,21 +197,18 @@ uint64_t read_data(
     TestCase* test_case,
     uint8_t *read_buf, uint64_t read_size,
     uint64_t total_transfer_size, uint64_t total_read_size) {
-  uint64_t current_size = test_case->buffer2->get_data_size(test_case->buffer2);
+  uint64_t current_size = pb_buffer_get_data_size(test_case->buffer2);
   assert(current_size >= read_size);
 
-  uint64_t readed =
-    test_case->buffer2->read_data(
-      test_case->buffer2, read_buf, read_size);
+  uint64_t readed = pb_buffer_read_data(test_case->buffer2, read_buf, read_size);
   assert(readed == read_size);
 
   EVP_DigestUpdate(test_case->md5ctx, read_buf, read_size);
 
-  uint64_t seeked =
-    test_case->buffer2->seek(test_case->buffer2, read_size);
+  uint64_t seeked = pb_buffer_seek(test_case->buffer2, read_size);
   assert(seeked == read_size);
 
-  current_size = test_case->buffer2->get_data_size(test_case->buffer2);
+  current_size = pb_buffer_get_data_size(test_case->buffer2);
   assert(current_size == (total_transfer_size - total_read_size - read_size));
 
   return seeked;
@@ -291,8 +286,11 @@ int main(int argc, char **argv) {
   TestCase *test_case;
 
   struct pb_buffer_strategy strategy;
+  memset(&strategy, 0, sizeof(strategy));
 
-  strategy.page_size = PB_TRIVIAL_BUFFER_DEFAULT_PAGE_SIZE;
+  strategy.supports_insert = true;
+
+  strategy.page_size = PB_BUFFER_DEFAULT_PAGE_SIZE;
   strategy.clone_on_write = false;
   strategy.fragment_as_target = false;
 
@@ -301,7 +299,7 @@ int main(int argc, char **argv) {
       "Standard heap sourced pb_buffer                                       ",
       strategy));
 
-  strategy.page_size = PB_TRIVIAL_BUFFER_DEFAULT_PAGE_SIZE;
+  strategy.page_size = PB_BUFFER_DEFAULT_PAGE_SIZE;
   strategy.clone_on_write = false;
   strategy.fragment_as_target = true;
 
@@ -310,7 +308,7 @@ int main(int argc, char **argv) {
       "Standard heap sourced pb_buffer, fragment_as_target                   ",
       strategy));
 
-  strategy.page_size = PB_TRIVIAL_BUFFER_DEFAULT_PAGE_SIZE;
+  strategy.page_size = PB_BUFFER_DEFAULT_PAGE_SIZE;
   strategy.clone_on_write = true;
   strategy.fragment_as_target = false;
 
@@ -319,7 +317,7 @@ int main(int argc, char **argv) {
       "Standard heap sourced pb_buffer, clone_on_Write                       ",
       strategy));
 
-  strategy.page_size = PB_TRIVIAL_BUFFER_DEFAULT_PAGE_SIZE;
+  strategy.page_size = PB_BUFFER_DEFAULT_PAGE_SIZE;
   strategy.clone_on_write = true;
   strategy.fragment_as_target = true;
 
@@ -476,8 +474,8 @@ int main(int argc, char **argv) {
        ++test_itr) {
     test_case = *test_itr;
 
-    assert(test_case->buffer1->get_data_size(test_case->buffer1) == 0);
-    assert(test_case->buffer2->get_data_size(test_case->buffer2) == 0);
+    assert(pb_buffer_get_data_size(test_case->buffer1) == 0);
+    assert(pb_buffer_get_data_size(test_case->buffer2) == 0);
 
     EVP_DigestFinal_ex(
       test_case->md5ctx, test_case->digest, &test_case->digest_len);
