@@ -345,28 +345,24 @@ class buffer {
 class line_reader {
   public:
     line_reader() :
-      reader_(0),
-      has_line_(false),
-      oversize_(false) {
+      line_reader_(0),
+      has_line_(false) {
     }
 
     explicit line_reader(buffer& buf) :
-      reader_(pb_trivial_line_reader_create(buf.buf_)),
-      has_line_(false),
-      oversize_(false) {
+      line_reader_(pb_trivial_line_reader_create(buf.buf_)),
+      has_line_(false) {
     }
 
     line_reader(const byte_reader& rvalue) :
-      reader_(0),
-      has_line_(false),
-      oversize_(false) {
+      line_reader_(0),
+      has_line_(false) {
       *this = rvalue;
     }
 
     line_reader(line_reader&& rvalue) :
-      reader_(0),
-      has_line_(false),
-      oversize_(false) {
+      line_reader_(0),
+      has_line_(false) {
       *this = rvalue;
     }
 
@@ -374,11 +370,11 @@ class line_reader {
       destroy();
     }
 
-  private:
+  public:
     line_reader& operator=(const line_reader& rvalue) {
       destroy();
 
-      reader_ = rvalue.reader_->clone(rvalue.reader_);
+      line_reader_ = pb_line_reader_clone(rvalue.line_reader_);
 
       return *this;
     }
@@ -387,30 +383,29 @@ class line_reader {
     line_reader& operator=(line_reader&& rvalue) {
       destroy();
 
-      reader_ = rvalue.reader_;
-      rvalue.reader_ = 0;
+      line_reader_ = rvalue.line_reader_;
+      rvalue.line_reader_ = 0;
 
       return *this;
     }
 
   public:
     virtual void reset() {
-      if (reader_)
-        reader_->reset(reader_);
+      if (line_reader_)
+        pb_line_reader_reset(line_reader_);
 
       line_.clear();
 
       has_line_ = false;
-      oversize_ = false;
     }
 
   protected:
     virtual void destroy() {
       reset();
 
-      if (reader_) {
-        reader_->destroy(reader_);
-        reader_ = 0;
+      if (line_reader_) {
+        pb_line_reader_destroy(line_reader_);
+        line_reader_ = 0;
       }
     }
 
@@ -419,23 +414,18 @@ class line_reader {
       if (has_line_)
         return true;
 
-      if (!reader_->has_line(reader_))
+      if (!pb_line_reader_has_line(line_reader_))
         return false;
 
       reset();
 
       has_line_ = true;
 
-      size_t line_len = reader_->get_line_len(reader_);
-      if (line_len > line_.max_size()) {
-        line_len = line_.max_size();
-
-        oversize_ = true;
-      }
+      size_t line_len = pb_line_reader_get_line_len(line_reader_);
 
       line_.resize(line_len);
-      reader_->get_line_data(
-        reader_,
+      pb_line_reader_get_line_data(
+        line_reader_,
         reinterpret_cast<uint8_t*>(const_cast<char*>(line_.data())),
         line_len);
 
@@ -447,7 +437,7 @@ class line_reader {
       if (!has_line_)
         return 0;
 
-      return reader_->get_line_len(reader_);
+      return pb_line_reader_get_line_len(line_reader_);
     }
 
     const std::string& get_line() {
@@ -461,10 +451,7 @@ class line_reader {
 
       size_t seeked;
 
-      if (!oversize_)
-        seeked = reader_->seek_line(reader_);
-      else
-        seeked = pb_buffer_seek(reader_->buffer, line_.size());
+      seeked = pb_line_reader_seek_line(line_reader_);
 
       reset();
 
@@ -478,28 +465,27 @@ class line_reader {
 
     void terminate_line(bool check_cr) {
       if (!check_cr)
-        reader_->terminate_line(reader_);
+        pb_line_reader_terminate_line(line_reader_);
       else
-        reader_->terminate_line_check_cr(reader_);
+        pb_line_reader_terminate_line_check_cr(line_reader_);
     }
 
   public:
     bool is_line_crlf() {
-      return reader_->is_crlf(reader_);
+      return pb_line_reader_is_crlf(line_reader_);
     }
 
     bool is_end() {
-      return reader_->is_end(reader_);
+      return pb_line_reader_is_end(line_reader_);
     }
 
   protected:
-    struct pb_line_reader *reader_;
+    struct pb_line_reader *line_reader_;
 
   protected:
     std::string line_;
 
     bool has_line_;
-    bool oversize_;
 };
 
 }; /* namespace pagebuf */

@@ -232,7 +232,10 @@ void pb_page_destroy(struct pb_page *page,
 
 
 
-/** The pb_buffer and its supporting classes. */
+
+
+
+/** The pb_buffer and its supporting classes and functions. */
 struct pb_buffer;
 
 
@@ -585,7 +588,7 @@ struct pb_buffer {
 
 
 
-/** Functional infterface for the generic pb_buffer class. */
+/** Functional infterfaces for the generic pb_buffer class. */
 uint64_t pb_buffer_get_data_revision(struct pb_buffer * const buffer);
 
 uint64_t pb_buffer_get_data_size(struct pb_buffer * const buffer);
@@ -670,7 +673,7 @@ void pb_buffer_destroy(
 
 
 
-/** The trivial buffer and its supporting classes. */
+/** The trivial buffer implementation and its supporting functions. */
 
 
 
@@ -794,9 +797,19 @@ void pb_trivial_buffer_destroy(
 
 
 
-/** An interface for reading data from a pb_buffer.
+
+
+
+/** The pb_data_reader and its supporting functions. */
+struct pb_data_reader;
+
+
+
+/**
+ *
+ * The operations structure of the data reader.
  */
-struct pb_data_reader {
+struct pb_data_reader_operations {
   /** Read data from the pb_buffer instance, into a memory region.
    *
    * buf indicates the start of the target memory region.
@@ -822,114 +835,67 @@ struct pb_data_reader {
 
   /** Destroy the pb_data_reader instance. */
   void (*destroy)(struct pb_data_reader * const data_reader);
+};
+
+
+
+/** An interface for reading data from a pb_buffer. */
+struct pb_data_reader {
+  const struct pb_data_reader_operations *operations;
 
   struct pb_buffer *buffer;
 };
 
+
+
+/** Functional interfaces for the generic pb_data_reader class. */
+uint64_t pb_data_reader_read(struct pb_data_reader * const data_reader,
+                             uint8_t * const buf, uint64_t len);
+
+void pb_data_reader_reset(struct pb_data_reader * const data_reader);
+void pb_data_reader_destroy(
+                          struct pb_data_reader * const data_reader);
+
+
+
+/** The trivial data reader implementation and its supporting functions. */
+
+
+
+/** Get a trivial data reader operations structure. */
+const struct pb_data_reader_operations
+  *pb_get_trivial_data_reader_operations(void);
+
+
+
 /** A trivial data reader implementation that reads data via iterators
  */
 struct pb_data_reader *pb_trivial_data_reader_create(
-                                          struct pb_buffer * const buffer);
+                                              struct pb_buffer * const buffer);
 
 uint64_t pb_trivial_data_reader_read(struct pb_data_reader * const data_reader,
                                      uint8_t * const buf, uint64_t len);
 
 void pb_trivial_data_reader_reset(struct pb_data_reader * const data_reader);
+void pb_trivial_data_reader_destroy(
+                                  struct pb_data_reader * const data_reader);
 
-void pb_trivial_data_reader_destroy(struct pb_data_reader * const data_reader);
 
 
 
-#if 0
-/** An interface for reading data from a pb_buffer byte by byte.
- *
- * If the pb_buffer instance data revision increases during the lifetime of
- * the byte reader, then the byte reader is returned to the new start position.
- */
-struct pb_byte_reader {
-  /** Gets a byte of data at the current reader position.
-   *
-   * If the buffer is empty, the byte returned will be the NULL byte (\0)
-   * If the
-   */
-  uint8_t (*get_current_byte)(struct pb_byte_reader * const byte_reader);
 
-  /** Indicates whether the byte reader is at the end of the buffer.
-   */
-  bool (*is_end)(struct pb_byte_reader * const byte_reader);
 
-  /** Compare two pb_byte_reader instances.
-   *
-   * Should only be called on byte readers created from the same pb_buffer,
-   * otherwise undefined behaviour will occur.
-   */
-  bool (*cmp)(struct pb_byte_reader * const byte_reader,
-              const struct pb_byte_reader *rvalue);
-
-  /** Advances the current byte position by one.
-   *
-   * If the current byte is already at the end of the buffer, then advancing
-   * will set the current offset to past-the-end, and the byte returned by
-   * get_current_byte will be the NULL byte (\0).
-   */
-  void (*next)(struct pb_byte_reader * const byte_reader);
-
-  /** Retreats the current byte position by one.
-   *
-   * If the current byte is already at the beginning of the buffer, then
-   * retreating will have no effect and the curent byte will remain at the
-   * beginning.
-   */
-  void (*prev)(struct pb_byte_reader * const byte_reader);
-
-  /** Clone the state of the byte reader into a new instance. */
-  struct pb_byte_reader *(*clone)(struct pb_byte_reader * const byte_reader);
-
-  /** Reset the byte reader back to the beginning byte of the pb_buffer. */
-  void (*reset)(struct pb_byte_reader * const byte_reader);
-
-  /** Destroy a byte reader instance. */
-  void (*destroy)(struct pb_byte_reader * const byte_reader);
-
-  struct pb_buffer *buffer;
-};
-
-/** A trivial byte reader implementation that reads data via iterators.
- */
-struct pb_byte_reader *pb_trivial_byte_reader_create(
-                                          struct pb_buffer * const buffer);
-struct pb_byte_reader *pb_trivial_byte_reader_create_end(
-                                          struct pb_buffer * const buffer);
-
-uint8_t pb_trivial_byte_reader_get_current_byte(
-                                 struct pb_byte_reader * const byte_reader);
-
-bool pb_trivial_byte_reader_is_end(struct pb_byte_reader * const byte_reader);
-bool pb_trivial_byte_reader_cmp(struct pb_byte_reader * const byte_reader,
-                                const struct pb_byte_reader *rvalue);
-
-void pb_trivial_byte_reader_next(struct pb_byte_reader * const byte_reader);
-void pb_trivial_byte_reader_prev(struct pb_byte_reader * const byte_reader);
-
-struct pb_byte_reader *pb_trivial_byte_reader_clone(
-                                 struct pb_byte_reader * const byte_reader);
-
-void pb_trivial_byte_reader_reset(struct pb_byte_reader * const byte_reader);
-void pb_trivial_byte_reader_destroy(struct pb_byte_reader * const byte_reader);
-#endif
+/** The pb_line_reader and its supporting functions. */
+struct pb_line_reader;
 
 
 
 /** An interface for discovering, reading and consuming LF or CRLF terminated
  *  lines in pb_buffer instances.
  *
- * Lines in a buffer will be limited by implementations to no longer than
- * PB_TRIVIAL_LINE_READER_DEFAULT_LINE_MAX bytes.  Any lines that are longer
- * will be truncated to that length.
+ * The operations structure of the line reader.
  */
-#define PB_TRIVIAL_LINE_READER_DEFAULT_LINE_MAX           16777216L
-
-struct pb_line_reader {
+struct pb_line_reader_operations {
   /** Indicates whether a line exists at the head of a pb_buffer instance. */
   bool (*has_line)(struct pb_line_reader * const line_reader);
 
@@ -973,9 +939,61 @@ struct pb_line_reader {
 
   /** Destroy a line reader instance. */
   void (*destroy)(struct pb_line_reader * const line_reader);
+};
+
+
+
+/** Lines in a buffer will be limited by implementations to no longer than
+ * PB_TRIVIAL_LINE_READER_DEFAULT_LINE_MAX bytes.  Any lines that are longer
+ * will be truncated to that length.
+ */
+#define PB_LINE_READER_DEFAULT_LINE_MAX                   16777216L
+
+struct pb_line_reader {
+  const struct pb_line_reader_operations *operations;
 
   struct pb_buffer *buffer;
 };
+
+
+
+
+/** Functional infterface for the generic pb_buffer class. */
+bool pb_line_reader_has_line(struct pb_line_reader * const line_reader);
+
+size_t pb_line_reader_get_line_len(struct pb_line_reader * const line_reader);
+size_t pb_line_reader_get_line_data(
+                                   struct pb_line_reader * const line_reader,
+                                   uint8_t * const buf, uint64_t len);
+
+bool pb_line_reader_is_crlf(
+                           struct pb_line_reader * const line_reader);
+bool pb_line_reader_is_end(struct pb_line_reader * const line_reader);
+
+void pb_line_reader_terminate_line(struct pb_line_reader * const line_reader);
+void pb_line_reader_terminate_line_check_cr(
+                                   struct pb_line_reader * const line_reader);
+
+size_t pb_line_reader_seek_line(struct pb_line_reader * const line_reader);
+
+struct pb_line_reader *pb_line_reader_clone(
+                                     struct pb_line_reader * const line_reader);
+
+void pb_line_reader_reset(struct pb_line_reader * const line_reader);
+void pb_line_reader_destroy(
+                          struct pb_line_reader * const line_reader);
+
+
+
+/** The trivial line reader implementation and its supporting functions. */
+
+
+
+/** Get a trivial line reader operations structure. */
+const struct pb_line_reader_operations
+  *pb_get_trivial_line_reader_operations(void);
+
+
 
 /** A trivial line reader implementation that searches for lines via iterators.
  */

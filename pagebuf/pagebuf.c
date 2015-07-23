@@ -755,13 +755,15 @@ void pb_trivial_buffer_get_byte_iterator(struct pb_buffer * const buffer,
 
   iterator->page_offset = 0;
 
-  if (!pb_buffer_iterator_is_end(buffer, &iterator->buffer_iterator) &&
-      (iterator->buffer_iterator.page->data_vec.len != 0))
-    iterator->current_byte =
-      (char*)(
-        &iterator->buffer_iterator.page->data_vec.base[iterator->page_offset]);
-  else
+  if (pb_buffer_iterator_is_end(buffer, &iterator->buffer_iterator)) {
     iterator->current_byte = NULL;
+
+    return;
+  }
+
+  iterator->current_byte =
+    (char*)(
+      &iterator->buffer_iterator.page->data_vec.base[iterator->page_offset]);
 }
 
 void pb_trivial_buffer_get_byte_iterator_end(struct pb_buffer * const buffer,
@@ -790,12 +792,44 @@ bool pb_trivial_buffer_byte_iterator_cmp(struct pb_buffer * const buffer,
 
 void pb_trivial_buffer_byte_iterator_next(struct pb_buffer * const buffer,
     struct pb_buffer_byte_iterator * const iterator) {
+  ++iterator->page_offset;
 
+  if (iterator->page_offset >= iterator->buffer_iterator.page->data_vec.len) {
+    pb_buffer_iterator_next(buffer, &iterator->buffer_iterator);
+
+    iterator->page_offset = 0;
+  }
+
+  if (pb_buffer_iterator_is_end(buffer, &iterator->buffer_iterator)) {
+    iterator->current_byte = NULL;
+
+    return;
+  }
+
+  iterator->current_byte =
+    (char*)(
+      &iterator->buffer_iterator.page->data_vec.base[iterator->page_offset]);
 }
 
 void pb_trivial_buffer_byte_iterator_prev(struct pb_buffer * const buffer,
     struct pb_buffer_byte_iterator * const iterator) {
+  if (iterator->page_offset == 0) {
+    pb_buffer_iterator_prev(buffer, &iterator->buffer_iterator);
 
+    iterator->page_offset = iterator->buffer_iterator.page->data_vec.len;
+  }
+
+  --iterator->page_offset;
+
+  if (pb_buffer_iterator_is_end(buffer, &iterator->buffer_iterator)) {
+    iterator->current_byte = NULL;
+
+    return;
+  }
+
+  iterator->current_byte =
+    (char*)(
+      &iterator->buffer_iterator.page->data_vec.base[iterator->page_offset]);
 }
 
 /*******************************************************************************
@@ -1323,17 +1357,54 @@ void pb_trivial_buffer_destroy(struct pb_buffer * const buffer) {
 
 
 
+
+
+
+/*******************************************************************************
+ */
+struct pb_data_reader_operations pb_trivial_data_reader_operations = {
+  .read = pb_trivial_data_reader_read,
+  .reset = pb_trivial_data_reader_reset,
+  .destroy = pb_trivial_data_reader_destroy,
+};
+
+const struct pb_data_reader_operations *pb_get_trivial_data_reader_operations(void) {
+  return &pb_trivial_data_reader_operations;
+}
+
+
+
 /*******************************************************************************
  */
 struct pb_trivial_data_reader {
   struct pb_data_reader data_reader;
 
-  struct pb_buffer_iterator buffer_iterator;
+  struct pb_buffer_iterator iterator;
 
   uint64_t buffer_data_revision;
 
   uint64_t page_offset;
 };
+
+
+
+/*******************************************************************************
+ */
+uint64_t pb_data_reader_read(struct pb_data_reader * const data_reader,
+    uint8_t * const buf, uint64_t len) {
+  return data_reader->operations->read(data_reader, buf, len);
+}
+
+void pb_data_reader_reset(struct pb_data_reader * const data_reader) {
+  data_reader->operations->reset(data_reader);
+}
+
+void pb_data_reader_destroy(struct pb_data_reader * const data_reader) {
+  data_reader->operations->destroy(data_reader);
+}
+
+
+
 
 /*******************************************************************************
  */
@@ -1347,14 +1418,12 @@ struct pb_data_reader *pb_trivial_data_reader_create(
   if (!trivial_data_reader)
     return NULL;
 
-  trivial_data_reader->data_reader.read = &pb_trivial_data_reader_read;
-
-  trivial_data_reader->data_reader.reset = &pb_trivial_data_reader_reset;
-  trivial_data_reader->data_reader.destroy = &pb_trivial_data_reader_destroy;
+  trivial_data_reader->data_reader.operations =
+    pb_get_trivial_data_reader_operations();
 
   trivial_data_reader->data_reader.buffer = buffer;
 
-  trivial_data_reader->data_reader.reset(&trivial_data_reader->data_reader);
+  pb_data_reader_reset(&trivial_data_reader->data_reader);
 
   return &trivial_data_reader->data_reader;
 }
@@ -1368,14 +1437,14 @@ uint64_t pb_trivial_data_reader_read(
   struct pb_trivial_data_reader *trivial_data_reader =
     (struct pb_trivial_data_reader*)data_reader;
   struct pb_buffer *buffer = trivial_data_reader->data_reader.buffer;
-  struct pb_buffer_iterator *itr = &trivial_data_reader->buffer_iterator;
+  struct pb_buffer_iterator *itr = &trivial_data_reader->iterator;
 
-  if (buffer->operations->get_data_revision(buffer) !=
+  if (pb_buffer_get_data_revision(buffer) !=
       trivial_data_reader->buffer_data_revision)
-    trivial_data_reader->data_reader.reset(&trivial_data_reader->data_reader);
+    pb_data_reader_reset(&trivial_data_reader->data_reader);
 
   if (trivial_data_reader->page_offset == itr->page->data_vec.len)
-    buffer->operations->iterator_next(buffer, itr);
+    pb_buffer_iterator_next(buffer, itr);
 
   uint64_t readed = 0;
 
@@ -1419,8 +1488,7 @@ void pb_trivial_data_reader_reset(struct pb_data_reader * const data_reader) {
     (struct pb_trivial_data_reader*)data_reader;
   struct pb_buffer *buffer = trivial_data_reader->data_reader.buffer;
 
-  buffer->operations->get_iterator(
-    buffer, &trivial_data_reader->buffer_iterator);
+  pb_buffer_get_iterator(buffer, &trivial_data_reader->iterator);
 
   trivial_data_reader->buffer_data_revision =
     buffer->operations->get_data_revision(buffer);
@@ -1442,225 +1510,34 @@ void pb_trivial_data_reader_destroy(struct pb_data_reader * const data_reader) {
 
 
 
-#if 0
+
+
+
 /*******************************************************************************
  */
-struct pb_trivial_byte_reader {
-  struct pb_byte_reader byte_reader;
+static struct pb_line_reader_operations pb_trivial_line_reader_operations = {
+  .has_line = &pb_trivial_line_reader_has_line,
 
-  struct pb_buffer_iterator buffer_iterator;
+  .get_line_len = &pb_trivial_line_reader_get_line_len,
+  .get_line_data = &pb_trivial_line_reader_get_line_data,
 
-  uint64_t buffer_data_revision;
+  .seek_line = &pb_trivial_line_reader_seek_line,
 
-  size_t page_offset;
+  .is_crlf = &pb_trivial_line_reader_is_crlf,
+  .is_end = &pb_trivial_line_reader_is_end,
+
+  .terminate_line = &pb_trivial_line_reader_terminate_line,
+  .terminate_line_check_cr = &pb_trivial_line_reader_terminate_line_check_cr,
+
+  .clone = &pb_trivial_line_reader_clone,
+
+  .reset = &pb_trivial_line_reader_reset,
+  .destroy = &pb_trivial_line_reader_destroy,
 };
 
-/*******************************************************************************
- */
-struct pb_byte_reader *pb_trivial_byte_reader_create(
-    struct pb_buffer * const buffer) {
-  const struct pb_allocator *allocator = buffer->allocator;
-
-  struct pb_trivial_byte_reader *trivial_byte_reader =
-    allocator->alloc(
-      allocator, pb_alloc_type_struct, sizeof(struct pb_trivial_byte_reader));
-  if (!trivial_byte_reader)
-    return NULL;
-
-  trivial_byte_reader->byte_reader.get_current_byte =
-    &pb_trivial_byte_reader_get_current_byte;
-
-  trivial_byte_reader->byte_reader.is_end =
-    &pb_trivial_byte_reader_is_end;
-  trivial_byte_reader->byte_reader.cmp =
-    &pb_trivial_byte_reader_cmp;
-
-  trivial_byte_reader->byte_reader.next =
-    &pb_trivial_byte_reader_next;
-  trivial_byte_reader->byte_reader.prev =
-    &pb_trivial_byte_reader_prev;
-
-  trivial_byte_reader->byte_reader.clone =
-    &pb_trivial_byte_reader_clone;
-
-  trivial_byte_reader->byte_reader.reset =
-    &pb_trivial_byte_reader_reset;
-
-  trivial_byte_reader->byte_reader.destroy =
-    &pb_trivial_byte_reader_destroy;
-
-  trivial_byte_reader->byte_reader.buffer = buffer;
-
-  pb_trivial_byte_reader_reset(&trivial_byte_reader->byte_reader);
-
-  return &trivial_byte_reader->byte_reader;
+const struct pb_line_reader_operations *pb_get_trivial_line_reader_operations() {
+  return &pb_trivial_line_reader_operations;
 }
-
-struct pb_byte_reader *pb_trivial_byte_reader_create_end(
-    struct pb_buffer * const buffer) {
-  struct pb_trivial_byte_reader *trivial_byte_reader =
-    (struct pb_trivial_byte_reader*)pb_trivial_byte_reader_create(buffer);
-
-  buffer->get_iterator_end(buffer, &trivial_byte_reader->buffer_iterator);
-
-  return &trivial_byte_reader->byte_reader;
-}
-
-/*******************************************************************************
- */
-uint8_t pb_trivial_byte_reader_get_current_byte(
-    struct pb_byte_reader * const byte_reader) {
-  struct pb_trivial_byte_reader *trivial_byte_reader =
-    (struct pb_trivial_byte_reader*)byte_reader;
-  struct pb_buffer *buffer = trivial_byte_reader->byte_reader.buffer;
-  struct pb_buffer_iterator *itr = &trivial_byte_reader->buffer_iterator;
-
-  if (buffer->get_data_revision(buffer) != trivial_byte_reader->buffer_data_revision)
-    trivial_byte_reader->byte_reader.reset(&trivial_byte_reader->byte_reader);
-
-  if (buffer->is_iterator_end(buffer, itr))
-    return '\0';
-
-  return itr->page->data_vec.base[trivial_byte_reader->page_offset];
-}
-
-/*******************************************************************************
- */
-bool pb_trivial_byte_reader_is_end(struct pb_byte_reader * const byte_reader) {
-  struct pb_trivial_byte_reader *trivial_byte_reader =
-    (struct pb_trivial_byte_reader*)byte_reader;
-  struct pb_buffer *buffer = trivial_byte_reader->byte_reader.buffer;
-
-  if (buffer->get_data_revision(buffer) != trivial_byte_reader->buffer_data_revision)
-    trivial_byte_reader->byte_reader.reset(&trivial_byte_reader->byte_reader);
-
-  return buffer->is_iterator_end(buffer, &trivial_byte_reader->buffer_iterator);
-}
-
-/*******************************************************************************
- */
-bool pb_trivial_byte_reader_cmp(struct pb_byte_reader * const byte_reader,
-    const struct pb_byte_reader *rvalue) {
-  if (byte_reader->buffer != rvalue->buffer)
-    return false;
-
-  const struct pb_trivial_byte_reader *trivial_byte_reader =
-    (struct pb_trivial_byte_reader*)byte_reader;
-  const struct pb_trivial_byte_reader *trivial_rvalue =
-    (const struct pb_trivial_byte_reader*)rvalue;
-
-  if (!trivial_byte_reader->byte_reader.buffer->cmp_iterator(
-        trivial_byte_reader->byte_reader.buffer,
-        &trivial_byte_reader->buffer_iterator,
-        &trivial_rvalue->buffer_iterator))
-    return false;
-
-  return true;
-}
-
-/*******************************************************************************
- */
-void pb_trivial_byte_reader_next(struct pb_byte_reader * const byte_reader) {
-  struct pb_trivial_byte_reader *trivial_byte_reader =
-    (struct pb_trivial_byte_reader*)byte_reader;
-  struct pb_buffer *buffer = trivial_byte_reader->byte_reader.buffer;
-  struct pb_buffer_iterator *itr = &trivial_byte_reader->buffer_iterator;
-
-  if (buffer->get_data_revision(buffer) != trivial_byte_reader->buffer_data_revision) {
-    trivial_byte_reader->byte_reader.reset(&trivial_byte_reader->byte_reader);
-
-    return;
-  }
-
-  if (buffer->is_iterator_end(buffer, itr))
-    return;
-
-  ++trivial_byte_reader->page_offset;
-
-  if (trivial_byte_reader->page_offset == itr->page->data_vec.len) {
-    buffer->iterator_next(buffer, itr);
-
-    trivial_byte_reader->page_offset = 0;
-  }
-}
-
-/*******************************************************************************
- */
-void pb_trivial_byte_reader_prev(struct pb_byte_reader * const byte_reader) {
-  struct pb_trivial_byte_reader *trivial_byte_reader =
-    (struct pb_trivial_byte_reader*)byte_reader;
-  struct pb_buffer *buffer = trivial_byte_reader->byte_reader.buffer;
-  struct pb_buffer_iterator *itr = &trivial_byte_reader->buffer_iterator;
-
-  if (buffer->get_data_revision(buffer) != trivial_byte_reader->buffer_data_revision) {
-    trivial_byte_reader->byte_reader.reset(&trivial_byte_reader->byte_reader);
-
-    return;
-  }
-
-  if (trivial_byte_reader->page_offset == 0) {
-    buffer->iterator_prev(buffer, itr);
-
-    trivial_byte_reader->page_offset = itr->page->data_vec.len;
-  }
-
-  if (buffer->is_iterator_end(buffer, itr))
-    return;
-
-  --trivial_byte_reader->page_offset;
-}
-
-/*******************************************************************************
- */
-struct pb_byte_reader *pb_trivial_byte_reader_clone(
-    struct pb_byte_reader * const byte_reader) {
-  struct pb_trivial_byte_reader *trivial_byte_reader =
-    (struct pb_trivial_byte_reader*)byte_reader;
-  const struct pb_allocator *allocator =
-    trivial_byte_reader->byte_reader.buffer->allocator;
-
-  struct pb_trivial_byte_reader *trivial_byte_reader_clone =
-    allocator->alloc(
-      allocator, pb_alloc_type_struct, sizeof(struct pb_trivial_byte_reader));
-  if (!trivial_byte_reader_clone)
-    return NULL;
-
-  memcpy(
-    trivial_byte_reader_clone,
-    trivial_byte_reader,
-    sizeof(struct pb_trivial_byte_reader));
-
-  return &trivial_byte_reader_clone->byte_reader;
-}
-
-/*******************************************************************************
- */
-void pb_trivial_byte_reader_reset(struct pb_byte_reader * const byte_reader) {
-  struct pb_trivial_byte_reader *trivial_byte_reader =
-    (struct pb_trivial_byte_reader*)byte_reader;
-  struct pb_buffer *buffer = trivial_byte_reader->byte_reader.buffer;
-
-  buffer->get_iterator(buffer, &trivial_byte_reader->buffer_iterator);
-
-  trivial_byte_reader->buffer_data_revision = buffer->get_data_revision(buffer);
-
-  trivial_byte_reader->page_offset = 0;
-}
-
-/*******************************************************************************
- */
-void pb_trivial_byte_reader_destroy(struct pb_byte_reader * const byte_reader) {
-  struct pb_trivial_byte_reader *trivial_byte_reader =
-    (struct pb_trivial_byte_reader*)byte_reader;
-  const struct pb_allocator *allocator =
-    trivial_byte_reader->byte_reader.buffer->allocator;
-
-  allocator->free(
-    allocator,
-    pb_alloc_type_struct,
-    trivial_byte_reader, sizeof(struct pb_trivial_byte_reader));
-}
-#endif
 
 
 
@@ -1669,19 +1546,70 @@ void pb_trivial_byte_reader_destroy(struct pb_byte_reader * const byte_reader) {
 struct pb_trivial_line_reader {
   struct pb_line_reader line_reader;
 
-  struct pb_buffer_iterator buffer_iterator;
+  struct pb_buffer_byte_iterator iterator;
 
   uint64_t buffer_data_revision;
 
   size_t buffer_offset;
-
-  size_t page_offset;
 
   bool has_line;
   bool has_cr;
   bool is_terminated;
   bool is_terminated_with_cr;
 };
+
+
+
+/*******************************************************************************
+ */
+bool pb_line_reader_has_line(struct pb_line_reader * const line_reader) {
+  return line_reader->operations->has_line(line_reader);
+}
+
+size_t pb_line_reader_get_line_len(struct pb_line_reader * const line_reader) {
+  return line_reader->operations->get_line_len(line_reader);
+}
+
+size_t pb_line_reader_get_line_data(struct pb_line_reader * const line_reader,
+    uint8_t * const buf, uint64_t len) {
+  return line_reader->operations->get_line_data(line_reader, buf, len);
+}
+
+bool pb_line_reader_is_crlf(struct pb_line_reader * const line_reader) {
+  return line_reader->operations->is_crlf(line_reader);
+}
+
+bool pb_line_reader_is_end(struct pb_line_reader * const line_reader) {
+  return line_reader->operations->is_end(line_reader);
+}
+
+void pb_line_reader_terminate_line(struct pb_line_reader * const line_reader) {
+  line_reader->operations->terminate_line(line_reader);
+}
+
+void pb_line_reader_terminate_line_check_cr(
+    struct pb_line_reader * const line_reader) {
+  line_reader->operations->terminate_line_check_cr(line_reader);
+}
+
+uint64_t pb_line_reader_seek_line(struct pb_line_reader * const line_reader) {
+  return line_reader->operations->seek_line(line_reader);
+}
+
+struct pb_line_reader *pb_line_reader_clone(
+    struct pb_line_reader * const line_reader) {
+  return line_reader->operations->clone(line_reader);
+}
+
+void pb_line_reader_reset(struct pb_line_reader * const line_reader) {
+  line_reader->operations->reset(line_reader);
+}
+
+void pb_line_reader_destroy(struct pb_line_reader * const line_reader) {
+  line_reader->operations->destroy(line_reader);
+}
+
+
 
 /*******************************************************************************
  */
@@ -1695,34 +1623,12 @@ struct pb_line_reader *pb_trivial_line_reader_create(
   if (!trivial_line_reader)
     return NULL;
 
-  trivial_line_reader->line_reader.has_line = &pb_trivial_line_reader_has_line;
-
-  trivial_line_reader->line_reader.get_line_len =
-    &pb_trivial_line_reader_get_line_len;
-  trivial_line_reader->line_reader.get_line_data =
-    &pb_trivial_line_reader_get_line_data;
-
-  trivial_line_reader->line_reader.seek_line =
-    &pb_trivial_line_reader_seek_line;
-
-  trivial_line_reader->line_reader.is_crlf =
-    &pb_trivial_line_reader_is_crlf;
-  trivial_line_reader->line_reader.is_end =
-    &pb_trivial_line_reader_is_end;
-
-  trivial_line_reader->line_reader.terminate_line =
-    &pb_trivial_line_reader_terminate_line;
-  trivial_line_reader->line_reader.terminate_line_check_cr =
-    &pb_trivial_line_reader_terminate_line_check_cr;
-
-  trivial_line_reader->line_reader.clone = &pb_trivial_line_reader_clone;
-
-  trivial_line_reader->line_reader.reset = &pb_trivial_line_reader_reset;
-  trivial_line_reader->line_reader.destroy = &pb_trivial_line_reader_destroy;
+  trivial_line_reader->line_reader.operations =
+    pb_get_trivial_line_reader_operations();
 
   trivial_line_reader->line_reader.buffer = buffer;
 
-  pb_trivial_line_reader_reset(&trivial_line_reader->line_reader);
+  pb_line_reader_reset(&trivial_line_reader->line_reader);
 
   return &trivial_line_reader->line_reader;
 }
@@ -1733,60 +1639,50 @@ bool pb_trivial_line_reader_has_line(
     struct pb_line_reader * const line_reader) {
   struct pb_trivial_line_reader *trivial_line_reader =
     (struct pb_trivial_line_reader*)line_reader;
-  struct pb_buffer *buffer = trivial_line_reader->line_reader.buffer;
-  struct pb_buffer_iterator *itr = &trivial_line_reader->buffer_iterator;
+  struct pb_buffer *buffer = line_reader->buffer;
+  struct pb_buffer_byte_iterator *iterator = &trivial_line_reader->iterator;
 
   if (trivial_line_reader->buffer_data_revision !=
-        buffer->operations->get_data_revision(buffer))
-    pb_trivial_line_reader_reset(&trivial_line_reader->line_reader);
+        pb_buffer_get_data_revision(buffer))
+    pb_line_reader_reset(line_reader);
 
   if (trivial_line_reader->has_line)
     return true;
 
-  if (buffer->operations->iterator_is_end(buffer, itr))
-    buffer->operations->iterator_prev(buffer, itr);
+  if (pb_buffer_get_data_size(buffer) == 0)
+    return false;
 
-  while (!buffer->operations->iterator_is_end(buffer, itr)) {
-    const struct pb_data_vec *data_vec =
-      &trivial_line_reader->buffer_iterator.page->data_vec;
-
-    while (trivial_line_reader->page_offset < data_vec->len) {
-      if (data_vec->base[trivial_line_reader->page_offset] == '\n')
-        return (trivial_line_reader->has_line = true);
-      else if (data_vec->base[trivial_line_reader->page_offset] == '\r')
-        trivial_line_reader->has_cr = true;
-      else
-        trivial_line_reader->has_cr = false;
-
-      ++trivial_line_reader->buffer_offset;
-      ++trivial_line_reader->page_offset;
-
-      if (trivial_line_reader->buffer_offset ==
-            PB_TRIVIAL_LINE_READER_DEFAULT_LINE_MAX) {
-        trivial_line_reader->has_cr = false;
-
-        return (trivial_line_reader->has_line = true);
-      }
-    }
-
-    buffer->operations->iterator_next(buffer, itr);
-
-    trivial_line_reader->page_offset = 0;
-  }
-
-  if (buffer->operations->iterator_is_end(buffer, itr)) {
-    buffer->operations->iterator_prev(buffer, itr);
-
-    trivial_line_reader->page_offset = itr->page->data_vec.len;
-
-    if (trivial_line_reader->is_terminated_with_cr)
+  while (!pb_buffer_byte_iterator_is_end(buffer, iterator)) {
+    if (*iterator->current_byte == '\n')
       return (trivial_line_reader->has_line = true);
+    else if (*iterator->current_byte == '\r')
+      trivial_line_reader->has_cr = true;
+    else
+      trivial_line_reader->has_cr = false;
 
-    if (trivial_line_reader->is_terminated) {
+    if (trivial_line_reader->buffer_offset == PB_LINE_READER_DEFAULT_LINE_MAX) {
       trivial_line_reader->has_cr = false;
 
       return (trivial_line_reader->has_line = true);
     }
+
+    pb_buffer_byte_iterator_next(buffer, iterator);
+
+    ++trivial_line_reader->buffer_offset;
+  }
+
+  // reset back to last position
+  pb_buffer_byte_iterator_prev(buffer, iterator);
+
+  --trivial_line_reader->buffer_offset;
+
+  if (trivial_line_reader->is_terminated_with_cr)
+    return (trivial_line_reader->has_line = true);
+
+  if (trivial_line_reader->is_terminated) {
+    trivial_line_reader->has_cr = false;
+
+    return (trivial_line_reader->has_line = true);
   }
 
   return false;
@@ -1798,11 +1694,11 @@ size_t pb_trivial_line_reader_get_line_len(
     struct pb_line_reader * const line_reader) {
   struct pb_trivial_line_reader *trivial_line_reader =
     (struct pb_trivial_line_reader*)line_reader;
-  struct pb_buffer *buffer = trivial_line_reader->line_reader.buffer;
+  struct pb_buffer *buffer = line_reader->buffer;
 
   if (trivial_line_reader->buffer_data_revision !=
-        buffer->operations->get_data_revision(buffer))
-    pb_trivial_line_reader_reset(&trivial_line_reader->line_reader);
+        pb_buffer_get_data_revision(buffer))
+    pb_line_reader_reset(line_reader);
 
   if (!trivial_line_reader->has_line)
     return 0;
@@ -1820,42 +1716,40 @@ size_t pb_trivial_line_reader_get_line_data(
     uint8_t * const buf, uint64_t len) {
   struct pb_trivial_line_reader *trivial_line_reader =
     (struct pb_trivial_line_reader*)line_reader;
-  struct pb_buffer *buffer = trivial_line_reader->line_reader.buffer;
+  struct pb_buffer *buffer = line_reader->buffer;
 
   if (trivial_line_reader->buffer_data_revision !=
-        buffer->operations->get_data_revision(buffer))
-    pb_trivial_line_reader_reset(&trivial_line_reader->line_reader);
+        pb_buffer_get_data_revision(buffer))
+    pb_line_reader_reset(line_reader);
 
   if (!trivial_line_reader->has_line)
     return 0;
 
   size_t getted = 0;
 
-  uint64_t line_len =
-    trivial_line_reader->line_reader.get_line_len(
-      &trivial_line_reader->line_reader);
+  uint64_t line_len = pb_line_reader_get_line_len(line_reader);
 
-  struct pb_buffer_iterator itr;
-  buffer->operations->get_iterator(buffer, &itr);
+  struct pb_buffer_iterator iterator;
+  pb_buffer_get_iterator(buffer, &iterator);
 
   while ((len > 0) &&
          (line_len > 0) &&
-         (!buffer->operations->iterator_is_end(buffer, &itr))) {
+         (!pb_buffer_iterator_is_end(buffer, &iterator))) {
     size_t to_get =
-      (itr.page->data_vec.len < len) ?
-       itr.page->data_vec.len : len;
+      (iterator.page->data_vec.len < len) ?
+          iterator.page->data_vec.len : len;
 
     to_get =
       (to_get < line_len) ?
        to_get : line_len;
 
-    memcpy(buf + getted, itr.page->data_vec.base, to_get);
+    memcpy(buf + getted, iterator.page->data_vec.base, to_get);
 
     len -= to_get;
     line_len -= to_get;
     getted += to_get;
 
-    buffer->operations->iterator_next(buffer, &itr);
+    pb_buffer_iterator_next(buffer, &iterator);
   }
 
   return getted;
@@ -1867,23 +1761,23 @@ uint64_t pb_trivial_line_reader_seek_line(
     struct pb_line_reader * const line_reader) {
   struct pb_trivial_line_reader *trivial_line_reader =
     (struct pb_trivial_line_reader*)line_reader;
-  struct pb_buffer *buffer = trivial_line_reader->line_reader.buffer;
+  struct pb_buffer *buffer = line_reader->buffer;
 
   if (trivial_line_reader->buffer_data_revision !=
-        buffer->operations->get_data_revision(buffer))
-    pb_trivial_line_reader_reset(&trivial_line_reader->line_reader);
+        pb_buffer_get_data_revision(buffer))
+    pb_line_reader_reset(line_reader);
 
   if (!trivial_line_reader->has_line)
     return 0;
 
   uint64_t to_seek =
     (trivial_line_reader->is_terminated) ?
-       trivial_line_reader->buffer_offset :
-       trivial_line_reader->buffer_offset + 1;
+      trivial_line_reader->buffer_offset :
+      trivial_line_reader->buffer_offset + 1;
 
-  to_seek = buffer->operations->seek(buffer, to_seek);
+  to_seek = pb_buffer_seek(buffer, to_seek);
 
-  pb_trivial_line_reader_reset(&trivial_line_reader->line_reader);
+  pb_line_reader_reset(line_reader);
 
   return to_seek;
 }
@@ -1903,8 +1797,7 @@ bool pb_trivial_line_reader_is_end(struct pb_line_reader * const line_reader) {
   struct pb_buffer *buffer = trivial_line_reader->line_reader.buffer;
 
   return
-    buffer->operations->iterator_is_end(
-      buffer, &trivial_line_reader->buffer_iterator);
+    pb_buffer_byte_iterator_is_end(buffer, &trivial_line_reader->iterator);
 }
 
 /*******************************************************************************
@@ -1919,7 +1812,6 @@ void pb_trivial_line_reader_terminate_line(
 
 void pb_trivial_line_reader_terminate_line_check_cr(
     struct pb_line_reader * const line_reader) {
-
   struct pb_trivial_line_reader *trivial_line_reader =
     (struct pb_trivial_line_reader*)line_reader;
 
@@ -1933,18 +1825,18 @@ struct pb_line_reader *pb_trivial_line_reader_clone(
   struct pb_trivial_line_reader *trivial_line_reader =
     (struct pb_trivial_line_reader*)line_reader;
   const struct pb_allocator *allocator =
-    trivial_line_reader->line_reader.buffer->allocator;
+    line_reader->buffer->allocator;
 
   struct pb_trivial_line_reader *trivial_line_reader_clone =
     allocator->alloc(
-      allocator, pb_alloc_type_struct, sizeof(struct pb_trivial_line_reader));
+      allocator, pb_alloc_type_struct, sizeof(struct pb_line_reader));
   if (!trivial_line_reader_clone)
     return NULL;
 
   memcpy(
     trivial_line_reader_clone,
     trivial_line_reader,
-    sizeof(struct pb_trivial_line_reader));
+    sizeof(struct pb_line_reader));
 
   return &trivial_line_reader_clone->line_reader;
 }
@@ -1956,14 +1848,12 @@ void pb_trivial_line_reader_reset(struct pb_line_reader * const line_reader) {
     (struct pb_trivial_line_reader*)line_reader;
   struct pb_buffer *buffer = trivial_line_reader->line_reader.buffer;
 
-  buffer->operations->get_iterator(
-    buffer, &trivial_line_reader->buffer_iterator);
+  pb_buffer_get_byte_iterator(buffer, &trivial_line_reader->iterator);
 
   trivial_line_reader->buffer_data_revision =
-    buffer->operations->get_data_revision(buffer);
+    pb_buffer_get_data_revision(buffer);
 
   trivial_line_reader->buffer_offset = 0;
-  trivial_line_reader->page_offset = 0;
 
   trivial_line_reader->has_line = false;
   trivial_line_reader->has_cr = false;
@@ -1974,15 +1864,13 @@ void pb_trivial_line_reader_reset(struct pb_line_reader * const line_reader) {
 /*******************************************************************************
  */
 void pb_trivial_line_reader_destroy(struct pb_line_reader * const line_reader) {
-  struct pb_trivial_line_reader *trivial_line_reader =
-    (struct pb_trivial_line_reader*)line_reader;
   const struct pb_allocator *allocator =
-    trivial_line_reader->line_reader.buffer->allocator;
+    line_reader->buffer->allocator;
 
-  pb_trivial_line_reader_reset(&trivial_line_reader->line_reader);
+  pb_line_reader_reset(line_reader);
 
   allocator->free(
     allocator,
     pb_alloc_type_struct,
-    trivial_line_reader, sizeof(struct pb_trivial_line_reader));
+    line_reader, sizeof(struct pb_trivial_line_reader));
 }

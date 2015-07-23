@@ -122,7 +122,7 @@ class TestCase {
       }
 
       if (line_reader) {
-        line_reader->destroy(line_reader);
+        pb_line_reader_destroy(line_reader);
 
         line_reader = NULL;
       }
@@ -228,23 +228,21 @@ uint64_t read_lines(
 
   std::list<LineProfile*>::iterator profiles_itr = line_profiles.begin();
 
-  while (test_case->line_reader->has_line(test_case->line_reader)) {
+  while (pb_line_reader_has_line(test_case->line_reader)) {
     LineProfile *line_profile = *profiles_itr;
 
-    uint64_t line_len =
-      test_case->line_reader->get_line_len(test_case->line_reader);
+    uint64_t line_len = pb_line_reader_get_line_len(test_case->line_reader);
     assert(line_len == line_profile->len);
 
-    assert(test_case->line_reader->is_crlf(test_case->line_reader) == line_profile->has_cr);
+    assert(pb_line_reader_is_crlf(test_case->line_reader) == line_profile->has_cr);
 
     assert(read_buf_size >= line_profile->len);
 
-    test_case->line_reader->get_line_data(
+    pb_line_reader_get_line_data(
       test_case->line_reader, read_buf, line_profile->len);
     EVP_DigestUpdate(test_case->md5ctx, read_buf, line_profile->len);
 
-    uint64_t seeked =
-      test_case->line_reader->seek_line(test_case->line_reader);
+    uint64_t seeked = pb_line_reader_seek_line(test_case->line_reader);
     assert(seeked == line_profile->full_len);
 
     current_size = pb_buffer_get_data_size(test_case->buffer2);
