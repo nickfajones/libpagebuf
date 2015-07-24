@@ -247,14 +247,6 @@ struct pb_buffer_iterator {
 
 
 
-/** Helper functions for buffer iterators.*/
-int8_t *pb_buffer_iterator_get_base(
-                             const struct pb_buffer_iterator *buffer_iterator);
-size_t pb_buffer_iterator_get_len(
-                             const struct pb_buffer_iterator *buffer_iterator);
-
-
-
 /** A structure used to iterate over buffer bytes. */
 struct pb_buffer_byte_iterator {
   struct pb_buffer_iterator buffer_iterator;
@@ -263,14 +255,6 @@ struct pb_buffer_byte_iterator {
 
   char *current_byte;
 };
-
-
-
-/** Helper functions for byte iterators.*/
-uint8_t *pb_byte_iterator_get_base(
-                          const struct pb_buffer_byte_iterator *byte_iterator);
-size_t pb_byte_iterator_get_len(
-                          const struct pb_buffer_byte_iterator *byte_iterator);
 
 
 
