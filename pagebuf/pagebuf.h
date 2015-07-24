@@ -245,6 +245,16 @@ struct pb_buffer_iterator {
   struct pb_page *page;
 };
 
+
+
+/** Helper functions for buffer iterators.*/
+int8_t *pb_buffer_iterator_get_base(
+                             const struct pb_buffer_iterator *buffer_iterator);
+size_t pb_buffer_iterator_get_len(
+                             const struct pb_buffer_iterator *buffer_iterator);
+
+
+
 /** A structure used to iterate over buffer bytes. */
 struct pb_buffer_byte_iterator {
   struct pb_buffer_iterator buffer_iterator;
@@ -253,6 +263,14 @@ struct pb_buffer_byte_iterator {
 
   char *current_byte;
 };
+
+
+
+/** Helper functions for byte iterators.*/
+uint8_t *pb_byte_iterator_get_base(
+                          const struct pb_buffer_byte_iterator *byte_iterator);
+size_t pb_byte_iterator_get_len(
+                          const struct pb_buffer_byte_iterator *byte_iterator);
 
 
 
@@ -588,7 +606,7 @@ struct pb_buffer {
 
 
 
-/** Functional infterfaces for the generic pb_buffer class. */
+/** Functional interfaces for the generic pb_buffer class. */
 uint64_t pb_buffer_get_data_revision(struct pb_buffer * const buffer);
 
 uint64_t pb_buffer_get_data_size(struct pb_buffer * const buffer);
@@ -596,7 +614,7 @@ uint64_t pb_buffer_get_data_size(struct pb_buffer * const buffer);
 uint64_t pb_buffer_insert(
                         struct pb_buffer * const buffer,
                         struct pb_page * const page,
-                        struct pb_buffer_iterator * const iterator,
+                        struct pb_buffer_iterator * const buffer_iterator,
                         size_t offset);
 uint64_t pb_buffer_seek(struct pb_buffer * const buffer, uint64_t len);
 uint64_t pb_buffer_reserve(
@@ -606,43 +624,43 @@ uint64_t pb_buffer_rewind(
 
 
 void pb_buffer_get_iterator(struct pb_buffer * const buffer,
-                            struct pb_buffer_iterator * const iterator);
+                            struct pb_buffer_iterator * const buffer_iterator);
 void pb_buffer_get_iterator_end(
                             struct pb_buffer * const buffer,
-                            struct pb_buffer_iterator * const iterator);
+                            struct pb_buffer_iterator * const buffer_iterator);
 bool pb_buffer_iterator_is_end(
                             struct pb_buffer * const buffer,
-                            struct pb_buffer_iterator * const iterator);
+                            struct pb_buffer_iterator * const buffer_iterator);
 bool pb_buffer_iterator_cmp(struct pb_buffer * const buffer,
                             const struct pb_buffer_iterator *lvalue,
                             const struct pb_buffer_iterator *rvalue);
 void pb_buffer_iterator_next(
                             struct pb_buffer * const buffer,
-                            struct pb_buffer_iterator * const iterator);
+                            struct pb_buffer_iterator * const buffer_iterator);
 void pb_buffer_iterator_prev(
                             struct pb_buffer * const buffer,
-                            struct pb_buffer_iterator * const iterator);
+                            struct pb_buffer_iterator * const buffer_iterator);
 
 
 void pb_buffer_get_byte_iterator(
-                              struct pb_buffer * const buffer,
-                              struct pb_buffer_byte_iterator * const iterator);
+                         struct pb_buffer * const buffer,
+                         struct pb_buffer_byte_iterator * const byte_iterator);
 void pb_buffer_get_byte_iterator_end(
-                              struct pb_buffer * const buffer,
-                              struct pb_buffer_byte_iterator * const iterator);
+                         struct pb_buffer * const buffer,
+                         struct pb_buffer_byte_iterator * const byte_iterator);
 bool pb_buffer_byte_iterator_is_end(
-                              struct pb_buffer * const buffer,
-                              struct pb_buffer_byte_iterator * const iterator);
+                         struct pb_buffer * const buffer,
+                         struct pb_buffer_byte_iterator * const byte_iterator);
 bool pb_buffer_byte_iterator_cmp(
-                              struct pb_buffer * const buffer,
-                              const struct pb_buffer_byte_iterator *lvalue,
-                              const struct pb_buffer_byte_iterator *rvalue);
+                         struct pb_buffer * const buffer,
+                         const struct pb_buffer_byte_iterator *lvalue,
+                         const struct pb_buffer_byte_iterator *rvalue);
 void pb_buffer_byte_iterator_next(
-                              struct pb_buffer * const buffer,
-                              struct pb_buffer_byte_iterator * const iterator);
+                         struct pb_buffer * const buffer,
+                         struct pb_buffer_byte_iterator * const byte_iterator);
 void pb_buffer_byte_iterator_prev(
-                              struct pb_buffer * const buffer,
-                              struct pb_buffer_byte_iterator * const iterator);
+                         struct pb_buffer * const buffer,
+                         struct pb_buffer_byte_iterator * const byte_iterator);
 
 
 uint64_t pb_buffer_write_data(struct pb_buffer * const buffer,
@@ -716,57 +734,59 @@ uint64_t pb_trivial_buffer_get_data_size(struct pb_buffer * const buffer);
 
 
 uint64_t pb_trivial_buffer_insert(
-                                struct pb_buffer * const buffer,
-                                struct pb_page * const page,
-                                struct pb_buffer_iterator * const iterator,
-                                size_t offset);
-uint64_t pb_trivial_buffer_seek(struct pb_buffer * const buffer,
-                                uint64_t len);
+                             struct pb_buffer * const buffer,
+                             struct pb_page * const page,
+                             struct pb_buffer_iterator * const buffer_iterator,
+                             size_t offset);
+uint64_t pb_trivial_buffer_seek(
+                             struct pb_buffer * const buffer,
+                             uint64_t len);
 uint64_t pb_trivial_buffer_reserve(
-                                struct pb_buffer * const buffer,
-                                uint64_t len);
+                             struct pb_buffer * const buffer,
+                             uint64_t len);
 uint64_t pb_trivial_buffer_rewind(
-                                struct pb_buffer * const buffer,
-                                uint64_t len);
+                             struct pb_buffer * const buffer,
+                             uint64_t len);
 
 
-void pb_trivial_buffer_get_iterator(struct pb_buffer * const buffer,
-                                    struct pb_buffer_iterator * const iterator);
+void pb_trivial_buffer_get_iterator(
+                            struct pb_buffer * const buffer,
+                            struct pb_buffer_iterator * const buffer_iterator);
 void pb_trivial_buffer_get_iterator_end(
-                                    struct pb_buffer * const buffer,
-                                    struct pb_buffer_iterator * const iterator);
+                            struct pb_buffer * const buffer,
+                            struct pb_buffer_iterator * const buffer_iterator);
 bool pb_trivial_buffer_iterator_is_end(
-                                    struct pb_buffer * const buffer,
-                                    struct pb_buffer_iterator * const iterator);
+                            struct pb_buffer * const buffer,
+                            struct pb_buffer_iterator * const buffer_iterator);
 bool pb_trivial_buffer_iterator_cmp(struct pb_buffer * const buffer,
-                                    const struct pb_buffer_iterator *lvalue,
-                                    const struct pb_buffer_iterator *rvalue);
+                            const struct pb_buffer_iterator *lvalue,
+                            const struct pb_buffer_iterator *rvalue);
 void pb_trivial_buffer_iterator_next(
-                                    struct pb_buffer * const buffer,
-                                    struct pb_buffer_iterator * const iterator);
+                            struct pb_buffer * const buffer,
+                            struct pb_buffer_iterator * const buffer_iterator);
 void pb_trivial_buffer_iterator_prev(
-                                    struct pb_buffer * const buffer,
-                                    struct pb_buffer_iterator * const iterator);
+                            struct pb_buffer * const buffer,
+                            struct pb_buffer_iterator * const buffer_iterator);
 
 
 void pb_trivial_buffer_get_byte_iterator(
-                                    struct pb_buffer * const buffer,
-                                    struct pb_buffer_byte_iterator * const iterator);
+                         struct pb_buffer * const buffer,
+                         struct pb_buffer_byte_iterator * const byte_iterator);
 void pb_trivial_buffer_get_byte_iterator_end(
-                                    struct pb_buffer * const buffer,
-                                    struct pb_buffer_byte_iterator * const iterator);
+                         struct pb_buffer * const buffer,
+                         struct pb_buffer_byte_iterator * const byte_iterator);
 bool pb_trivial_buffer_byte_iterator_is_end(
-                                    struct pb_buffer * const buffer,
-                                    struct pb_buffer_byte_iterator * const iterator);
+                         struct pb_buffer * const buffer,
+                         struct pb_buffer_byte_iterator * const byte_iterator);
 bool pb_trivial_buffer_byte_iterator_cmp(struct pb_buffer * const buffer,
-                                    const struct pb_buffer_byte_iterator *lvalue,
-                                    const struct pb_buffer_byte_iterator *rvalue);
+                         const struct pb_buffer_byte_iterator *lvalue,
+                         const struct pb_buffer_byte_iterator *rvalue);
 void pb_trivial_buffer_byte_iterator_next(
-                                    struct pb_buffer * const buffer,
-                                    struct pb_buffer_byte_iterator * const iterator);
+                         struct pb_buffer * const buffer,
+                         struct pb_buffer_byte_iterator * const byte_iterator);
 void pb_trivial_buffer_byte_iterator_prev(
-                                    struct pb_buffer * const buffer,
-                                    struct pb_buffer_byte_iterator * const iterator);
+                         struct pb_buffer * const buffer,
+                         struct pb_buffer_byte_iterator * const byte_iterator);
 
 
 uint64_t pb_trivial_buffer_write_data(struct pb_buffer * const buffer,
@@ -1000,30 +1020,32 @@ const struct pb_line_reader_operations
 struct pb_line_reader *pb_trivial_line_reader_create(
                                           struct pb_buffer * const buffer);
 
-bool pb_trivial_line_reader_has_line(struct pb_line_reader * const line_reader);
+bool pb_trivial_line_reader_has_line(
+                                    struct pb_line_reader * const line_reader);
 
 size_t pb_trivial_line_reader_get_line_len(
-                                     struct pb_line_reader * const line_reader);
+                                    struct pb_line_reader * const line_reader);
 size_t pb_trivial_line_reader_get_line_data(
-                                     struct pb_line_reader * const line_reader,
-                                     uint8_t * const buf, uint64_t len);
+                                    struct pb_line_reader * const line_reader,
+                                    uint8_t * const buf, uint64_t len);
 
 size_t pb_trivial_line_reader_seek_line(
-                                     struct pb_line_reader * const line_reader);
+                                    struct pb_line_reader * const line_reader);
 
 bool pb_trivial_line_reader_is_crlf(struct pb_line_reader * const line_reader);
 bool pb_trivial_line_reader_is_end(struct pb_line_reader * const line_reader);
 
 void pb_trivial_line_reader_terminate_line(
-                                     struct pb_line_reader * const line_reader);
+                                    struct pb_line_reader * const line_reader);
 void pb_trivial_line_reader_terminate_line_check_cr(
-                                     struct pb_line_reader * const line_reader);
+                                    struct pb_line_reader * const line_reader);
 
 struct pb_line_reader *pb_trivial_line_reader_clone(
-                                     struct pb_line_reader * const line_reader);
+                                    struct pb_line_reader * const line_reader);
 
 void pb_trivial_line_reader_reset(struct pb_line_reader * const line_reader);
-void pb_trivial_line_reader_destroy(struct pb_line_reader * const line_reader);
+void pb_trivial_line_reader_destroy(
+                                  struct pb_line_reader * const line_reader);
 
 
 
