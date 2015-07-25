@@ -1,5 +1,5 @@
 /*******************************************************************************
- *  Copyright 2013-2015 Nick Jones <nick.fa.jones@gmail.com>
+ *  Copyright 2015 Nick Jones <nick.fa.jones@gmail.com>
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -253,19 +253,6 @@ static struct pb_buffer_operations pb_trivial_buffer_operations = {
 const struct pb_buffer_operations *pb_get_trivial_buffer_operations(void) {
   return &pb_trivial_buffer_operations;
 }
-
-
-
-/*******************************************************************************
- */
-struct pb_trivial_buffer {
-  struct pb_buffer buffer;
-
-  struct pb_page page_end;
-
-  uint64_t data_revision;
-  uint64_t data_size;
-};
 
 
 

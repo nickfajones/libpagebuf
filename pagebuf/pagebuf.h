@@ -1,5 +1,5 @@
 /*******************************************************************************
- *  Copyright 2013-2015 Nick Jones <nick.fa.jones@gmail.com>
+ *  Copyright 2015 Nick Jones <nick.fa.jones@gmail.com>
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -458,10 +458,10 @@ struct pb_buffer_operations {
                             struct pb_buffer_byte_iterator * const
                               buffer_byte_iterator);
   /** Initialise an iterator to the end of the pb_buffer instance data.
-     *
-     * The iterator should be a pointer to an object on the stack that must
-     * be manipulated only by the iterator methods of the same buffer instance.
-     */
+   *
+   * The iterator should be a pointer to an object on the stack that must
+   * be manipulated only by the iterator methods of the same buffer instance.
+   */
   void (*get_byte_iterator_end)(struct pb_buffer * const buffer,
                                 struct pb_buffer_byte_iterator * const
                                   buffer_byte_iterator);
@@ -525,9 +525,9 @@ struct pb_buffer_operations {
                              uint64_t len);
   /** Write data from a source pb_buffer instance to the pb_buffer instance.
    *
-   * src_buffer is the buffer to write from.  This pb_buffer instance will not have
-   *          it's data modified, but it is not const because iterator
-   *          operations of this pb_buffer may cause internal state changes.
+   * src_buffer is the buffer to write from.  This pb_buffer instance will not
+   *            have it's data modified, but it is not const because iterator
+   *            operations of this pb_buffer may cause internal state changes.
    * len indicates the amount of data to write, in bytes.
    *
    * returns the amount of data written.  This buffer will not be altered by
@@ -581,10 +581,13 @@ struct pb_buffer_operations {
  * data buffers.
  */
 struct pb_buffer {
+  /** Strategy for the pb_buffer instance.  Cannot be changed after creation. */
   const struct pb_buffer_strategy *strategy;
 
+  /** Operations for the pb_buffer instance.  Cannot be changed after creation. */
   const struct pb_buffer_operations *operations;
 
+  /** Allocator used to allocate storage for this struct and its pages. */
   const struct pb_allocator *allocator;
 };
 
@@ -675,7 +678,19 @@ void pb_buffer_destroy(
 
 
 
-/** The trivial buffer implementation and its supporting functions. */
+/** The trivial buffer implementation and its supporting functions.
+ *
+ * The trivial buffer defines a classic strategy and operations set, and uses
+ * the trivial heap based allocator by default.
+ */
+struct pb_trivial_buffer {
+  struct pb_buffer buffer;
+
+  struct pb_page page_end;
+
+  uint64_t data_revision;
+  uint64_t data_size;
+};
 
 
 
