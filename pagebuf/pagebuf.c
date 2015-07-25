@@ -203,7 +203,7 @@ static struct pb_buffer_strategy pb_trivial_buffer_strategy = {
   .page_size = PB_BUFFER_DEFAULT_PAGE_SIZE,
   .clone_on_write = false,
   .fragment_as_target = false,
-  .supports_insert = true,
+  .rejects_insert = false,
 };
 
 const struct pb_buffer_strategy *pb_get_trivial_buffer_strategy(void) {
@@ -444,14 +444,7 @@ struct pb_buffer *pb_trivial_buffer_create_with_strategy_with_alloc(
   if (!trivial_buffer)
     return NULL;
 
-  ((struct pb_buffer_strategy*)&trivial_buffer->buffer.strategy)->
-    page_size = strategy->page_size;
-  ((struct pb_buffer_strategy*)&trivial_buffer->buffer.strategy)->
-    clone_on_write = strategy->clone_on_write;
-  ((struct pb_buffer_strategy*)&trivial_buffer->buffer.strategy)->
-    fragment_as_target = strategy->fragment_as_target;
-  ((struct pb_buffer_strategy*)&trivial_buffer->buffer.strategy)->
-    supports_insert = strategy->supports_insert;
+  trivial_buffer->buffer.strategy = strategy;
 
   trivial_buffer->buffer.operations = pb_get_trivial_buffer_operations();
 
@@ -510,7 +503,7 @@ uint64_t pb_trivial_buffer_insert(struct pb_buffer * const buffer,
     struct pb_buffer_iterator * const buffer_iterator,
     size_t offset) {
   if (!pb_buffer_iterator_is_end(buffer, buffer_iterator) &&
-      !buffer->strategy.supports_insert)
+       buffer->strategy->rejects_insert)
     return 0;
 
   while ((offset > 0) &&
@@ -613,9 +606,9 @@ uint64_t pb_trivial_buffer_reserve(struct pb_buffer * const buffer,
 
   while (len > 0) {
     uint64_t reserve_len =
-      (buffer->strategy.page_size != 0) ?
-      (buffer->strategy.page_size < len) ?
-       buffer->strategy.page_size : len :
+      (buffer->strategy->page_size != 0) ?
+      (buffer->strategy->page_size < len) ?
+       buffer->strategy->page_size : len :
        len;
 
     void *buf =
@@ -665,9 +658,9 @@ uint64_t pb_trivial_buffer_rewind(struct pb_buffer * const buffer,
 
   while (len > 0) {
     uint64_t reserve_len =
-      (buffer->strategy.page_size != 0) ?
-      (buffer->strategy.page_size < len) ?
-       buffer->strategy.page_size : len :
+      (buffer->strategy->page_size != 0) ?
+      (buffer->strategy->page_size < len) ?
+       buffer->strategy->page_size : len :
        len;
 
     void *buf =
@@ -856,9 +849,9 @@ uint64_t pb_trivial_buffer_write_data1(struct pb_buffer * const buffer,
 
   while (len > 0) {
     uint64_t write_len =
-      (buffer->strategy.page_size != 0) ?
-      (buffer->strategy.page_size < len) ?
-       buffer->strategy.page_size : len :
+      (buffer->strategy->page_size != 0) ?
+      (buffer->strategy->page_size < len) ?
+       buffer->strategy->page_size : len :
        len;
 
     write_len = pb_buffer_reserve(buffer, write_len);
@@ -924,7 +917,7 @@ uint64_t pb_trivial_buffer_write_data2(struct pb_buffer * const buffer,
 uint64_t pb_trivial_buffer_write_data(struct pb_buffer * const buffer,
     const uint8_t *buf,
     uint64_t len) {
-  if (!buffer->strategy.fragment_as_target)
+  if (!buffer->strategy->fragment_as_target)
     return pb_trivial_buffer_write_data1(buffer, buf, len);
 
   return pb_trivial_buffer_write_data2(buffer, buf, len);
@@ -979,9 +972,9 @@ uint64_t pb_trivial_buffer_write_data_ref2(struct pb_buffer * const buffer,
 
   while (len > 0) {
     uint64_t write_len =
-      (buffer->strategy.page_size != 0) ?
-      (buffer->strategy.page_size < len) ?
-       buffer->strategy.page_size : len :
+      (buffer->strategy->page_size != 0) ?
+      (buffer->strategy->page_size < len) ?
+       buffer->strategy->page_size : len :
        len;
 
     struct pb_data *data =
@@ -1013,14 +1006,14 @@ uint64_t pb_trivial_buffer_write_data_ref2(struct pb_buffer * const buffer,
 uint64_t pb_trivial_buffer_write_data_ref(struct pb_buffer * const buffer,
     const uint8_t *buf,
     uint64_t len) {
-  if ((!buffer->strategy.clone_on_write) &&
-      (!buffer->strategy.fragment_as_target)) {
+  if ((!buffer->strategy->clone_on_write) &&
+      (!buffer->strategy->fragment_as_target)) {
     return pb_trivial_buffer_write_data_ref1(buffer, buf, len);
-  } else if ((!buffer->strategy.clone_on_write) &&
-             (buffer->strategy.fragment_as_target)) {
+  } else if ((!buffer->strategy->clone_on_write) &&
+             (buffer->strategy->fragment_as_target)) {
     return pb_trivial_buffer_write_data_ref2(buffer, buf, len);
-  } else if ((buffer->strategy.clone_on_write) &&
-             (!buffer->strategy.fragment_as_target)) {
+  } else if ((buffer->strategy->clone_on_write) &&
+             (!buffer->strategy->fragment_as_target)) {
     return pb_trivial_buffer_write_data1(buffer, buf, len);
   }
   /*else if ((buffer->strategy->clone_on_write) &&
@@ -1102,9 +1095,9 @@ uint64_t pb_trivial_buffer_write_buffer2(struct pb_buffer * const buffer,
   while ((len > 0) &&
          (!pb_buffer_iterator_is_end(src_buffer, &src_buffer_iterator))) {
     uint64_t write_len =
-      (buffer->strategy.page_size != 0) ?
-      (buffer->strategy.page_size < len) ?
-       buffer->strategy.page_size : len :
+      (buffer->strategy->page_size != 0) ?
+      (buffer->strategy->page_size < len) ?
+       buffer->strategy->page_size : len :
        len;
 
     write_len =
@@ -1160,9 +1153,9 @@ uint64_t pb_trivial_buffer_write_buffer3(struct pb_buffer * const buffer,
   while ((len > 0) &&
          (!pb_buffer_iterator_is_end(src_buffer, &src_buffer_iterator))) {
     uint64_t write_len =
-      (buffer->strategy.page_size != 0) ?
-      (buffer->strategy.page_size < len) ?
-       buffer->strategy.page_size : len :
+      (buffer->strategy->page_size != 0) ?
+      (buffer->strategy->page_size < len) ?
+       buffer->strategy->page_size : len :
        len;
 
     write_len =
@@ -1267,14 +1260,14 @@ uint64_t pb_trivial_buffer_write_buffer4(struct pb_buffer * const buffer,
 uint64_t pb_trivial_buffer_write_buffer(struct pb_buffer * const buffer,
     struct pb_buffer * const src_buffer,
     uint64_t len) {
-  if ((!buffer->strategy.clone_on_write) &&
-      (!buffer->strategy.fragment_as_target)) {
+  if ((!buffer->strategy->clone_on_write) &&
+      (!buffer->strategy->fragment_as_target)) {
     return pb_trivial_buffer_write_buffer1(buffer, src_buffer, len);
-  } else if ((!buffer->strategy.clone_on_write) &&
-             (buffer->strategy.fragment_as_target)) {
+  } else if ((!buffer->strategy->clone_on_write) &&
+             (buffer->strategy->fragment_as_target)) {
     return pb_trivial_buffer_write_buffer2(buffer, src_buffer, len);
-  } else if ((buffer->strategy.clone_on_write) &&
-             (!buffer->strategy.fragment_as_target)) {
+  } else if ((buffer->strategy->clone_on_write) &&
+             (!buffer->strategy->fragment_as_target)) {
     return pb_trivial_buffer_write_buffer3(buffer, src_buffer, len);
   }
   /*else if ((buffer->strategy->clone_on_write) &&

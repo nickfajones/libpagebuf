@@ -332,7 +332,7 @@ int main(int argc, char **argv) {
   struct pb_buffer_strategy strategy;
   memset(&strategy, 0, sizeof(strategy));
 
-  strategy.supports_insert = true;
+  strategy.rejects_insert = false;
 
   strategy.page_size = PB_BUFFER_DEFAULT_PAGE_SIZE;
   strategy.clone_on_write = false;

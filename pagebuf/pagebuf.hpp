@@ -267,7 +267,7 @@ class buffer {
 
   public:
     const struct pb_buffer_strategy& get_strategy() const {
-      return buffer_->strategy;
+      return *buffer_->strategy;
     }
 
     const struct pb_allocator& get_allocator() const {

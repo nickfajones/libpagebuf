@@ -279,9 +279,9 @@ struct pb_buffer_strategy {
 
   /** Indicates whether data written to the buffer from another buffer is:
    *
-   * not_cloned (false): reference to the pb_data instance is incremented.
+   * not_cloned (false):reference to the pb_data instance is incremented.
    *
-   * cloned (true): new pb_data instance created and memory regions copied.
+   * cloned     (true): new pb_data instance created and memory regions copied.
    */
   bool clone_on_write;
 
@@ -296,7 +296,7 @@ struct pb_buffer_strategy {
    *                    fragmented according to the lower of the source
    *                    fragment size, and the target page_size, which may be
    *                    zero, in which case the source fragment size is used.
-   * as target (true):  target pb_buffer page_size takes precedence.
+   * as target  (true): target pb_buffer page_size takes precedence.
    *                    When clone_on_write is false, source fragments that
    *                    are greater than the target page_size limit are split.
    *                    When clone_on_write is true, source fragments will be
@@ -305,13 +305,13 @@ struct pb_buffer_strategy {
    */
   bool fragment_as_target;
 
-  /** Indicates whether a pb_buffer supports insert operations.
+  /** Indicates whether a pb_buffer rejects (fails to support) insert operations.
    *
-   * no support (false): insert operations will immediately return 0.
-   * support    (true):  insert operations can be performed and the buffer
+   * no reject (false): insert operations can be performed and the buffer
    *                     update its data view appropriately.
+   * reject     (true): insert operations will immediately return 0.
    */
-  bool supports_insert;
+  bool rejects_insert;
 };
 
 
@@ -581,7 +581,7 @@ struct pb_buffer_operations {
  * data buffers.
  */
 struct pb_buffer {
-  const struct pb_buffer_strategy strategy;
+  const struct pb_buffer_strategy *strategy;
 
   const struct pb_buffer_operations *operations;
 
@@ -1034,7 +1034,7 @@ void pb_trivial_line_reader_destroy(
 
 
 #ifdef __cplusplus
-}; // extern "C"
+}; /* extern "C" */
 #endif
 
 #endif /* PAGEBUF_H */
