@@ -56,76 +56,14 @@ const struct pb_allocator *pb_get_trivial_allocator(void) {
 
 /*******************************************************************************
  */
-struct pb_data *pb_data_create(uint8_t * const buf, size_t len,
-    const struct pb_allocator *allocator) {
-  struct pb_data *data =
-    allocator->alloc(allocator, pb_alloc_type_struct, sizeof(struct pb_data));
-  if (!data)
-    return NULL;
+static struct pb_data_operations pb_trivial_data_operations = {
+  .destroy = &pb_trivial_data_destroy,
+};
 
-  data->data_vec.base = buf;
-  data->data_vec.len = len;
-
-  data->use_count = 1;
-
-  data->responsibility = pb_data_owned;
-
-  data->allocator = allocator;
-
-  return data;
+const struct pb_data_operations *pb_get_trivial_data_operations(void) {
+  return &pb_trivial_data_operations;
 }
 
-struct pb_data *pb_data_create_ref(const uint8_t *buf, size_t len,
-    const struct pb_allocator *allocator) {
-  struct pb_data *data =
-    allocator->alloc(allocator, pb_alloc_type_struct, sizeof(struct pb_data));
-  if (!data)
-    return NULL;
-
-  data->data_vec.base = (uint8_t*)buf; // we won't actually change it
-  data->data_vec.len = len;
-
-  data->use_count = 1;
-
-  data->responsibility = pb_data_referenced;
-
-  data->allocator = allocator;
-
-  return data;
-}
-
-struct pb_data *pb_data_clone(uint8_t * const buf, size_t len, size_t src_off,
-    const struct pb_data *src_data,
-    const struct pb_allocator *allocator) {
-  struct pb_data *data =
-    allocator->alloc(allocator, pb_alloc_type_struct, sizeof(struct pb_data));
-  if (!data)
-    return NULL;
-
-  data->data_vec.base = buf;
-  data->data_vec.len = len;
-
-  memcpy(data->data_vec.base, src_data->data_vec.base + src_off, len);
-
-  data->use_count = 1;
-
-  data->responsibility = pb_data_owned;
-
-  data->allocator = allocator;
-
-  return data;
-  }
-
-void pb_data_destroy(struct pb_data * const data) {
-  const struct pb_allocator *allocator = data->allocator;
-
-  if (data->responsibility == pb_data_owned)
-    allocator->free(
-      allocator, pb_alloc_type_struct, data->data_vec.base, data->data_vec.len);
-
-  allocator->free(
-    allocator, pb_alloc_type_struct, data, sizeof(struct pb_data));
-}
 
 /*******************************************************************************
  */
@@ -139,6 +77,69 @@ void pb_data_put(struct pb_data *data) {
 
   pb_data_destroy(data);
 }
+
+/*******************************************************************************
+ */
+void pb_data_destroy(struct pb_data * const data) {
+  data->operations->destroy(data);
+}
+
+
+
+/*******************************************************************************
+ */
+struct pb_data *pb_trivial_data_create(uint8_t * const buf, size_t len,
+    const struct pb_allocator *allocator) {
+  struct pb_data *data =
+    allocator->alloc(allocator, pb_alloc_type_struct, sizeof(struct pb_data));
+  if (!data)
+    return NULL;
+
+  data->data_vec.base = buf;
+  data->data_vec.len = len;
+
+  data->responsibility = pb_data_owned;
+
+  data->use_count = 1;
+
+  data->allocator = allocator;
+  data->operations = pb_get_trivial_data_operations();
+
+  return data;
+}
+
+struct pb_data *pb_trivial_data_create_ref(const uint8_t *buf, size_t len,
+    const struct pb_allocator *allocator) {
+  struct pb_data *data =
+    allocator->alloc(allocator, pb_alloc_type_struct, sizeof(struct pb_data));
+  if (!data)
+    return NULL;
+
+  data->data_vec.base = (uint8_t*)buf; // we won't actually change it
+  data->data_vec.len = len;
+
+  data->responsibility = pb_data_referenced;
+
+  data->use_count = 1;
+
+  data->allocator = allocator;
+  data->operations = pb_get_trivial_data_operations();
+
+  return data;
+}
+
+void pb_trivial_data_destroy(struct pb_data * const data) {
+  const struct pb_allocator *allocator = data->allocator;
+
+  if (data->responsibility == pb_data_owned)
+    allocator->free(
+      allocator, pb_alloc_type_struct, data->data_vec.base, data->data_vec.len);
+
+  allocator->free(
+    allocator, pb_alloc_type_struct, data, sizeof(struct pb_data));
+}
+
+
 
 
 
@@ -218,6 +219,9 @@ static struct pb_buffer_operations pb_trivial_buffer_operations = {
   .get_data_revision = &pb_trivial_buffer_get_data_revision,
 
   .get_data_size = &pb_trivial_buffer_get_data_size,
+
+  .data_create = &pb_trivial_buffer_data_create,
+  .data_create_ref = &pb_trivial_buffer_data_create_ref,
 
   .insert = &pb_trivial_buffer_insert,
   .seek = &pb_trivial_buffer_seek,
@@ -463,6 +467,19 @@ uint64_t pb_trivial_buffer_get_data_revision(struct pb_buffer * const buffer) {
 
 /*******************************************************************************
  */
+struct pb_data *pb_trivial_buffer_data_create(struct pb_buffer * const buffer,
+    uint8_t * const buf, size_t len) {
+  return pb_trivial_data_create(buf, len, buffer->allocator);
+}
+
+struct pb_data *pb_trivial_buffer_data_create_ref(
+    struct pb_buffer * const buffer,
+    const uint8_t *buf, size_t len) {
+  return pb_trivial_data_create_ref(buf, len, buffer->allocator);
+}
+
+/*******************************************************************************
+ */
 static void pb_trivial_buffer_increment_data_size(
     struct pb_buffer * const buffer, uint64_t size) {
   struct pb_trivial_buffer *trivial_buffer = (struct pb_trivial_buffer*)buffer;
@@ -603,7 +620,8 @@ uint64_t pb_trivial_buffer_reserve(struct pb_buffer * const buffer,
     if (!buf)
       return reserved;
 
-    struct pb_data *data = pb_data_create(buf, reserve_len, allocator);
+    struct pb_data *data =
+      buffer->operations->data_create(buffer, buf, reserve_len);
     if (!data) {
       allocator->free(allocator, pb_alloc_type_region, buf, reserve_len);
 
@@ -655,7 +673,8 @@ uint64_t pb_trivial_buffer_rewind(struct pb_buffer * const buffer,
     if (!buf)
       return rewinded;
 
-    struct pb_data *data = pb_data_create(buf, reserve_len, allocator);
+    struct pb_data *data =
+      buffer->operations->data_create(buffer, buf, reserve_len);
     if (!data) {
       allocator->free(allocator, pb_alloc_type_region, buf, reserve_len);
 
@@ -923,7 +942,8 @@ uint64_t pb_trivial_buffer_write_data_ref1(struct pb_buffer * const buffer,
     uint64_t len) {
   const struct pb_allocator *allocator = buffer->allocator;
 
-  struct pb_data *data = pb_data_create_ref(buf, len, allocator);
+  struct pb_data *data =
+    buffer->operations->data_create_ref(buffer, buf, len);
   if (!data)
     return 0;
 
@@ -965,7 +985,7 @@ uint64_t pb_trivial_buffer_write_data_ref2(struct pb_buffer * const buffer,
        len;
 
     struct pb_data *data =
-      pb_data_create_ref(buf + written, write_len, allocator);
+      buffer->operations->data_create_ref(buffer, buf + written, write_len);
     if (!data)
       return written;
 

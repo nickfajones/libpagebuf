@@ -72,6 +72,11 @@ const struct pb_allocator *pb_get_trivial_allocator(void);
 
 
 
+/** The pb_data and its supporting classes and functions. */
+struct pb_data;
+
+
+
 /** A structure used to represent a data region.
  */
 struct pb_data_vec {
@@ -94,6 +99,29 @@ enum pb_data_responsibility {
   pb_data_referenced,
 };
 
+
+
+/** The structure that holds the operations that implement the pb_data
+ *  functionality.
+ *
+ * A pb_buffer should tie data operations to each data instance so that
+ * data instances can be destroyed in the correct way even if they are passed
+ * outside of their creating pb_buffer.
+ */
+struct pb_data_operations {
+  /** Destroy a pb_data instance.
+   *
+   * Not to be called directly unless the instance was never 'get'd by a
+   * container.
+   *
+   * The memory region will be freed if it is owned by the instance.
+   * The pb_data instance will be freed.
+   */
+  void (*destroy)(struct pb_data * const data);
+};
+
+
+
 /** Reference counted structure that represents a memory region.
  *
  * Instances of this object are created using the create routines below, but
@@ -105,62 +133,25 @@ struct pb_data {
   /** The bounds of the region. */
   struct pb_data_vec data_vec;
 
-  /** Use count, maintained with atomic operations. */
-  uint16_t use_count;
-
   /** Responsibility that this structure has over the memory region. */
   enum pb_data_responsibility responsibility;
 
+  /** Use count, maintained with atomic operations. */
+  uint16_t use_count;
+
+  /** Operations for the pb_buffer instance.  Cannot be changed after creation. */
+  const struct pb_data_operations *operations;
+
   /** Allocator used to allocate storage for this struct and its owned
-   * memory region */
+   *  memory region. */
   const struct pb_allocator *allocator;
 };
 
 
 
-/** Create a pb_data instance.
+/** Data reference count modifiers:
  *
- * Memory region buf is now owned by the pb_data instance and will be freed
- * when the instance is destroyed.
- *
- * Use count is initialised to one, therefore returned data instance must
- * be treated with the pb_data_put function when the creator is finished with
- * it, whether it is passed to another owner or not.
- */
-struct pb_data *pb_data_create(uint8_t * const buf, size_t len,
-                               const struct pb_allocator *allocator);
-
-/** Create a pb_data instance.
- *
- * Memory region buf is not owned by the pb_data instance.
- *
- * Use count is initialised to one, therefore returned data instance must
- * be treated with the pb_data_put function when the creator is finished with
- * it, whether it is passed to another owner or not.
- */
-struct pb_data *pb_data_create_ref(const uint8_t *buf, size_t len,
-                                   const struct pb_allocator * allocator);
-
-/** Clone a pb_data instance.
- *
- * A new memory region is allocated and the source memory region is copied
- * byte by byte.
- */
-struct pb_data *pb_data_clone(uint8_t * const buf, size_t len, size_t src_off,
-                              const struct pb_data *src_data,
-                              const struct pb_allocator *allocator);
-
-/** Destroy a pb_data instance.
- *
- * Not to be called directly unless the instance was never 'get'd by a
- * container.
- *
- * The memory region will be freed if it is owned by the instance.
- * The pb_data instance will be freed.
- */
-void pb_data_destroy(struct pb_data *data);
-
-/** Increment the use count of the pb_data instance.
+ * Increment the use count of the pb_data instance.
  */
 void pb_data_get(struct pb_data *data);
 
@@ -169,6 +160,31 @@ void pb_data_get(struct pb_data *data);
  *  Will destroy the instance if the use count becomes zero.
  */
 void pb_data_put(struct pb_data *data);
+
+/** Functional interfaces for the generic pb_data class. */
+void pb_data_destroy(struct pb_data * const data);
+
+
+
+/** The trivial data implementation and its supporting functions. */
+const struct pb_data_operations *pb_get_trivial_data_operations(void);
+
+
+
+/** An implementation of pb_data using trivial operations and the supplied
+ *  allocator. */
+struct pb_data *pb_trivial_data_create(
+                                   uint8_t * const buf, size_t len,
+                                   const struct pb_allocator *allocator);
+
+struct pb_data *pb_trivial_data_create_ref(
+                                   const uint8_t *buf, size_t len,
+                                   const struct pb_allocator * allocator);
+
+
+
+/** Trivial data operations. */
+void pb_trivial_data_destroy(struct pb_data * const data);
 
 
 
@@ -210,17 +226,6 @@ struct pb_page *pb_page_create(struct pb_data *data,
 struct pb_page *pb_page_transfer(const struct pb_page *src_page,
                                  size_t len, size_t src_off,
                                  const struct pb_allocator *allocator);
-
-#if 0
-/** Clone an existing pb_page instance
- *
- * Duplicate the base and len values as well as a full clone of the referenced
- * pb_data instance.
- */
-struct pb_page *pb_page_clone(const struct pb_page *src_page,
-                              uint8_t * const buf, size_t len, size_t src_off,
-                              const struct pb_allocator *allocator);
-#endif
 
 /** Destroy the pb_page instance.
  *
@@ -319,16 +324,6 @@ struct pb_buffer_strategy {
 /** The structure that holds the operations that implement pb_buffer
  *  functionality.
  *
- * A author of pb_buffer subclasses may make a copy of the base
- * pb_buffer_operations structure, and replace operator functions to customise
- * the behaviour of their pb_buffer.
- *
- * A pb_buffer_operations structure should not embed itself as a non pointer
- * member of a larger structure, in order to hide implementation details.
- *
- * An author should instead embed the pb_buffer structure in order to hide
- * implementation details of their subclass.
- *
  * An author should also define a group of factory functions to opaquely
  * create their pb_buffer instance and bind it to their customised
  * pb_buffer_operations structure.  See the pb_buffer_create* group of factory
@@ -352,6 +347,34 @@ struct pb_buffer_operations {
 
   /** Return the amount of data in the buffer, in bytes. */
   uint64_t (*get_data_size)(struct pb_buffer * const buffer);
+
+  /** Create a pb_data instance.
+   *
+   * Memory region buf is now owned by the pb_data instance and will be freed
+   * when the instance is destroyed.
+   *
+   * Use count is initialised to one, therefore returned data instance must
+   * be treated with the pb_data_put function when the creator is finished with
+   * it, whether it is passed to another owner or not.
+   *
+   * This is a private function and should not be called explicitly.
+   */
+  struct pb_data *(*data_create)(struct pb_buffer * const buffer,
+                                 uint8_t * const buf, size_t len);
+
+  /** Create a pb_data instance.
+   *
+   * Memory region buf is not owned by the pb_data instance.
+   *
+   * Use count is initialised to one, therefore returned data instance must
+   * be treated with the pb_data_put function when the creator is finished with
+   * it, whether it is passed to another owner or not.
+   *
+   * This is a private function and should not be called explicitly.
+   */
+  struct pb_data *(*data_create_ref)(
+                                 struct pb_buffer * const buffer,
+                                 const uint8_t *buf, size_t len);
 
   /** Append a pb_page instance to the pb_buffer.
    *
@@ -716,12 +739,12 @@ const struct pb_buffer_operations *pb_get_trivial_buffer_operations(void);
 /** An implementation of pb_buffer using the default or supplied allocator. */
 struct pb_buffer *pb_trivial_buffer_create(void);
 struct pb_buffer *pb_trivial_buffer_create_with_strategy(
-                                     const struct pb_buffer_strategy *strategy);
+                                    const struct pb_buffer_strategy *strategy);
 struct pb_buffer *pb_trivial_buffer_create_with_alloc(
-                                     const struct pb_allocator *allocator);
+                                    const struct pb_allocator *allocator);
 struct pb_buffer *pb_trivial_buffer_create_with_strategy_with_alloc(
-                                     const struct pb_buffer_strategy *strategy,
-                                     const struct pb_allocator *allocator);
+                                    const struct pb_buffer_strategy *strategy,
+                                    const struct pb_allocator *allocator);
 
 
 
@@ -731,6 +754,12 @@ uint64_t pb_trivial_buffer_get_data_revision(
 
 uint64_t pb_trivial_buffer_get_data_size(struct pb_buffer * const buffer);
 
+
+struct pb_data *pb_trivial_buffer_data_create(struct pb_buffer * const buffer,
+                                              uint8_t * const buf, size_t len);
+struct pb_data *pb_trivial_buffer_data_create_ref(
+                                              struct pb_buffer * const buffer,
+                                              const uint8_t *buf, size_t len);
 
 uint64_t pb_trivial_buffer_insert(
                              struct pb_buffer * const buffer,
