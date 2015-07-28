@@ -88,12 +88,19 @@ void pb_data_destroy(struct pb_data * const data) {
 
 /*******************************************************************************
  */
-struct pb_data *pb_trivial_data_create(uint8_t * const buf, size_t len,
+struct pb_data *pb_trivial_data_create(size_t len,
     const struct pb_allocator *allocator) {
+  void *buf = allocator->alloc(allocator, pb_alloc_type_region, len);
+  if (!buf)
+    return NULL;
+
   struct pb_data *data =
     allocator->alloc(allocator, pb_alloc_type_struct, sizeof(struct pb_data));
-  if (!data)
+  if (!data) {
+    allocator->free(allocator, pb_alloc_type_region, buf, len);
+
     return NULL;
+  }
 
   data->data_vec.base = buf;
   data->data_vec.len = len;
@@ -468,8 +475,8 @@ uint64_t pb_trivial_buffer_get_data_revision(struct pb_buffer * const buffer) {
 /*******************************************************************************
  */
 struct pb_data *pb_trivial_buffer_data_create(struct pb_buffer * const buffer,
-    uint8_t * const buf, size_t len) {
-  return pb_trivial_data_create(buf, len, buffer->allocator);
+    size_t len) {
+  return pb_trivial_data_create(len, buffer->allocator);
 }
 
 struct pb_data *pb_trivial_buffer_data_create_ref(
@@ -615,18 +622,9 @@ uint64_t pb_trivial_buffer_reserve(struct pb_buffer * const buffer,
        buffer->strategy->page_size : len :
        len;
 
-    void *buf =
-      allocator->alloc(allocator, pb_alloc_type_region, reserve_len);
-    if (!buf)
+    struct pb_data *data = buffer->operations->data_create(buffer, reserve_len);
+    if (!data)
       return reserved;
-
-    struct pb_data *data =
-      buffer->operations->data_create(buffer, buf, reserve_len);
-    if (!data) {
-      allocator->free(allocator, pb_alloc_type_region, buf, reserve_len);
-
-      return reserved;
-    }
 
     struct pb_page *page = pb_page_create(data, allocator);
     if (!page) {
@@ -668,18 +666,9 @@ uint64_t pb_trivial_buffer_rewind(struct pb_buffer * const buffer,
        buffer->strategy->page_size : len :
        len;
 
-    void *buf =
-      allocator->alloc(allocator, pb_alloc_type_region, reserve_len);
-    if (!buf)
+    struct pb_data *data = buffer->operations->data_create(buffer, reserve_len);
+    if (!data)
       return rewinded;
-
-    struct pb_data *data =
-      buffer->operations->data_create(buffer, buf, reserve_len);
-    if (!data) {
-      allocator->free(allocator, pb_alloc_type_region, buf, reserve_len);
-
-      return rewinded;
-    }
 
     struct pb_page *page = pb_page_create(data, allocator);
     if (!page) {

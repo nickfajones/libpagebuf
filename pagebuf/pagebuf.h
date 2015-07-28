@@ -174,12 +174,12 @@ const struct pb_data_operations *pb_get_trivial_data_operations(void);
 /** An implementation of pb_data using trivial operations and the supplied
  *  allocator. */
 struct pb_data *pb_trivial_data_create(
-                                   uint8_t * const buf, size_t len,
+                                   size_t len,
                                    const struct pb_allocator *allocator);
 
 struct pb_data *pb_trivial_data_create_ref(
                                    const uint8_t *buf, size_t len,
-                                   const struct pb_allocator * allocator);
+                                   const struct pb_allocator *allocator);
 
 
 
@@ -360,7 +360,7 @@ struct pb_buffer_operations {
    * This is a private function and should not be called explicitly.
    */
   struct pb_data *(*data_create)(struct pb_buffer * const buffer,
-                                 uint8_t * const buf, size_t len);
+                                 size_t len);
 
   /** Create a pb_data instance.
    *
@@ -756,7 +756,7 @@ uint64_t pb_trivial_buffer_get_data_size(struct pb_buffer * const buffer);
 
 
 struct pb_data *pb_trivial_buffer_data_create(struct pb_buffer * const buffer,
-                                              uint8_t * const buf, size_t len);
+                                              size_t len);
 struct pb_data *pb_trivial_buffer_data_create_ref(
                                               struct pb_buffer * const buffer,
                                               const uint8_t *buf, size_t len);
