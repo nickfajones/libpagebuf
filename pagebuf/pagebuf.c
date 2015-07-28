@@ -57,6 +57,9 @@ const struct pb_allocator *pb_get_trivial_allocator(void) {
 /*******************************************************************************
  */
 static struct pb_data_operations pb_trivial_data_operations = {
+  .get = &pb_trivial_data_get,
+  .put = &pb_trivial_data_put,
+
   .destroy = &pb_trivial_data_destroy,
 };
 
@@ -68,18 +71,13 @@ const struct pb_data_operations *pb_get_trivial_data_operations(void) {
 /*******************************************************************************
  */
 void pb_data_get(struct pb_data *data) {
-  __sync_add_and_fetch(&data->use_count, 1);
+  data->operations->get(data);
 }
 
 void pb_data_put(struct pb_data *data) {
-  if (__sync_sub_and_fetch(&data->use_count, 1) != 0)
-    return;
-
-  pb_data_destroy(data);
+  data->operations->put(data);
 }
 
-/*******************************************************************************
- */
 void pb_data_destroy(struct pb_data * const data) {
   data->operations->destroy(data);
 }
@@ -133,6 +131,17 @@ struct pb_data *pb_trivial_data_create_ref(const uint8_t *buf, size_t len,
   data->operations = pb_get_trivial_data_operations();
 
   return data;
+}
+
+void pb_trivial_data_get(struct pb_data *data) {
+  __sync_add_and_fetch(&data->use_count, 1);
+}
+
+void pb_trivial_data_put(struct pb_data *data) {
+  if (__sync_sub_and_fetch(&data->use_count, 1) != 0)
+    return;
+
+  pb_data_destroy(data);
 }
 
 void pb_trivial_data_destroy(struct pb_data * const data) {

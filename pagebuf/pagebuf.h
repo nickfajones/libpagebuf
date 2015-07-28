@@ -109,6 +109,15 @@ enum pb_data_responsibility {
  * outside of their creating pb_buffer.
  */
 struct pb_data_operations {
+  /** Increment the use count of the pb_data instance. */
+  void (*get)(struct pb_data * const data);
+
+  /** Decrement the use count of the pb_data instance.
+   *
+   *  Will destroy the instance if the use count becomes zero.
+   */
+  void (*put)(struct pb_data * const data);
+
   /** Destroy a pb_data instance.
    *
    * Not to be called directly unless the instance was never 'get'd by a
@@ -149,19 +158,10 @@ struct pb_data {
 
 
 
-/** Data reference count modifiers:
- *
- * Increment the use count of the pb_data instance.
- */
-void pb_data_get(struct pb_data *data);
-
-/** Decrement the use count of the pb_data instance.
- *
- *  Will destroy the instance if the use count becomes zero.
- */
-void pb_data_put(struct pb_data *data);
-
 /** Functional interfaces for the generic pb_data class. */
+void pb_data_get(struct pb_data * const data);
+void pb_data_put(struct pb_data * const data);
+
 void pb_data_destroy(struct pb_data * const data);
 
 
@@ -184,6 +184,8 @@ struct pb_data *pb_trivial_data_create_ref(
 
 
 /** Trivial data operations. */
+void pb_trivial_data_get(struct pb_data * const data);
+void pb_trivial_data_put(struct pb_data * const data);
 void pb_trivial_data_destroy(struct pb_data * const data);
 
 
