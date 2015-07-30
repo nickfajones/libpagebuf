@@ -114,19 +114,11 @@ struct pb_data_operations {
 
   /** Decrement the use count of the pb_data instance.
    *
-   *  Will destroy the instance if the use count becomes zero.
+   * Will destroy the instance if the use count becomes zero.
+   * The memory region of the instance will be freed if it is owned by the
+   * instance.  The pb_data instance itself will be freed.
    */
   void (*put)(struct pb_data * const data);
-
-  /** Destroy a pb_data instance.
-   *
-   * Not to be called directly unless the instance was never 'get'd by a
-   * container.
-   *
-   * The memory region will be freed if it is owned by the instance.
-   * The pb_data instance will be freed.
-   */
-  void (*destroy)(struct pb_data * const data);
 };
 
 
@@ -162,8 +154,6 @@ struct pb_data {
 void pb_data_get(struct pb_data * const data);
 void pb_data_put(struct pb_data * const data);
 
-void pb_data_destroy(struct pb_data * const data);
-
 
 
 /** The trivial data implementation and its supporting functions. */
@@ -186,7 +176,6 @@ struct pb_data *pb_trivial_data_create_ref(
 /** Trivial data operations. */
 void pb_trivial_data_get(struct pb_data * const data);
 void pb_trivial_data_put(struct pb_data * const data);
-void pb_trivial_data_destroy(struct pb_data * const data);
 
 
 
