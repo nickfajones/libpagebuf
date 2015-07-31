@@ -67,6 +67,14 @@ struct pb_allocator {
                 enum pb_allocator_type type, void *obj, size_t size);
 };
 
+/** Functional interfaces for the pb_allocator class. */
+void *pb_allocator_alloc(
+                       const struct pb_allocator *allocator,
+                       enum pb_allocator_type type, size_t size);
+void pb_allocator_free(const struct pb_allocator *allocator,
+                       enum pb_allocator_type type, void *obj, size_t size);
+
+
 /** Get a built in, trivial heap based allocator. */
 const struct pb_allocator *pb_get_trivial_allocator(void);
 
