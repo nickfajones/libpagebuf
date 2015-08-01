@@ -78,14 +78,6 @@ struct pb_buffer *pb_mmap_buffer_create_with_alloc(const char *file_path,
   const struct pb_allocator *allocator);
 
 
-
-/** Operations functions overrides for mmap buffer. */
-uint64_t pb_mmap_buffer_get_data_size(struct pb_buffer * const buffer);
-
-void pb_mmap_buffer_clear(struct pb_buffer * const buffer);
-void pb_mmap_buffer_destroy(
-                          struct pb_buffer * const buffer);
-
 #ifdef __cplusplus
 }; /* extern "C" */
 #endif
