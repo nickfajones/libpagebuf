@@ -16,6 +16,10 @@
 
 #include "pagebuf_mmap.h"
 
+#define pb_uthash_malloc(sz)   (pb_allocator_alloc(mmap_allocator->struct_allocator, pb_alloc_type_struct, sz))
+#define pb_uthash_free(ptr,sz) (pb_allocator_free(mmap_allocator->struct_allocator, pb_alloc_type_struct, ptr, sz))
+#include "pagebuf_hash.h"
+
 #include <sys/types.h>
 #include <errno.h>
 #include <assert.h>
@@ -29,17 +33,16 @@ struct pb_mmap_data;
 
 
 
-/*******************************************************************************
- */
+/** The specialised allocator that tracks regions backed by a block device file. */
 struct pb_mmap_allocator {
   struct pb_allocator allocator;
 
   const struct pb_allocator *struct_allocator;
 
-  char *file_path;
+  /** Use count, maintained with atomic operations. */
+  uint16_t use_count;
 
-  enum pb_mmap_open_action open_action;
-  enum pb_mmap_close_action close_action;
+  char *file_path;
 
   int file_fd;
 
@@ -48,8 +51,22 @@ struct pb_mmap_allocator {
 
   struct pb_mmap_data *data_tree;
 
-  /** Use count, maintained with atomic operations. */
-  uint16_t use_count;
+  enum pb_mmap_open_action open_action;
+  enum pb_mmap_close_action close_action;
+};
+
+
+
+/** The specialised data struct for use with the mmap_allocator
+ */
+struct pb_mmap_data {
+  struct pb_data data;
+
+  struct pb_mmap_allocator *mmap_allocator;
+
+  UT_hash_handle hh;
+
+  off64_t file_offset;
 };
 
 
@@ -81,6 +98,14 @@ static void pb_mmap_allocator_free(const struct pb_allocator *allocator,
 }
 
 
+
+/*******************************************************************************
+ */
+static void pb_mmap_allocator_get(struct pb_mmap_allocator *mmap_allocator);
+static void pb_mmap_allocator_put(struct pb_mmap_allocator *mmap_allocator);
+
+
+
 /*******************************************************************************
  */
 static struct pb_mmap_allocator *pb_mmap_allocator_create(const char *file_path,
@@ -93,18 +118,35 @@ static struct pb_mmap_allocator *pb_mmap_allocator_create(const char *file_path,
   if (!mmap_allocator)
     return NULL;
 
+  mmap_allocator->use_count = 1;
+
   mmap_allocator->allocator.alloc = &pb_mmap_allocator_alloc;
   mmap_allocator->allocator.free = &pb_mmap_allocator_free;
 
   mmap_allocator->struct_allocator = allocator;
 
-  mmap_allocator->file_path = strdup(file_path);
+  size_t file_path_len = strlen(file_path);
+
+  mmap_allocator->file_path =
+    pb_allocator_alloc(
+      allocator, pb_alloc_type_struct, (file_path_len + 1));
   if (!mmap_allocator->file_path) {
     int temp_errno = errno;
 
-    pb_allocator_free(
-      allocator,
-      pb_alloc_type_struct, mmap_allocator, sizeof(struct pb_mmap_allocator));
+    pb_mmap_allocator_put(mmap_allocator);
+
+    errno = temp_errno;
+
+    return NULL;
+  }
+  memcpy(mmap_allocator->file_path, file_path, file_path_len);
+  mmap_allocator->file_path[file_path_len] = '\0';
+
+  mmap_allocator->file_fd = -1; // mmap
+  if (!mmap_allocator->file_path) {
+    int temp_errno = errno;
+
+    pb_mmap_allocator_put(mmap_allocator);
 
     errno = temp_errno;
 
@@ -129,6 +171,21 @@ static void pb_mmap_allocator_put(struct pb_mmap_allocator *mmap_allocator) {
 
   if (__sync_sub_and_fetch(&mmap_allocator->use_count, 1) != 0)
     return;
+
+  PB_HASH_CLEAR(mmap_allocator->data_tree);
+
+  if (mmap_allocator->file_fd >= 0) {
+    mmap_allocator->file_fd = -1;
+  }
+
+  if (mmap_allocator->file_path) {
+    pb_allocator_free(
+      struct_allocator,
+      pb_alloc_type_struct,
+      mmap_allocator->file_path, sizeof(struct pb_mmap_allocator));
+
+    mmap_allocator->file_path = 0;
+  }
 
   pb_allocator_free(
     struct_allocator,
@@ -160,15 +217,6 @@ static const struct pb_data_operations *pb_get_mmap_data_operations(void) {
 
 
 
-/*******************************************************************************
- */
-struct pb_mmap_data {
-  struct pb_data data;
-
-  struct pb_mmap_allocator *mmap_allocator;
-
-  off64_t file_offset;
-};
 
 
 
@@ -177,7 +225,15 @@ struct pb_mmap_data {
 static struct pb_mmap_data *pb_mmap_data_create(
     size_t len,
     struct pb_mmap_allocator *mmap_allocator) {
-  struct pb_mmap_data *mmap_data =
+  struct pb_mmap_data *mmap_data;
+  PB_HASH_FIND_INT(
+    mmap_allocator->data_tree, &mmap_allocator->head_offset, mmap_data);
+  if (mmap_data)
+    {
+    return mmap_data;
+    }
+
+  mmap_data =
     pb_allocator_alloc(
       &mmap_allocator->allocator, pb_alloc_type_struct,
       sizeof(struct pb_mmap_data));
@@ -187,6 +243,8 @@ static struct pb_mmap_data *pb_mmap_data_create(
   uint64_t head_offset = mmap_allocator->head_offset;
 
   // reserve mmap file data
+
+  PB_HASH_ADD_INT(mmap_allocator->data_tree, file_offset, mmap_data);
 
   mmap_data->data.operations = pb_get_mmap_data_operations();
   mmap_data->data.allocator = &mmap_allocator->allocator;
