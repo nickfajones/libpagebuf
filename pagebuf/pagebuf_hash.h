@@ -105,9 +105,9 @@ do {                                                                            
   out=NULL;                                                                      \
   if (head != NULL) {                                                            \
      unsigned _hf_bkt,_hf_hashv;                                                 \
-     PB_HASH_FCN(keyptr,keylen, (head)->hh.tbl->num_buckets, _hf_hashv, _hf_bkt);   \
-     if (PB_HASH_BLOOM_TEST((head)->hh.tbl, _hf_hashv) != 0) {                      \
-       PB_HASH_FIND_IN_BKT((head)->hh.tbl, hh, (head)->hh.tbl->buckets[ _hf_bkt ],  \
+     PB_HASH_FCN(keyptr,keylen, (head)->hh.tbl->num_buckets, _hf_hashv, _hf_bkt); \
+     if (PB_HASH_BLOOM_TEST((head)->hh.tbl, _hf_hashv) != 0) {                   \
+       PB_HASH_FIND_IN_BKT((head)->hh.tbl, hh, (head)->hh.tbl->buckets[ _hf_bkt ], \
                         keyptr,keylen,out);                                      \
      }                                                                           \
   }                                                                              \
@@ -179,7 +179,7 @@ do {                                                                            
   PB_HASH_ADD(hh,head,fieldname,keylen_in,add);                                  \
 } while(0)
 
-#define PB_HASH_ADD_KEYPTR(hh,head,keyptr,keylen_in,add)                            \
+#define PB_HASH_ADD_KEYPTR(hh,head,keyptr,keylen_in,add)                         \
 do {                                                                             \
  unsigned _ha_bkt;                                                               \
  (add)->hh.next = NULL;                                                          \
@@ -188,7 +188,7 @@ do {                                                                            
  if (!(head)) {                                                                  \
     head = (add);                                                                \
     (head)->hh.prev = NULL;                                                      \
-    PB_HASH_MAKE_TABLE(hh,head);                                                    \
+    PB_HASH_MAKE_TABLE(hh,head);                                                 \
  } else {                                                                        \
     (head)->hh.tbl->tail->next = (add);                                          \
     (add)->hh.prev = ELMT_FROM_HH((head)->hh.tbl, (head)->hh.tbl->tail);         \
@@ -196,15 +196,15 @@ do {                                                                            
  }                                                                               \
  (head)->hh.tbl->num_items++;                                                    \
  (add)->hh.tbl = (head)->hh.tbl;                                                 \
- PB_HASH_FCN(keyptr,keylen_in, (head)->hh.tbl->num_buckets,                         \
+ PB_HASH_FCN(keyptr,keylen_in, (head)->hh.tbl->num_buckets,                      \
          (add)->hh.hashv, _ha_bkt);                                              \
- PB_HASH_ADD_TO_BKT((head)->hh.tbl->buckets[_ha_bkt],&(add)->hh);                   \
- PB_HASH_BLOOM_ADD((head)->hh.tbl,(add)->hh.hashv);                                 \
- PB_HASH_EMIT_KEY(hh,head,keyptr,keylen_in);                                        \
- PB_HASH_FSCK(hh,head);                                                             \
+ PB_HASH_ADD_TO_BKT((head)->hh.tbl->buckets[_ha_bkt],&(add)->hh);                \
+ PB_HASH_BLOOM_ADD((head)->hh.tbl,(add)->hh.hashv);                              \
+ PB_HASH_EMIT_KEY(hh,head,keyptr,keylen_in);                                     \
+ PB_HASH_FSCK(hh,head);                                                          \
 } while(0)
 
-#define PB_HASH_TO_BKT( hashv, num_bkts, bkt )                                      \
+#define PB_HASH_TO_BKT( hashv, num_bkts, bkt )                                   \
 do {                                                                             \
   bkt = ((hashv) & ((num_bkts) - 1U));                                           \
 } while(0)
@@ -221,14 +221,14 @@ do {                                                                            
  * copy the deletee pointer, then the latter references are via that
  * scratch pointer rather than through the repointed (users) symbol.
  */
-#define PB_HASH_DELETE(hh,head,delptr)                                              \
+#define PB_HASH_DELETE(hh,head,delptr)                                           \
 do {                                                                             \
     struct UT_hash_handle *_hd_hh_del;                                           \
     if ( ((delptr)->hh.prev == NULL) && ((delptr)->hh.next == NULL) )  {         \
-        pb_uthash_free((head)->hh.tbl->buckets,                                     \
+        pb_uthash_free((head)->hh.tbl->buckets,                                  \
                     (head)->hh.tbl->num_buckets*sizeof(struct UT_hash_bucket) ); \
-        PB_HASH_BLOOM_FREE((head)->hh.tbl);                                         \
-        pb_uthash_free((head)->hh.tbl, sizeof(UT_hash_table));                      \
+        PB_HASH_BLOOM_FREE((head)->hh.tbl);                                      \
+        pb_uthash_free((head)->hh.tbl, sizeof(UT_hash_table));                   \
         head = NULL;                                                             \
     } else {                                                                     \
         unsigned _hd_bkt;                                                        \
@@ -249,34 +249,34 @@ do {                                                                            
                     (head)->hh.tbl->hho))->prev =                                \
                     _hd_hh_del->prev;                                            \
         }                                                                        \
-        PB_HASH_TO_BKT( _hd_hh_del->hashv, (head)->hh.tbl->num_buckets, _hd_bkt);   \
-        PB_HASH_DEL_IN_BKT(hh,(head)->hh.tbl->buckets[_hd_bkt], _hd_hh_del);        \
+        PB_HASH_TO_BKT( _hd_hh_del->hashv, (head)->hh.tbl->num_buckets, _hd_bkt);\
+        PB_HASH_DEL_IN_BKT(hh,(head)->hh.tbl->buckets[_hd_bkt], _hd_hh_del);     \
         (head)->hh.tbl->num_items--;                                             \
     }                                                                            \
-    PB_HASH_FSCK(hh,head);                                                          \
+    PB_HASH_FSCK(hh,head);                                                       \
 } while (0)
 
 
 /* convenience forms of PB_HASH_FIND/HASH_ADD/HASH_DEL */
-#define PB_HASH_FIND_STR(head,findstr,out)                                          \
+#define PB_HASH_FIND_STR(head,findstr,out)                                       \
     PB_HASH_FIND(hh,head,findstr,(unsigned)strlen(findstr),out)
-#define PB_HASH_ADD_STR(head,strfield,add)                                          \
+#define PB_HASH_ADD_STR(head,strfield,add)                                       \
     PB_HASH_ADD(hh,head,strfield[0],(unsigned int)strlen(add->strfield),add)
-#define PB_HASH_REPLACE_STR(head,strfield,add,replaced)                             \
+#define PB_HASH_REPLACE_STR(head,strfield,add,replaced)                          \
     PB_HASH_REPLACE(hh,head,strfield[0],(unsigned)strlen(add->strfield),add,replaced)
-#define PB_HASH_FIND_INT(head,findint,out)                                          \
+#define PB_HASH_FIND_INT(head,findint,out)                                       \
     PB_HASH_FIND(hh,head,findint,sizeof(int),out)
-#define PB_HASH_ADD_INT(head,intfield,add)                                          \
+#define PB_HASH_ADD_INT(head,intfield,add)                                       \
     PB_HASH_ADD(hh,head,intfield,sizeof(int),add)
-#define PB_HASH_REPLACE_INT(head,intfield,add,replaced)                             \
+#define PB_HASH_REPLACE_INT(head,intfield,add,replaced)                          \
     PB_HASH_REPLACE(hh,head,intfield,sizeof(int),add,replaced)
-#define PB_HASH_FIND_PTR(head,findptr,out)                                          \
+#define PB_HASH_FIND_PTR(head,findptr,out)                                       \
     PB_HASH_FIND(hh,head,findptr,sizeof(void *),out)
-#define PB_HASH_ADD_PTR(head,ptrfield,add)                                          \
+#define PB_HASH_ADD_PTR(head,ptrfield,add)                                       \
     PB_HASH_ADD(hh,head,ptrfield,sizeof(void *),add)
-#define PB_HASH_REPLACE_PTR(head,ptrfield,add,replaced)                             \
+#define PB_HASH_REPLACE_PTR(head,ptrfield,add,replaced)                          \
     PB_HASH_REPLACE(hh,head,ptrfield,sizeof(void *),add,replaced)
-#define PB_HASH_DEL(head,delptr)                                                    \
+#define PB_HASH_DEL(head,delptr)                                                 \
     PB_HASH_DELETE(hh,head,delptr)
 
 /* PB_HASH_FSCK checks hash integrity on every add/delete when PB_HASH_DEBUG is defined.
@@ -284,7 +284,7 @@ do {                                                                            
  */
 #ifdef PB_HASH_DEBUG
 #define PB_HASH_OOPS(...) do { fprintf(stderr,__VA_ARGS__); exit(-1); } while (0)
-#define PB_HASH_FSCK(hh,head)                                                       \
+#define PB_HASH_FSCK(hh,head)                                                    \
 do {                                                                             \
     struct UT_hash_handle *_thh;                                                 \
     if (head) {                                                                  \
@@ -298,7 +298,7 @@ do {                                                                            
             _prev = NULL;                                                        \
             while (_thh) {                                                       \
                if (_prev != (char*)(_thh->hh_prev)) {                            \
-                   PB_HASH_OOPS("invalid hh_prev %p, actual %p\n",                  \
+                   PB_HASH_OOPS("invalid hh_prev %p, actual %p\n",               \
                     _thh->hh_prev, _prev );                                      \
                }                                                                 \
                _bkt_count++;                                                     \
@@ -307,12 +307,12 @@ do {                                                                            
             }                                                                    \
             _count += _bkt_count;                                                \
             if ((head)->hh.tbl->buckets[_bkt_i].count !=  _bkt_count) {          \
-               PB_HASH_OOPS("invalid bucket count %u, actual %u\n",                 \
+               PB_HASH_OOPS("invalid bucket count %u, actual %u\n",              \
                 (head)->hh.tbl->buckets[_bkt_i].count, _bkt_count);              \
             }                                                                    \
         }                                                                        \
         if (_count != (head)->hh.tbl->num_items) {                               \
-            PB_HASH_OOPS("invalid hh item count %u, actual %u\n",                   \
+            PB_HASH_OOPS("invalid hh item count %u, actual %u\n",                \
                 (head)->hh.tbl->num_items, _count );                             \
         }                                                                        \
         /* traverse hh in app order; check next/prev integrity, count */         \
@@ -322,7 +322,7 @@ do {                                                                            
         while (_thh) {                                                           \
            _count++;                                                             \
            if (_prev !=(char*)(_thh->prev)) {                                    \
-              PB_HASH_OOPS("invalid prev %p, actual %p\n",                          \
+              PB_HASH_OOPS("invalid prev %p, actual %p\n",                       \
                     _thh->prev, _prev );                                         \
            }                                                                     \
            _prev = (char*)ELMT_FROM_HH((head)->hh.tbl, _thh);                    \
@@ -330,7 +330,7 @@ do {                                                                            
                                   (head)->hh.tbl->hho) : NULL );                 \
         }                                                                        \
         if (_count != (head)->hh.tbl->num_items) {                               \
-            PB_HASH_OOPS("invalid app item count %u, actual %u\n",                  \
+            PB_HASH_OOPS("invalid app item count %u, actual %u\n",              \
                 (head)->hh.tbl->num_items, _count );                             \
         }                                                                        \
     }                                                                            \
@@ -343,11 +343,11 @@ do {                                                                            
  * the descriptor to which this macro is defined for tuning the hash function.
  * The app can #include <unistd.h> to get the prototype for write(2). */
 #ifdef PB_HASH_EMIT_KEYS
-#define PB_HASH_EMIT_KEY(hh,head,keyptr,fieldlen)                                   \
+#define PB_HASH_EMIT_KEY(hh,head,keyptr,fieldlen)                                \
 do {                                                                             \
     unsigned _klen = fieldlen;                                                   \
-    write(PB_HASH_EMIT_KEYS, &_klen, sizeof(_klen));                                \
-    write(PB_HASH_EMIT_KEYS, keyptr, (unsigned long)fieldlen);                      \
+    write(PB_HASH_EMIT_KEYS, &_klen, sizeof(_klen));                             \
+    write(PB_HASH_EMIT_KEYS, keyptr, (unsigned long)fieldlen);                   \
 } while (0)
 #else
 #define PB_HASH_EMIT_KEY(hh,head,keyptr,fieldlen)
@@ -361,7 +361,7 @@ do {                                                                            
 #endif
 
 /* The Bernstein hash function, used in Perl prior to v5.6. Note (x<<5+x)=x*33. */
-#define PB_HASH_BER(key,keylen,num_bkts,hashv,bkt)                                  \
+#define PB_HASH_BER(key,keylen,num_bkts,hashv,bkt)                               \
 do {                                                                             \
   unsigned _hb_keylen=(unsigned)keylen;                                          \
   const unsigned char *_hb_key=(const unsigned char*)(key);                      \
@@ -375,7 +375,7 @@ do {                                                                            
 
 /* SAX/FNV/OAT/JEN hash functions are macro variants of those listed at
  * http://eternallyconfuzzled.com/tuts/algorithms/jsw_tut_hashing.aspx */
-#define PB_HASH_SAX(key,keylen,num_bkts,hashv,bkt)                                  \
+#define PB_HASH_SAX(key,keylen,num_bkts,hashv,bkt)                               \
 do {                                                                             \
   unsigned _sx_i;                                                                \
   const unsigned char *_hs_key=(const unsigned char*)(key);                      \
@@ -386,7 +386,7 @@ do {                                                                            
   bkt = hashv & (num_bkts-1U);                                                   \
 } while (0)
 /* FNV-1a variation */
-#define PB_HASH_FNV(key,keylen,num_bkts,hashv,bkt)                                  \
+#define PB_HASH_FNV(key,keylen,num_bkts,hashv,bkt)                               \
 do {                                                                             \
   unsigned _fn_i;                                                                \
   const unsigned char *_hf_key=(const unsigned char*)(key);                      \
@@ -398,7 +398,7 @@ do {                                                                            
   bkt = hashv & (num_bkts-1U);                                                   \
 } while(0)
 
-#define PB_HASH_OAT(key,keylen,num_bkts,hashv,bkt)                                  \
+#define PB_HASH_OAT(key,keylen,num_bkts,hashv,bkt)                               \
 do {                                                                             \
   unsigned _ho_i;                                                                \
   const unsigned char *_ho_key=(const unsigned char*)(key);                      \
@@ -414,7 +414,7 @@ do {                                                                            
   bkt = hashv & (num_bkts-1U);                                                   \
 } while(0)
 
-#define PB_HASH_JEN_MIX(a,b,c)                                                      \
+#define PB_HASH_JEN_MIX(a,b,c)                                                   \
 do {                                                                             \
   a -= b; a -= c; a ^= ( c >> 13 );                                              \
   b -= c; b -= a; b ^= ( a << 8 );                                               \
@@ -427,7 +427,7 @@ do {                                                                            
   c -= a; c -= b; c ^= ( b >> 15 );                                              \
 } while (0)
 
-#define PB_HASH_JEN(key,keylen,num_bkts,hashv,bkt)                                  \
+#define PB_HASH_JEN(key,keylen,num_bkts,hashv,bkt)                               \
 do {                                                                             \
   unsigned _hj_i,_hj_j,_hj_k;                                                    \
   unsigned const char *_hj_key=(unsigned const char*)(key);                      \
@@ -445,7 +445,7 @@ do {                                                                            
         + ( (unsigned)_hj_key[10] << 16 )                                        \
         + ( (unsigned)_hj_key[11] << 24 ) );                                     \
                                                                                  \
-     PB_HASH_JEN_MIX(_hj_i, _hj_j, hashv);                                          \
+     PB_HASH_JEN_MIX(_hj_i, _hj_j, hashv);                                       \
                                                                                  \
      _hj_key += 12;                                                              \
      _hj_k -= 12U;                                                               \
@@ -464,7 +464,7 @@ do {                                                                            
      case 2:  _hj_i += ( (unsigned)_hj_key[1] << 8 );   /* FALLTHROUGH */        \
      case 1:  _hj_i += _hj_key[0];                                               \
   }                                                                              \
-  PB_HASH_JEN_MIX(_hj_i, _hj_j, hashv);                                             \
+  PB_HASH_JEN_MIX(_hj_i, _hj_j, hashv);                                          \
   bkt = hashv & (num_bkts-1U);                                                   \
 } while(0)
 
@@ -479,7 +479,7 @@ do {                                                                            
 #define get16bits(d) ((((uint32_t)(((const uint8_t *)(d))[1])) << 8)             \
                        +(uint32_t)(((const uint8_t *)(d))[0]) )
 #endif
-#define PB_HASH_SFH(key,keylen,num_bkts,hashv,bkt)                                  \
+#define PB_HASH_SFH(key,keylen,num_bkts,hashv,bkt)                               \
 do {                                                                             \
   unsigned const char *_sfh_key=(unsigned const char*)(key);                     \
   uint32_t _sfh_tmp, _sfh_len = (uint32_t)keylen;                                \
@@ -565,7 +565,7 @@ do {                 \
   _h ^= _h >> 16;    \
 } while(0)
 
-#define PB_HASH_MUR(key,keylen,num_bkts,hashv,bkt)                        \
+#define PB_HASH_MUR(key,keylen,num_bkts,hashv,bkt)                     \
 do {                                                                   \
   const uint8_t *_mur_data = (const uint8_t*)(key);                    \
   const int _mur_nblocks = (int)(keylen) / 4;                          \
@@ -608,13 +608,13 @@ do {                                                                   \
 #define PB_HASH_KEYCMP(a,b,len) memcmp(a,b,(unsigned long)(len))
 
 /* iterate over items in a known bucket to find desired item */
-#define PB_HASH_FIND_IN_BKT(tbl,hh,head,keyptr,keylen_in,out)                       \
+#define PB_HASH_FIND_IN_BKT(tbl,hh,head,keyptr,keylen_in,out)                    \
 do {                                                                             \
  if (head.hh_head != NULL) { DECLTYPE_ASSIGN(out,ELMT_FROM_HH(tbl,head.hh_head)); } \
  else { out=NULL; }                                                              \
  while (out != NULL) {                                                           \
     if ((out)->hh.keylen == (keylen_in)) {                                       \
-        if ((PB_HASH_KEYCMP((out)->hh.key,keyptr,keylen_in)) == 0) { break; }         \
+        if ((PB_HASH_KEYCMP((out)->hh.key,keyptr,keylen_in)) == 0) { break; }    \
     }                                                                            \
     if ((out)->hh.hh_next != NULL) { DECLTYPE_ASSIGN(out,ELMT_FROM_HH(tbl,(out)->hh.hh_next)); } \
     else { out = NULL; }                                                         \
@@ -622,21 +622,21 @@ do {                                                                            
 } while(0)
 
 /* add an item to a bucket  */
-#define PB_HASH_ADD_TO_BKT(head,addhh)                                              \
+#define PB_HASH_ADD_TO_BKT(head,addhh)                                           \
 do {                                                                             \
  head.count++;                                                                   \
  (addhh)->hh_next = head.hh_head;                                                \
  (addhh)->hh_prev = NULL;                                                        \
  if (head.hh_head != NULL) { (head).hh_head->hh_prev = (addhh); }                \
  (head).hh_head=addhh;                                                           \
- if ((head.count >= ((head.expand_mult+1U) * PB_HASH_BKT_CAPACITY_THRESH))          \
+ if ((head.count >= ((head.expand_mult+1U) * PB_HASH_BKT_CAPACITY_THRESH))       \
      && ((addhh)->tbl->noexpand != 1U)) {                                        \
-       PB_HASH_EXPAND_BUCKETS((addhh)->tbl);                                        \
+       PB_HASH_EXPAND_BUCKETS((addhh)->tbl);                                     \
  }                                                                               \
 } while(0)
 
 /* remove an item from a given bucket */
-#define PB_HASH_DEL_IN_BKT(hh,head,hh_del)                                          \
+#define PB_HASH_DEL_IN_BKT(hh,head,hh_del)                                       \
     (head).count--;                                                              \
     if ((head).hh_head == hh_del) {                                              \
       (head).hh_head = hh_del->hh_next;                                          \
@@ -677,15 +677,15 @@ do {                                                                            
  *      ceil(n/b) = (n>>lb) + ( (n & (b-1)) ? 1:0)
  *
  */
-#define PB_HASH_EXPAND_BUCKETS(tbl)                                                 \
+#define PB_HASH_EXPAND_BUCKETS(tbl)                                              \
 do {                                                                             \
     unsigned _he_bkt;                                                            \
     unsigned _he_bkt_i;                                                          \
     struct UT_hash_handle *_he_thh, *_he_hh_nxt;                                 \
     UT_hash_bucket *_he_new_buckets, *_he_newbkt;                                \
-    _he_new_buckets = (UT_hash_bucket*)pb_uthash_malloc(                            \
+    _he_new_buckets = (UT_hash_bucket*)pb_uthash_malloc(                         \
              2UL * tbl->num_buckets * sizeof(struct UT_hash_bucket));            \
-    if (!_he_new_buckets) { pb_uthash_fatal( "out of memory"); }                    \
+    if (!_he_new_buckets) { pb_uthash_fatal( "out of memory"); }                 \
     memset(_he_new_buckets, 0,                                                   \
             2UL * tbl->num_buckets * sizeof(struct UT_hash_bucket));             \
     tbl->ideal_chain_maxlen =                                                    \
@@ -697,7 +697,7 @@ do {                                                                            
         _he_thh = tbl->buckets[ _he_bkt_i ].hh_head;                             \
         while (_he_thh != NULL) {                                                \
            _he_hh_nxt = _he_thh->hh_next;                                        \
-           PB_HASH_TO_BKT( _he_thh->hashv, tbl->num_buckets*2U, _he_bkt);           \
+           PB_HASH_TO_BKT( _he_thh->hashv, tbl->num_buckets*2U, _he_bkt);        \
            _he_newbkt = &(_he_new_buckets[ _he_bkt ]);                           \
            if (++(_he_newbkt->count) > tbl->ideal_chain_maxlen) {                \
              tbl->nonideal_items++;                                              \
@@ -720,9 +720,9 @@ do {                                                                            
         (tbl->ineff_expands+1U) : 0U;                                            \
     if (tbl->ineff_expands > 1U) {                                               \
         tbl->noexpand=1;                                                         \
-        pb_uthash_noexpand_fyi(tbl);                                                \
+        pb_uthash_noexpand_fyi(tbl);                                             \
     }                                                                            \
-    pb_uthash_expand_fyi(tbl);                                                      \
+    pb_uthash_expand_fyi(tbl);                                                   \
 } while(0)
 
 
@@ -730,7 +730,7 @@ do {                                                                            
 /* Note that PB_HASH_SORT assumes the hash handle name to be hh.
  * PB_HASH_SRT was added to allow the hash handle name to be passed in. */
 #define PB_HASH_SORT(head,cmpfcn) PB_HASH_SRT(hh,head,cmpfcn)
-#define PB_HASH_SRT(hh,head,cmpfcn)                                                 \
+#define PB_HASH_SRT(hh,head,cmpfcn)                                              \
 do {                                                                             \
   unsigned _hs_i;                                                                \
   unsigned _hs_looping,_hs_nmerges,_hs_insize,_hs_psize,_hs_qsize;               \
@@ -813,7 +813,7 @@ do {                                                                            
           }                                                                      \
           _hs_insize *= 2U;                                                      \
       }                                                                          \
-      PB_HASH_FSCK(hh,head);                                                        \
+      PB_HASH_FSCK(hh,head);                                                     \
  }                                                                               \
 } while (0)
 
@@ -822,7 +822,7 @@ do {                                                                            
  * in both hashes. There is no copy of the items made; rather
  * they are added into the new hash through a secondary hash
  * hash handle that must be present in the structure. */
-#define PB_HASH_SELECT(hh_dst, dst, hh_src, src, cond)                              \
+#define PB_HASH_SELECT(hh_dst, dst, hh_src, src, cond)                           \
 do {                                                                             \
   unsigned _src_bkt, _dst_bkt;                                                   \
   void *_last_elt=NULL, *_elt;                                                   \
@@ -844,12 +844,12 @@ do {                                                                            
             if (_last_elt_hh != NULL) { _last_elt_hh->next = _elt; }             \
             if (dst == NULL) {                                                   \
               DECLTYPE_ASSIGN(dst,_elt);                                         \
-              PB_HASH_MAKE_TABLE(hh_dst,dst);                                       \
+              PB_HASH_MAKE_TABLE(hh_dst,dst);                                    \
             } else {                                                             \
               _dst_hh->tbl = (dst)->hh_dst.tbl;                                  \
             }                                                                    \
-            PB_HASH_TO_BKT(_dst_hh->hashv, _dst_hh->tbl->num_buckets, _dst_bkt);    \
-            PB_HASH_ADD_TO_BKT(_dst_hh->tbl->buckets[_dst_bkt],_dst_hh);            \
+            PB_HASH_TO_BKT(_dst_hh->hashv, _dst_hh->tbl->num_buckets, _dst_bkt); \
+            PB_HASH_ADD_TO_BKT(_dst_hh->tbl->buckets[_dst_bkt],_dst_hh);         \
             (dst)->hh_dst.tbl->num_items++;                                      \
             _last_elt = _elt;                                                    \
             _last_elt_hh = _dst_hh;                                              \
@@ -857,22 +857,22 @@ do {                                                                            
       }                                                                          \
     }                                                                            \
   }                                                                              \
-  PB_HASH_FSCK(hh_dst,dst);                                                         \
+  PB_HASH_FSCK(hh_dst,dst);                                                      \
 } while (0)
 
 #define PB_HASH_CLEAR(head) PB_HASH_CLR(hh,head)
 #define PB_HASH_CLR(hh,head)\
 do {                                                                             \
   if (head != NULL) {                                                            \
-    pb_uthash_free((head)->hh.tbl->buckets,                                         \
+    pb_uthash_free((head)->hh.tbl->buckets,                                      \
                 (head)->hh.tbl->num_buckets*sizeof(struct UT_hash_bucket));      \
-    PB_HASH_BLOOM_FREE((head)->hh.tbl);                                             \
-    pb_uthash_free((head)->hh.tbl, sizeof(UT_hash_table));                          \
+    PB_HASH_BLOOM_FREE((head)->hh.tbl);                                          \
+    pb_uthash_free((head)->hh.tbl, sizeof(UT_hash_table));                       \
     (head)=NULL;                                                                 \
   }                                                                              \
 } while(0)
 
-#define PB_HASH_OVERHEAD(hh,head)                                                   \
+#define PB_HASH_OVERHEAD(hh,head)                                                \
  ((head != NULL) ? (                                                             \
  (size_t)(((head)->hh.tbl->num_items   * sizeof(UT_hash_handle))   +             \
           ((head)->hh.tbl->num_buckets * sizeof(UT_hash_bucket))   +             \
