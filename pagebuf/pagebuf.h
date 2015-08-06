@@ -349,31 +349,39 @@ struct pb_buffer_operations {
 
   /** Create a pb_data instance.
    *
-   * Memory region buf is now owned by the pb_data instance and will be freed
-   * when the instance is destroyed.
-   *
    * Use count is initialised to one, therefore returned data instance must
    * be treated with the pb_data_put function when the creator is finished with
    * it, whether it is passed to another owner or not.
    *
    * This is a private function and should not be called explicitly.
+   *
+   * len is the size of the memory region to allocate.
+   * is_rewind indicates whether the region is to be placed at the beginning
+   *           of the buffer in a rewind situation.
    */
   struct pb_data *(*data_create)(struct pb_buffer * const buffer,
-                                 size_t len);
+                                 size_t len,
+                                 bool is_rewind);
 
   /** Create a pb_data instance.
    *
-   * Memory region buf is not owned by the pb_data instance.
-   *
    * Use count is initialised to one, therefore returned data instance must
    * be treated with the pb_data_put function when the creator is finished with
    * it, whether it is passed to another owner or not.
    *
    * This is a private function and should not be called explicitly.
+   *
+   * buf is the memory region to reference.
+   * len is the size of the memory region to allocate.
+   * is_rewind indicates whether the region is to be placed at the beginning
+   *           of the buffer in a rewind situation.
+   *
+   * Memory region buf will not owned by the pb_data instance.
    */
   struct pb_data *(*data_create_ref)(
                                  struct pb_buffer * const buffer,
-                                 const uint8_t *buf, size_t len);
+                                 const uint8_t *buf, size_t len,
+                                 bool is_rewind);
 
   /** Append a pb_page instance to the pb_buffer.
    *
@@ -755,10 +763,12 @@ uint64_t pb_trivial_buffer_get_data_size(struct pb_buffer * const buffer);
 
 
 struct pb_data *pb_trivial_buffer_data_create(struct pb_buffer * const buffer,
-                                              size_t len);
+                                              size_t len,
+                                              bool is_rewind);
 struct pb_data *pb_trivial_buffer_data_create_ref(
                                               struct pb_buffer * const buffer,
-                                              const uint8_t *buf, size_t len);
+                                              const uint8_t *buf, size_t len,
+                                              bool is_rewind);
 
 uint64_t pb_trivial_buffer_insert(
                              struct pb_buffer * const buffer,

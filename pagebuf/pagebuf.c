@@ -493,13 +493,14 @@ uint64_t pb_trivial_buffer_get_data_revision(struct pb_buffer * const buffer) {
 /*******************************************************************************
  */
 struct pb_data *pb_trivial_buffer_data_create(struct pb_buffer * const buffer,
-    size_t len) {
+    size_t len, bool is_rewind) {
   return pb_trivial_data_create(len, buffer->allocator);
 }
 
 struct pb_data *pb_trivial_buffer_data_create_ref(
     struct pb_buffer * const buffer,
-    const uint8_t *buf, size_t len) {
+    const uint8_t *buf, size_t len,
+    bool is_rewind) {
   return pb_trivial_data_create_ref(buf, len, buffer->allocator);
 }
 
@@ -640,7 +641,8 @@ uint64_t pb_trivial_buffer_reserve(struct pb_buffer * const buffer,
        buffer->strategy->page_size : len :
        len;
 
-    struct pb_data *data = buffer->operations->data_create(buffer, reserve_len);
+    struct pb_data *data =
+      buffer->operations->data_create(buffer, reserve_len, false);
     if (!data)
       return reserved;
 
@@ -684,7 +686,8 @@ uint64_t pb_trivial_buffer_rewind(struct pb_buffer * const buffer,
        buffer->strategy->page_size : len :
        len;
 
-    struct pb_data *data = buffer->operations->data_create(buffer, reserve_len);
+    struct pb_data *data =
+      buffer->operations->data_create(buffer, reserve_len, true);
     if (!data)
       return rewinded;
 
@@ -950,7 +953,7 @@ uint64_t pb_trivial_buffer_write_data_ref1(struct pb_buffer * const buffer,
   const struct pb_allocator *allocator = buffer->allocator;
 
   struct pb_data *data =
-    buffer->operations->data_create_ref(buffer, buf, len);
+    buffer->operations->data_create_ref(buffer, buf, len, false);
   if (!data)
     return 0;
 
@@ -992,7 +995,8 @@ uint64_t pb_trivial_buffer_write_data_ref2(struct pb_buffer * const buffer,
        len;
 
     struct pb_data *data =
-      buffer->operations->data_create_ref(buffer, buf + written, write_len);
+      buffer->operations->data_create_ref(
+        buffer, buf + written, write_len, false);
     if (!data)
       return written;
 
