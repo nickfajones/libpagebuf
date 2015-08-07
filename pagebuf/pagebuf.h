@@ -409,16 +409,6 @@ struct pb_buffer_operations {
                      struct pb_page * const page,
                      struct pb_buffer_iterator * const buffer_iterator,
                      size_t offset);
-  /** Seek the buffer by len bytes.
-   *
-   * len indicates the amount of data to seek, in bytes.
-   *
-   * The seek operation may cause internal pages to be consumed depending on
-   * the buffer implementation details.  These pb_pages will be destroyed during
-   * the seek operation and their respective data 'put'd.
-   */
-  uint64_t (*seek)(struct pb_buffer * const buffer,
-                   uint64_t len);
   /** Increase the size of the buffer by adding len bytes of data to the end.
    *
    * len indicates the amount of data to add in bytes.
@@ -426,7 +416,7 @@ struct pb_buffer_operations {
    * Depending on the buffer implementation details, the total len may be split
    * across multiple pages.
    */
-  uint64_t (*reserve)(struct pb_buffer * const buffer,
+  uint64_t (*extend)(struct pb_buffer * const buffer,
                       uint64_t len);
   /** Increases the size of the buffer by adding len bytes of data to the head.
    *
@@ -437,6 +427,16 @@ struct pb_buffer_operations {
    */
   uint64_t (*rewind)(struct pb_buffer * const buffer,
                      uint64_t len);
+  /** Seek the buffer by len bytes.
+   *
+   * len indicates the amount of data to seek, in bytes.
+   *
+   * The seek operation may cause internal pages to be consumed depending on
+   * the buffer implementation details.  These pb_pages will be destroyed during
+   * the seek operation and their respective data 'put'd.
+   */
+  uint64_t (*seek)(struct pb_buffer * const buffer,
+                   uint64_t len);
 
   /** Initialise an iterator to the start of the pb_buffer instance data.
    *
@@ -634,7 +634,7 @@ uint64_t pb_buffer_insert(
                         struct pb_buffer_iterator * const buffer_iterator,
                         size_t offset);
 uint64_t pb_buffer_seek(struct pb_buffer * const buffer, uint64_t len);
-uint64_t pb_buffer_reserve(
+uint64_t pb_buffer_extend(
                         struct pb_buffer * const buffer, uint64_t len);
 uint64_t pb_buffer_rewind(
                         struct pb_buffer * const buffer, uint64_t len);
@@ -778,7 +778,7 @@ uint64_t pb_trivial_buffer_insert(
 uint64_t pb_trivial_buffer_seek(
                              struct pb_buffer * const buffer,
                              uint64_t len);
-uint64_t pb_trivial_buffer_reserve(
+uint64_t pb_trivial_buffer_extend(
                              struct pb_buffer * const buffer,
                              uint64_t len);
 uint64_t pb_trivial_buffer_rewind(

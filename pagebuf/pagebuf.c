@@ -249,9 +249,9 @@ static struct pb_buffer_operations pb_trivial_buffer_operations = {
   .data_create_ref = &pb_trivial_buffer_data_create_ref,
 
   .insert = &pb_trivial_buffer_insert,
-  .seek = &pb_trivial_buffer_seek,
-  .reserve = &pb_trivial_buffer_reserve,
+  .extend = &pb_trivial_buffer_extend,
   .rewind = &pb_trivial_buffer_rewind,
+  .seek = &pb_trivial_buffer_seek,
 
   .get_iterator = &pb_trivial_buffer_get_iterator,
   .get_iterator_end = &pb_trivial_buffer_get_iterator_end,
@@ -306,8 +306,8 @@ uint64_t pb_buffer_insert(struct pb_buffer * const buffer,
   return buffer->operations->insert(buffer, page, buffer_iterator, offset);
 }
 
-uint64_t pb_buffer_reserve(struct pb_buffer * const buffer, uint64_t len) {
-  return buffer->operations->reserve(buffer, len);
+uint64_t pb_buffer_extend(struct pb_buffer * const buffer, uint64_t len) {
+  return buffer->operations->extend(buffer, len);
 }
 
 uint64_t pb_buffer_rewind(struct pb_buffer * const buffer, uint64_t len) {
@@ -584,6 +584,94 @@ uint64_t pb_trivial_buffer_insert(struct pb_buffer * const buffer,
 
 /*******************************************************************************
  */
+uint64_t pb_trivial_buffer_extend(struct pb_buffer * const buffer,
+    uint64_t len) {
+  const struct pb_allocator *allocator = buffer->allocator;
+
+  uint64_t extended = 0;
+
+  while (len > 0) {
+    uint64_t extend_len =
+      (buffer->strategy->page_size != 0) ?
+      (buffer->strategy->page_size < len) ?
+       buffer->strategy->page_size : len :
+       len;
+
+    struct pb_data *data =
+      buffer->operations->data_create(buffer, extend_len, false);
+    if (!data)
+      return extended;
+
+    struct pb_page *page = pb_page_create(data, allocator);
+    if (!page) {
+      pb_data_put(data);
+
+      return extended;
+    }
+
+    pb_data_put(data);
+
+    struct pb_buffer_iterator end_buffer_iterator;
+    pb_buffer_get_iterator_end(buffer, &end_buffer_iterator);
+
+    extend_len = pb_buffer_insert(buffer, page, &end_buffer_iterator, 0);
+    if (extend_len == 0)
+      break;
+
+    len -= extend_len;
+    extended += extend_len;
+  }
+
+  return extended;
+}
+
+/*******************************************************************************
+ */
+uint64_t pb_trivial_buffer_rewind(struct pb_buffer * const buffer,
+    uint64_t len) {
+  const struct pb_allocator *allocator = buffer->allocator;
+
+  pb_trivial_buffer_increment_data_revision(buffer);
+
+  uint64_t rewinded = 0;
+
+  while (len > 0) {
+    uint64_t extend_len =
+      (buffer->strategy->page_size != 0) ?
+      (buffer->strategy->page_size < len) ?
+       buffer->strategy->page_size : len :
+       len;
+
+    struct pb_data *data =
+      buffer->operations->data_create(buffer, extend_len, true);
+    if (!data)
+      return rewinded;
+
+    struct pb_page *page = pb_page_create(data, allocator);
+    if (!page) {
+      pb_data_put(data);
+
+      return rewinded;
+    }
+
+    pb_data_put(data);
+
+    struct pb_buffer_iterator buffer_iterator;
+    pb_buffer_get_iterator(buffer, &buffer_iterator);
+
+    extend_len = pb_buffer_insert(buffer, page, &buffer_iterator, 0);
+    if (extend_len == 0)
+      break;
+
+    len -= extend_len;
+    rewinded += extend_len;
+  }
+
+  return rewinded;
+}
+
+/*******************************************************************************
+ */
 uint64_t pb_trivial_buffer_seek(struct pb_buffer * const buffer, uint64_t len) {
   const struct pb_allocator *allocator = buffer->allocator;
 
@@ -624,94 +712,6 @@ uint64_t pb_trivial_buffer_seek(struct pb_buffer * const buffer, uint64_t len) {
   }
 
   return seeked;
-}
-
-/*******************************************************************************
- */
-uint64_t pb_trivial_buffer_reserve(struct pb_buffer * const buffer,
-    uint64_t len) {
-  const struct pb_allocator *allocator = buffer->allocator;
-
-  uint64_t reserved = 0;
-
-  while (len > 0) {
-    uint64_t reserve_len =
-      (buffer->strategy->page_size != 0) ?
-      (buffer->strategy->page_size < len) ?
-       buffer->strategy->page_size : len :
-       len;
-
-    struct pb_data *data =
-      buffer->operations->data_create(buffer, reserve_len, false);
-    if (!data)
-      return reserved;
-
-    struct pb_page *page = pb_page_create(data, allocator);
-    if (!page) {
-      pb_data_put(data);
-
-      return reserved;
-    }
-
-    pb_data_put(data);
-
-    struct pb_buffer_iterator end_buffer_iterator;
-    pb_buffer_get_iterator_end(buffer, &end_buffer_iterator);
-
-    reserve_len = pb_buffer_insert(buffer, page, &end_buffer_iterator, 0);
-    if (reserve_len == 0)
-      break;
-
-    len -= reserve_len;
-    reserved += reserve_len;
-  }
-
-  return reserved;
-}
-
-/*******************************************************************************
- */
-uint64_t pb_trivial_buffer_rewind(struct pb_buffer * const buffer,
-    uint64_t len) {
-  const struct pb_allocator *allocator = buffer->allocator;
-
-  pb_trivial_buffer_increment_data_revision(buffer);
-
-  uint64_t rewinded = 0;
-
-  while (len > 0) {
-    uint64_t reserve_len =
-      (buffer->strategy->page_size != 0) ?
-      (buffer->strategy->page_size < len) ?
-       buffer->strategy->page_size : len :
-       len;
-
-    struct pb_data *data =
-      buffer->operations->data_create(buffer, reserve_len, true);
-    if (!data)
-      return rewinded;
-
-    struct pb_page *page = pb_page_create(data, allocator);
-    if (!page) {
-      pb_data_put(data);
-
-      return rewinded;
-    }
-
-    pb_data_put(data);
-
-    struct pb_buffer_iterator buffer_iterator;
-    pb_buffer_get_iterator(buffer, &buffer_iterator);
-
-    reserve_len = pb_buffer_insert(buffer, page, &buffer_iterator, 0);
-    if (reserve_len == 0)
-      break;
-
-    len -= reserve_len;
-    rewinded += reserve_len;
-  }
-
-  return rewinded;
 }
 
 /*******************************************************************************
@@ -870,7 +870,7 @@ uint64_t pb_trivial_buffer_write_data1(struct pb_buffer * const buffer,
        buffer->strategy->page_size : len :
        len;
 
-    write_len = pb_buffer_reserve(buffer, write_len);
+    write_len = pb_buffer_extend(buffer, write_len);
 
     if (!pb_buffer_iterator_is_end(buffer, &buffer_iterator))
       pb_buffer_iterator_next(buffer, &buffer_iterator);
@@ -905,7 +905,7 @@ uint64_t pb_trivial_buffer_write_data2(struct pb_buffer * const buffer,
   pb_buffer_get_iterator_end(buffer, &buffer_iterator);
   pb_buffer_iterator_prev(buffer, &buffer_iterator);
 
-  len = pb_buffer_reserve(buffer, len);
+  len = pb_buffer_extend(buffer, len);
 
   if (!pb_buffer_iterator_is_end(buffer, &buffer_iterator))
     pb_buffer_iterator_next(buffer, &buffer_iterator);
@@ -1180,7 +1180,7 @@ uint64_t pb_trivial_buffer_write_buffer3(struct pb_buffer * const buffer,
       (src_buffer_iterator.page->data_vec.len - src_offset < write_len) ?
        src_buffer_iterator.page->data_vec.len - src_offset : write_len;
 
-    write_len = pb_buffer_reserve(buffer, write_len);
+    write_len = pb_buffer_extend(buffer, write_len);
 
     if (!pb_buffer_iterator_is_end(buffer, &buffer_iterator))
       pb_buffer_iterator_next(buffer, &buffer_iterator);
@@ -1227,7 +1227,7 @@ uint64_t pb_trivial_buffer_write_buffer4(struct pb_buffer * const buffer,
   struct pb_buffer_iterator src_buffer_iterator;
   pb_buffer_get_iterator(src_buffer, &src_buffer_iterator);
 
-  len = pb_buffer_reserve(buffer, len);
+  len = pb_buffer_extend(buffer, len);
 
   if (!pb_buffer_iterator_is_end(buffer, &buffer_iterator))
     pb_buffer_iterator_next(buffer, &buffer_iterator);
