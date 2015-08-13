@@ -169,19 +169,15 @@ const struct pb_data_operations *pb_get_trivial_data_operations(void);
 
 
 
-/** An implementation of pb_data using trivial operations and the supplied
- *  allocator. */
-struct pb_data *pb_trivial_data_create(
-                                   size_t len,
-                                   const struct pb_allocator *allocator);
+/** Trivial implementation of the pb_data operations. */
+struct pb_data *pb_trivial_data_create(size_t len,
+                                       const struct pb_allocator *allocator);
 
 struct pb_data *pb_trivial_data_create_ref(
-                                   const uint8_t *buf, size_t len,
-                                   const struct pb_allocator *allocator);
+                                       const uint8_t *buf, size_t len,
+                                       const struct pb_allocator *allocator);
 
 
-
-/** Trivial data operations. */
 void pb_trivial_data_get(struct pb_data * const data);
 void pb_trivial_data_put(struct pb_data * const data);
 
@@ -347,11 +343,7 @@ struct pb_buffer_operations {
   /** Return the amount of data in the buffer, in bytes. */
   uint64_t (*get_data_size)(struct pb_buffer * const buffer);
 
-  /** Create a pb_data instance.
-   *
-   * Use count is initialised to one, therefore returned data instance must
-   * be treated with the pb_data_put function when the creator is finished with
-   * it, whether it is passed to another owner or not.
+  /** Create a pb_page instance with accompanying pb_data.
    *
    * This is a private function and should not be called explicitly.
    *
@@ -359,15 +351,11 @@ struct pb_buffer_operations {
    * is_rewind indicates whether the region is to be placed at the beginning
    *           of the buffer in a rewind situation.
    */
-  struct pb_data *(*data_create)(struct pb_buffer * const buffer,
+  struct pb_page *(*page_create)(struct pb_buffer * const buffer,
                                  size_t len,
                                  bool is_rewind);
 
-  /** Create a pb_data instance.
-   *
-   * Use count is initialised to one, therefore returned data instance must
-   * be treated with the pb_data_put function when the creator is finished with
-   * it, whether it is passed to another owner or not.
+  /** Create a pb_page instance with accompanying pb_data.
    *
    * This is a private function and should not be called explicitly.
    *
@@ -376,9 +364,9 @@ struct pb_buffer_operations {
    * is_rewind indicates whether the region is to be placed at the beginning
    *           of the buffer in a rewind situation.
    *
-   * Memory region buf will not owned by the pb_data instance.
+   * Memory region buf will not owned by the accompanying pb_data instance.
    */
-  struct pb_data *(*data_create_ref)(
+  struct pb_page *(*page_create_ref)(
                                  struct pb_buffer * const buffer,
                                  const uint8_t *buf, size_t len,
                                  bool is_rewind);
@@ -417,7 +405,7 @@ struct pb_buffer_operations {
    * across multiple pages.
    */
   uint64_t (*extend)(struct pb_buffer * const buffer,
-                      uint64_t len);
+                     uint64_t len);
   /** Increases the size of the buffer by adding len bytes of data to the head.
    *
    * len indicates the amount of data to ad in bytes.
@@ -762,13 +750,14 @@ uint64_t pb_trivial_buffer_get_data_revision(
 uint64_t pb_trivial_buffer_get_data_size(struct pb_buffer * const buffer);
 
 
-struct pb_data *pb_trivial_buffer_data_create(struct pb_buffer * const buffer,
+struct pb_page *pb_trivial_buffer_page_create(struct pb_buffer * const buffer,
                                               size_t len,
                                               bool is_rewind);
-struct pb_data *pb_trivial_buffer_data_create_ref(
+struct pb_page *pb_trivial_buffer_page_create_ref(
                                               struct pb_buffer * const buffer,
                                               const uint8_t *buf, size_t len,
                                               bool is_rewind);
+
 
 uint64_t pb_trivial_buffer_insert(
                              struct pb_buffer * const buffer,
