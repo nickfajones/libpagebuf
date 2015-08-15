@@ -177,13 +177,13 @@ struct pb_page *pb_page_create(struct pb_data *data,
   if (!page)
     return NULL;
 
-  pb_data_get(data);
-
   page->data_vec.base = data->data_vec.base;
   page->data_vec.len = data->data_vec.len;
   page->data = data;
   page->prev = NULL;
   page->next = NULL;
+
+  pb_data_get(data);
 
   return page;
 }
@@ -196,13 +196,13 @@ struct pb_page *pb_page_transfer(const struct pb_page *src_page,
   if (!page)
     return NULL;
 
-  pb_data_get(src_page->data);
-
   page->data_vec.base = src_page->data_vec.base + src_off;
   page->data_vec.len = len;
   page->data = src_page->data;
   page->prev = NULL;
   page->next = NULL;
+
+  pb_data_get(src_page->data);
 
   return page;
 }
