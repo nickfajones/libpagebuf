@@ -270,6 +270,12 @@ do {                                                                            
     PB_HASH_ADD(hh,head,intfield,sizeof(int),add)
 #define PB_HASH_REPLACE_INT(head,intfield,add,replaced)                          \
     PB_HASH_REPLACE(hh,head,intfield,sizeof(int),add,replaced)
+#define PB_HASH_FIND_UINT64(head,findint,out)                                    \
+    PB_HASH_FIND(hh,head,findint,sizeof(uint64_t),out)
+#define PB_HASH_ADD_UINT64(head,intfield,add)                                    \
+    PB_HASH_ADD(hh,head,intfield,sizeof(uint64_t),add)
+#define PB_HASH_REPLACE_UINT64(head,intfield,add,replaced)                       \
+    PB_HASH_REPLACE(hh,head,intfield,sizeof(uint64_t),add,replaced)
 #define PB_HASH_FIND_PTR(head,findptr,out)                                       \
     PB_HASH_FIND(hh,head,findptr,sizeof(void *),out)
 #define PB_HASH_ADD_PTR(head,ptrfield,add)                                       \

@@ -29,13 +29,11 @@ extern "C" {
 
 /** Indicates which actions to take when opening and closing mmap'd files. */
 enum pb_mmap_open_action {
-  pb_mmap_open_action_none =                              0,
   pb_mmap_open_action_append =                            1,
   pb_mmap_open_action_overwrite =                         2,
 };
 
 enum pb_mmap_close_action {
-  pb_mmap_close_action_none =                             0,
   pb_mmap_close_action_retain =                           1,
   pb_mmap_close_action_remove =                           2,
 };
