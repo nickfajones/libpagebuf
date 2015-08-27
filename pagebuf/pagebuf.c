@@ -492,8 +492,10 @@ uint64_t pb_trivial_buffer_get_data_revision(struct pb_buffer * const buffer) {
 
 /*******************************************************************************
  */
-struct pb_page *pb_trivial_buffer_page_create(struct pb_buffer * const buffer,
-    size_t len, bool is_rewind) {
+struct pb_page *pb_trivial_buffer_page_create(
+    struct pb_buffer * const buffer,
+    size_t len,
+    bool is_rewind) {
   const struct pb_allocator *allocator = buffer->allocator;
 
   struct pb_data *data = pb_trivial_data_create(len, allocator);
