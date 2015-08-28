@@ -202,8 +202,8 @@ static uint64_t pb_mmap_allocator_get_data_size(
   }
 
   return
-    (mmap_allocator->file_head_offset < file_stat.st_size) ?
-     mmap_allocator->file_head_offset - file_stat.st_size : 0;
+    (file_stat.st_size > mmap_allocator->file_head_offset) ?
+     file_stat.st_size - mmap_allocator->file_head_offset : 0;
 }
 
 /*******************************************************************************
@@ -393,9 +393,25 @@ static uint64_t pb_mmap_allocator_extend(
     struct pb_mmap_allocator *mmap_allocator,
     size_t len) {
 
-
+  assert(0);
 
   return 0;
+}
+
+static uint64_t pb_mmap_allocator_seek(
+    struct pb_mmap_allocator *mmap_allocator,
+    size_t len) {
+  uint64_t file_size = pb_mmap_allocator_get_data_size(mmap_allocator);
+
+  if (len > file_size)
+    len = file_size;
+
+  mmap_allocator->file_head_offset += len;
+
+  if (mmap_allocator->file_tail_offset < mmap_allocator->file_head_offset)
+    mmap_allocator->file_tail_offset = mmap_allocator->file_head_offset;
+
+  return len;
 }
 
 /*******************************************************************************
@@ -421,25 +437,58 @@ static uint64_t pb_mmap_allocator_write_data_buffer(
     return 0;
 
   struct pb_buffer_iterator src_buffer_iterator;
-    pb_buffer_get_iterator(src_buffer, &src_buffer_iterator);
+  pb_buffer_get_iterator(src_buffer, &src_buffer_iterator);
 
   if (pb_buffer_iterator_is_end(src_buffer, &src_buffer_iterator))
     return 0;
 
-  int iovcnt = 0;
+  int iovpos = 0;
   int iovlim = 2;
 
   struct iovec *iov =
     pb_allocator_alloc(
       mmap_allocator->struct_allocator,
       pb_alloc_type_struct, sizeof(struct iovec) * iovlim);
+  if (!iov)
+    return 0;
 
-  while ((len > 0) &&
+  while ((iovpos < 1024) &&
+         (len > 0) &&
          (!pb_buffer_iterator_is_end(src_buffer, &src_buffer_iterator))) {
+    if (iovpos == iovlim) {
+      struct iovec *iov2 =
+        pb_allocator_alloc(
+          mmap_allocator->struct_allocator,
+          pb_alloc_type_struct, sizeof(struct iovec) * (iovlim * 2));
+      if (!iov2)
+        break;
 
+      memcpy(iov2, iov, sizeof(struct iovec) * iovlim);
+
+      pb_allocator_free(
+        mmap_allocator->struct_allocator,
+        pb_alloc_type_struct,
+        iov, sizeof(struct iovec) * iovlim);
+
+      iovlim = (iovlim * 2);
+
+      iov = iov2;
+    }
+
+    uint64_t iov_len =
+      (src_buffer_iterator.page->data_vec.len < len) ?
+       src_buffer_iterator.page->data_vec.len : len;
+
+    iov[iovpos].iov_base = src_buffer_iterator.page->data_vec.base;
+    iov[iovpos].iov_len = iov_len;
+
+    len -= iov_len;
+    ++iovpos;
+
+    pb_buffer_iterator_next(src_buffer, &src_buffer_iterator);
   }
 
-  ssize_t written = writev(mmap_allocator->file_fd, iov, iovcnt);
+  ssize_t written = writev(mmap_allocator->file_fd, iov, (iovpos + 1));
   if (written < 0)
     written = 0;
 
@@ -805,7 +854,12 @@ uint64_t pb_mmap_buffer_rewind(struct pb_buffer * const buffer,
 
 uint64_t pb_mmap_buffer_seek(struct pb_buffer * const buffer,
     uint64_t len) {
-  return pb_trivial_buffer_seek(buffer, len);
+  struct pb_mmap_allocator *mmap_allocator =
+    (struct pb_mmap_allocator*)buffer->allocator;
+
+  uint64_t seeked = pb_mmap_allocator_seek(mmap_allocator, len);
+
+  return pb_trivial_buffer_seek(buffer, seeked);
 }
 
 /*******************************************************************************
@@ -838,13 +892,13 @@ void pb_mmap_buffer_get_iterator_end(struct pb_buffer * const buffer,
 
 bool pb_mmap_buffer_iterator_is_end(struct pb_buffer * const buffer,
     struct pb_buffer_iterator * const buffer_iterator) {
-  return buffer->operations->iterator_is_end(buffer, buffer_iterator);
+  return pb_trivial_buffer_iterator_is_end(buffer, buffer_iterator);
 }
 
 bool pb_mmap_buffer_iterator_cmp(struct pb_buffer * const buffer,
     const struct pb_buffer_iterator *lvalue,
     const struct pb_buffer_iterator *rvalue) {
-  return buffer->operations->iterator_cmp(buffer, lvalue, rvalue);
+  return pb_trivial_buffer_iterator_cmp(buffer, lvalue, rvalue);
 }
 
 void pb_mmap_buffer_iterator_next(struct pb_buffer * const buffer,

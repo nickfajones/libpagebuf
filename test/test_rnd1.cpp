@@ -34,7 +34,8 @@
 
 #include <openssl/evp.h>
 
-#include <pagebuf/pagebuf.h>
+#include "pagebuf/pagebuf.h"
+#include "pagebuf/pagebuf_mmap.h"
 
 
 /*******************************************************************************
@@ -92,11 +93,11 @@ void read_stream(
  */
 class TestCase {
   public:
-    TestCase(
-        const std::string& description, const pb_buffer_strategy& strategy) :
+    TestCase(const std::string& description,
+        pb_buffer *buffer1, pb_buffer * buffer2) :
       description(description),
-      buffer1(pb_trivial_buffer_create_with_strategy(&strategy)),
-      buffer2(pb_trivial_buffer_create_with_strategy(&strategy)),
+      buffer1(buffer1),
+      buffer2(buffer2),
       md5ctx(new EVP_MD_CTX),
       digest(new unsigned char[EVP_MAX_MD_SIZE]),
       digest_len(0) {
@@ -297,7 +298,8 @@ int main(int argc, char **argv) {
   test_cases.push_back(
     new TestCase(
       "Standard heap sourced pb_buffer                                       ",
-      strategy));
+      pb_trivial_buffer_create_with_strategy(&strategy),
+      pb_trivial_buffer_create_with_strategy(&strategy)));
 
   strategy.page_size = PB_BUFFER_DEFAULT_PAGE_SIZE;
   strategy.clone_on_write = false;
@@ -306,7 +308,8 @@ int main(int argc, char **argv) {
   test_cases.push_back(
     new TestCase(
       "Standard heap sourced pb_buffer, fragment_as_target                   ",
-      strategy));
+      pb_trivial_buffer_create_with_strategy(&strategy),
+      pb_trivial_buffer_create_with_strategy(&strategy)));
 
   strategy.page_size = PB_BUFFER_DEFAULT_PAGE_SIZE;
   strategy.clone_on_write = true;
@@ -315,7 +318,8 @@ int main(int argc, char **argv) {
   test_cases.push_back(
     new TestCase(
       "Standard heap sourced pb_buffer, clone_on_Write                       ",
-      strategy));
+      pb_trivial_buffer_create_with_strategy(&strategy),
+      pb_trivial_buffer_create_with_strategy(&strategy)));
 
   strategy.page_size = PB_BUFFER_DEFAULT_PAGE_SIZE;
   strategy.clone_on_write = true;
@@ -324,7 +328,24 @@ int main(int argc, char **argv) {
   test_cases.push_back(
     new TestCase(
       "Standard heap sourced pb_buffer, clone_on_Write and fragment_on_target",
-      strategy));
+      pb_trivial_buffer_create_with_strategy(&strategy),
+      pb_trivial_buffer_create_with_strategy(&strategy)));
+
+  char buffer1_name[34];
+  char buffer2_name[34];
+
+  sprintf(buffer1_name, "/tmp/pb_test_rnd1_buffer1-%05d-1", getpid());
+  sprintf(buffer2_name, "/tmp/pb_test_rnd1_buffer1-%05d-2", getpid());
+
+  test_cases.push_back(
+    new TestCase(
+      "mmap file backed pb_buffer                                            ",
+      pb_mmap_buffer_create(
+        buffer1_name,
+        pb_mmap_open_action_overwrite, pb_mmap_close_action_remove),
+      pb_mmap_buffer_create(
+        buffer2_name,
+        pb_mmap_open_action_overwrite, pb_mmap_close_action_remove)));
 
   EVP_MD_CTX control_mdctx;
 
