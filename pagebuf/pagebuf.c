@@ -119,8 +119,8 @@ struct pb_data *pb_trivial_data_create(size_t len,
 
   data->use_count = 1;
 
-  data->allocator = allocator;
   data->operations = pb_get_trivial_data_operations();
+  data->allocator = allocator;
 
   return data;
 }
@@ -140,8 +140,8 @@ struct pb_data *pb_trivial_data_create_ref(const uint8_t *buf, size_t len,
 
   data->use_count = 1;
 
-  data->allocator = allocator;
   data->operations = pb_get_trivial_data_operations();
+  data->allocator = allocator;
 
   return data;
 }

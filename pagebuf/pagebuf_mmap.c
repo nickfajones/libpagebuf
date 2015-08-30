@@ -50,6 +50,8 @@ struct pb_mmap_data {
 
   uint64_t file_offset;
 
+  bool obsolete;
+
   UT_hash_handle hh;
 };
 
@@ -192,30 +194,36 @@ static struct pb_mmap_allocator *pb_mmap_allocator_create(const char *file_path,
 
 /***;****************************************************************************
  */
-static uint64_t pb_mmap_allocator_get_data_size(
+static uint64_t pb_mmap_allocator_get_file_size(
     struct pb_mmap_allocator *mmap_allocator) {
   struct stat file_stat;
   memset(&file_stat, 0, sizeof(struct stat));
 
-  if (fstat(mmap_allocator->file_fd, &file_stat) == -1) {
+  if (fstat(mmap_allocator->file_fd, &file_stat) == -1)
     return 0;
+
+  return file_stat.st_size;
   }
 
+static uint64_t pb_mmap_allocator_get_data_size(
+    struct pb_mmap_allocator *mmap_allocator) {
+  uint64_t file_size = pb_mmap_allocator_get_file_size(mmap_allocator);
+
   return
-    (file_stat.st_size > mmap_allocator->file_head_offset) ?
-     file_stat.st_size - mmap_allocator->file_head_offset : 0;
+    (file_size > mmap_allocator->file_head_offset) ?
+     file_size - mmap_allocator->file_head_offset : 0;
 }
 
 /*******************************************************************************
  */
 static struct pb_mmap_data *pb_mmap_allocator_data_create(
     struct pb_mmap_allocator *mmap_allocator,
-    uint64_t map_offset, size_t map_len) {
+    uint64_t mmap_offset, size_t mmap_len) {
   void *mmap_base =
     mmap64(
-      NULL, map_len,
+      NULL, mmap_len,
       PROT_READ | PROT_WRITE, MAP_SHARED,
-      mmap_allocator->file_fd, map_offset);
+      mmap_allocator->file_fd, mmap_offset);
   if (mmap_base == MAP_FAILED)
     return NULL;
 
@@ -224,20 +232,24 @@ static struct pb_mmap_data *pb_mmap_allocator_data_create(
       mmap_allocator->struct_allocator,
       pb_alloc_type_struct, sizeof(struct pb_mmap_data));
   if (!mmap_data) {
-    munmap(mmap_base, map_len);
+    munmap(mmap_base, mmap_len);
 
     return NULL;
   }
 
   mmap_data->data.data_vec.base = mmap_base;
-  mmap_data->data.data_vec.len = map_len;
+  mmap_data->data.data_vec.len = mmap_len;
+
+  mmap_data->data.responsibility = pb_data_referenced;
+
+  mmap_data->data.use_count = 1;
 
   mmap_data->data.operations = pb_get_mmap_data_operations();
   mmap_data->data.allocator = &mmap_allocator->allocator;
 
   mmap_data->mmap_allocator = mmap_allocator;
 
-  mmap_data->file_offset = map_offset;
+  mmap_data->file_offset = mmap_offset;
 
   pb_mmap_allocator_get(mmap_allocator);
 
@@ -247,7 +259,8 @@ static struct pb_mmap_data *pb_mmap_allocator_data_create(
 static void pb_mmap_allocator_data_destroy(
     struct pb_mmap_allocator *mmap_allocator,
     struct pb_mmap_data *mmap_data) {
-  PB_HASH_DEL(mmap_allocator->data_tree, mmap_data);
+  if (!mmap_data->obsolete)
+    PB_HASH_DEL(mmap_allocator->data_tree, mmap_data);
 
   munmap(mmap_data->data.data_vec.base, mmap_data->data.data_vec.len);
 
@@ -266,102 +279,56 @@ static struct pb_page *pb_mmap_allocator_page_create_forward(
   struct pb_mmap_data *mmap_data;
   struct pb_page *page;
 
-  uint64_t file_size = pb_mmap_allocator_get_data_size(mmap_allocator);
+  uint64_t file_size = pb_mmap_allocator_get_file_size(mmap_allocator);
   uint64_t file_offset = mmap_allocator->file_tail_offset;
-  uint64_t map_offset = file_offset % PB_MMAP_ALLOCATOR_BASE_MMAP_SIZE;
+  uint64_t mmap_offset =
+    (file_offset / PB_MMAP_ALLOCATOR_BASE_MMAP_SIZE) *
+       PB_MMAP_ALLOCATOR_BASE_MMAP_SIZE;
 
   if (file_offset == file_size)
     return NULL;
 
-  PB_HASH_FIND_UINT64(mmap_allocator->data_tree, &map_offset, mmap_data);
+  PB_HASH_FIND_UINT64(mmap_allocator->data_tree, &mmap_offset, mmap_data);
   if (mmap_data) {
-    size_t map_len = mmap_data->data.data_vec.len;
-    if ((map_offset + map_len) >= (file_offset + len)) {
-
-    } else if ((map_len < PB_MMAP_ALLOCATOR_BASE_MMAP_SIZE) &&
-               ((map_offset + map_len) < file_size)) {
-      map_len =
-        (PB_MMAP_ALLOCATOR_BASE_MMAP_SIZE < (file_size - map_offset)) ?
-         PB_MMAP_ALLOCATOR_BASE_MMAP_SIZE : (file_size - map_offset);
+    size_t mmap_len = mmap_data->data.data_vec.len;
+    if ((mmap_offset + mmap_len) >= (file_offset + len)) {
+      // temporary hold on the data
+      pb_data_get(&mmap_data->data);
+    } else if ((mmap_len < PB_MMAP_ALLOCATOR_BASE_MMAP_SIZE) &&
+               ((mmap_offset + mmap_len) < file_size)) {
+      mmap_len =
+        (PB_MMAP_ALLOCATOR_BASE_MMAP_SIZE < (file_size - mmap_offset)) ?
+         PB_MMAP_ALLOCATOR_BASE_MMAP_SIZE : (file_size - mmap_offset);
 
       struct pb_mmap_data *new_mmap_data =
-        pb_mmap_allocator_data_create(mmap_allocator, map_offset, map_len);
+        pb_mmap_allocator_data_create(mmap_allocator, mmap_offset, mmap_len);
       if (!new_mmap_data)
         return NULL;
 
-      pb_data_put(&mmap_data->data);
       PB_HASH_DEL(mmap_allocator->data_tree, mmap_data);
+      mmap_data->obsolete = true;
 
       mmap_data = new_mmap_data;
 
       PB_HASH_ADD_UINT64(mmap_allocator->data_tree, file_offset, mmap_data);
+      pb_data_get(&mmap_data->data);
     }
 
-    len = (map_offset + map_len) - file_offset;
+    len = (mmap_offset + mmap_len) - file_offset;
   } else {
-    size_t map_len =
-      (PB_MMAP_ALLOCATOR_BASE_MMAP_SIZE < (file_size - map_offset)) ?
-       PB_MMAP_ALLOCATOR_BASE_MMAP_SIZE : (file_size - map_offset);
+    size_t mmap_len =
+      (PB_MMAP_ALLOCATOR_BASE_MMAP_SIZE < (file_size - mmap_offset)) ?
+       PB_MMAP_ALLOCATOR_BASE_MMAP_SIZE : (file_size - mmap_offset);
 
     mmap_data =
-      pb_mmap_allocator_data_create(mmap_allocator, map_offset, map_len);
+      pb_mmap_allocator_data_create(mmap_allocator, mmap_offset, mmap_len);
     if (!mmap_data)
       return NULL;
 
     PB_HASH_ADD_UINT64(mmap_allocator->data_tree, file_offset, mmap_data);
+    pb_data_get(&mmap_data->data);
 
-    len = (map_offset + map_len) - file_offset;
-  }
-
-  page =
-    pb_allocator_alloc(
-      mmap_allocator->struct_allocator,
-      pb_alloc_type_struct, sizeof(struct pb_page));
-  if (!page)
-    return NULL;
-
-  page->data_vec.base = mmap_data->data.data_vec.base + (file_offset - map_offset);
-  page->data_vec.len = len;
-  page->data = &mmap_data->data;
-  page->prev = NULL;
-  page->next = NULL;
-
-  pb_data_get(&mmap_data->data);
-
-  mmap_allocator->file_tail_offset += len;
-
-  return page;
-}
-
-static struct pb_page *pb_mmap_allocator_page_create_reverse(
-    struct pb_mmap_allocator *mmap_allocator,
-    size_t len) {
-  struct pb_mmap_data *mmap_data;
-  struct pb_page *page;
-
-  uint64_t file_offset = mmap_allocator->file_head_offset;
-  uint64_t map_offset;
-
-  if (file_offset == 0)
-    return NULL;
-
-  map_offset = (file_offset > len) ? (file_offset - len) : 0;
-  map_offset = map_offset % PB_MMAP_ALLOCATOR_BASE_MMAP_SIZE;
-
-  PB_HASH_FIND_UINT64(mmap_allocator->data_tree, &map_offset, mmap_data);
-  if (mmap_data) {
-    len = file_offset - map_offset;
-  } else {
-    size_t map_len = PB_MMAP_ALLOCATOR_BASE_MMAP_SIZE;
-
-    mmap_data =
-      pb_mmap_allocator_data_create(mmap_allocator, map_offset, map_len);
-    if (!mmap_data)
-      return NULL;
-
-    PB_HASH_ADD_UINT64(mmap_allocator->data_tree, file_offset, mmap_data);
-
-    len = file_offset - map_offset;
+    len = (mmap_offset + mmap_len) - file_offset;
   }
 
   page =
@@ -374,7 +341,69 @@ static struct pb_page *pb_mmap_allocator_page_create_reverse(
     return NULL;
   }
 
-  page->data_vec.base = mmap_data->data.data_vec.base + (file_offset - map_offset);
+  page->data_vec.base = mmap_data->data.data_vec.base + (file_offset - mmap_offset);
+  page->data_vec.len = len;
+  page->data = &mmap_data->data;
+  page->prev = NULL;
+  page->next = NULL;
+
+  pb_data_get(&mmap_data->data);
+
+  mmap_allocator->file_tail_offset += len;
+
+  pb_data_put(&mmap_data->data);
+
+  return page;
+}
+
+static struct pb_page *pb_mmap_allocator_page_create_reverse(
+    struct pb_mmap_allocator *mmap_allocator,
+    size_t len) {
+  struct pb_mmap_data *mmap_data;
+  struct pb_page *page;
+
+  uint64_t file_offset = mmap_allocator->file_head_offset;
+  uint64_t mmap_offset;
+
+  if (file_offset == 0)
+    return NULL;
+
+  mmap_offset = (file_offset > len) ? (file_offset - len) : 0;
+  mmap_offset =
+    (mmap_offset / PB_MMAP_ALLOCATOR_BASE_MMAP_SIZE) *
+       PB_MMAP_ALLOCATOR_BASE_MMAP_SIZE;
+
+  PB_HASH_FIND_UINT64(mmap_allocator->data_tree, &mmap_offset, mmap_data);
+  if (mmap_data) {
+    // temporary hold on the data
+    pb_data_get(&mmap_data->data);
+
+    len = file_offset - mmap_offset;
+  } else {
+    size_t mmap_len = PB_MMAP_ALLOCATOR_BASE_MMAP_SIZE;
+
+    mmap_data =
+      pb_mmap_allocator_data_create(mmap_allocator, mmap_offset, mmap_len);
+    if (!mmap_data)
+      return NULL;
+
+    PB_HASH_ADD_UINT64(mmap_allocator->data_tree, file_offset, mmap_data);
+    pb_data_get(&mmap_data->data);
+
+    len = file_offset - mmap_offset;
+  }
+
+  page =
+    pb_allocator_alloc(
+      mmap_allocator->struct_allocator,
+      pb_alloc_type_struct, sizeof(struct pb_page));
+  if (!page) {
+    pb_data_put(&mmap_data->data);
+
+    return NULL;
+  }
+
+  page->data_vec.base = mmap_data->data.data_vec.base + (file_offset - mmap_offset);
   page->data_vec.len = len;
   page->data = &mmap_data->data;
   page->prev = NULL;
@@ -383,6 +412,8 @@ static struct pb_page *pb_mmap_allocator_page_create_reverse(
   pb_data_get(&mmap_data->data);
 
   mmap_allocator->file_head_offset -= len;
+
+  pb_data_put(&mmap_data->data);
 
   return page;
 }
@@ -401,10 +432,10 @@ static uint64_t pb_mmap_allocator_extend(
 static uint64_t pb_mmap_allocator_seek(
     struct pb_mmap_allocator *mmap_allocator,
     size_t len) {
-  uint64_t file_size = pb_mmap_allocator_get_data_size(mmap_allocator);
+  uint64_t data_size = pb_mmap_allocator_get_data_size(mmap_allocator);
 
-  if (len > file_size)
-    len = file_size;
+  if (len > data_size)
+    len = data_size;
 
   mmap_allocator->file_head_offset += len;
 
@@ -488,7 +519,7 @@ static uint64_t pb_mmap_allocator_write_data_buffer(
     pb_buffer_iterator_next(src_buffer, &src_buffer_iterator);
   }
 
-  ssize_t written = writev(mmap_allocator->file_fd, iov, (iovpos + 1));
+  ssize_t written = writev(mmap_allocator->file_fd, iov, iovpos);
   if (written < 0)
     written = 0;
 
@@ -566,8 +597,6 @@ static void pb_mmap_data_put(struct pb_data * const data) {
     return;
 
   pb_mmap_allocator_data_destroy(mmap_allocator, mmap_data);
-
-  pb_mmap_allocator_put(mmap_allocator);
 }
 
 
