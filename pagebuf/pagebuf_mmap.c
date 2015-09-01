@@ -537,6 +537,15 @@ static uint64_t pb_mmap_allocator_overwrite_data(
   return 0;
 }
 
+/*******************************************************************************
+ */
+static void pb_mmap_allocator_clear(struct pb_mmap_allocator *mmap_allocator) {
+  uint64_t file_size = pb_mmap_allocator_get_file_size(mmap_allocator);
+
+  mmap_allocator->file_head_offset = file_size;
+  mmap_allocator->file_tail_offset = file_size;
+}
+
 
 
 /*******************************************************************************
@@ -982,6 +991,12 @@ void pb_mmap_buffer_iterator_prev(struct pb_buffer * const buffer,
 uint64_t pb_mmap_buffer_write_data(struct pb_buffer * const buffer,
     const uint8_t *buf,
     uint64_t len) {
+  struct pb_mmap_buffer *mmap_buffer =
+    (struct pb_mmap_buffer*)buffer;
+
+  if (pb_buffer_get_data_size(buffer) == 0)
+    ++mmap_buffer->trivial_buffer.data_revision;
+
   struct pb_mmap_allocator *mmap_allocator =
     (struct pb_mmap_allocator*)buffer->allocator;
 
@@ -992,6 +1007,12 @@ uint64_t pb_mmap_buffer_write_data_ref(
     struct pb_buffer * const buffer,
     const uint8_t *buf,
     uint64_t len) {
+  struct pb_mmap_buffer *mmap_buffer =
+    (struct pb_mmap_buffer*)buffer;
+
+  if (pb_buffer_get_data_size(buffer) == 0)
+    ++mmap_buffer->trivial_buffer.data_revision;
+
   struct pb_mmap_allocator *mmap_allocator =
     (struct pb_mmap_allocator*)buffer->allocator;
 
@@ -1002,6 +1023,12 @@ uint64_t pb_mmap_buffer_write_buffer(
     struct pb_buffer * const buffer,
     struct pb_buffer * const src_buffer,
     uint64_t len) {
+  struct pb_mmap_buffer *mmap_buffer =
+    (struct pb_mmap_buffer*)buffer;
+
+  if (pb_buffer_get_data_size(buffer) == 0)
+    ++mmap_buffer->trivial_buffer.data_revision;
+
   struct pb_mmap_allocator *mmap_allocator =
     (struct pb_mmap_allocator*)buffer->allocator;
 
@@ -1022,6 +1049,11 @@ uint64_t pb_mmap_buffer_overwrite_data(
  */
 static void pb_mmap_buffer_clear(struct pb_buffer * const buffer) {
   pb_trivial_buffer_clear(buffer);
+
+  struct pb_mmap_allocator *mmap_allocator =
+    (struct pb_mmap_allocator*)buffer->allocator;
+
+  pb_mmap_allocator_clear(mmap_allocator);
 }
 
 static void pb_mmap_buffer_destroy(struct pb_buffer * const buffer) {

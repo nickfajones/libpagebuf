@@ -286,7 +286,6 @@ int main(int argc, char **argv) {
   std::list<TestCase*>::iterator test_itr;
   TestCase *test_case;
 
-  /*
   struct pb_buffer_strategy strategy;
   memset(&strategy, 0, sizeof(strategy));
 
@@ -331,7 +330,6 @@ int main(int argc, char **argv) {
       "Standard heap sourced pb_buffer, clone_on_Write and fragment_on_target",
       pb_trivial_buffer_create_with_strategy(&strategy),
       pb_trivial_buffer_create_with_strategy(&strategy)));
-*/
 
   char buffer1_name[34];
   char buffer2_name[34];
