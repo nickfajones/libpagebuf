@@ -483,25 +483,27 @@ static uint64_t pb_mmap_allocator_write_data_buffer(
   if (!iov)
     return 0;
 
-  while ((iovpos < 1024) &&
-         (len > 0) &&
+  while ((len > 0) &&
          (!pb_buffer_iterator_is_end(src_buffer, &src_buffer_iterator))) {
     if (iovpos == iovlim) {
+      if (iovlim == 1024)
+        break;
+
+      iovlim *= 2;
+
       struct iovec *iov2 =
         pb_allocator_alloc(
           mmap_allocator->struct_allocator,
-          pb_alloc_type_struct, sizeof(struct iovec) * (iovlim * 2));
+          pb_alloc_type_struct, sizeof(struct iovec) * iovlim);
       if (!iov2)
         break;
 
-      memcpy(iov2, iov, sizeof(struct iovec) * iovlim);
+      memcpy(iov2, iov, sizeof(struct iovec) * iovpos);
 
       pb_allocator_free(
         mmap_allocator->struct_allocator,
         pb_alloc_type_struct,
-        iov, sizeof(struct iovec) * iovlim);
-
-      iovlim = (iovlim * 2);
+        iov, sizeof(struct iovec) * iovpos);
 
       iov = iov2;
     }
