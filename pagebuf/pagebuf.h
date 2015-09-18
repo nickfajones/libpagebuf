@@ -747,7 +747,18 @@ struct pb_buffer *pb_trivial_buffer_create_with_strategy_with_alloc(
 uint64_t pb_trivial_buffer_get_data_revision(
                                          struct pb_buffer * const buffer);
 
+void pb_trivial_buffer_increment_data_revision(
+                                         struct pb_buffer * const buffer);
+
+
 uint64_t pb_trivial_buffer_get_data_size(struct pb_buffer * const buffer);
+
+void pb_trivial_buffer_increment_data_size(
+                                         struct pb_buffer * const buffer,
+                                         uint64_t size);
+void pb_trivial_buffer_decrement_data_size(
+                                         struct pb_buffer * const buffer,
+                                         uint64_t size);
 
 
 struct pb_page *pb_trivial_buffer_page_create(struct pb_buffer * const buffer,

@@ -16,6 +16,21 @@
 
 #include "pagebuf_mmap.h"
 
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/mman.h>
+#include <sys/uio.h>
+#include <errno.h>
+#include <assert.h>
+#include <unistd.h>
+#include <stdbool.h>
+#include <fcntl.h>
+#include <string.h>
+
+
+
+/** Hashmap prepare and import
+ */
 #define pb_uthash_malloc(sz) \
   (pb_allocator_alloc( \
      mmap_allocator->struct_allocator, pb_alloc_type_struct, sz))
@@ -24,15 +39,6 @@
      mmap_allocator->struct_allocator, pb_alloc_type_struct, ptr, sz))
 #include "pagebuf_hash.h"
 
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <sys/mman.h>
-#include <sys/uio.h>
-#include <errno.h>
-#include <assert.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <string.h>
 
 
 /** Pre declare mmap_allocator.
@@ -997,7 +1003,8 @@ uint64_t pb_mmap_buffer_write_data(struct pb_buffer * const buffer,
     (struct pb_mmap_buffer*)buffer;
 
   if (pb_buffer_get_data_size(buffer) == 0)
-    ++mmap_buffer->trivial_buffer.data_revision;
+    pb_trivial_buffer_increment_data_revision(
+      &mmap_buffer->trivial_buffer.buffer);
 
   struct pb_mmap_allocator *mmap_allocator =
     (struct pb_mmap_allocator*)buffer->allocator;
@@ -1013,7 +1020,8 @@ uint64_t pb_mmap_buffer_write_data_ref(
     (struct pb_mmap_buffer*)buffer;
 
   if (pb_buffer_get_data_size(buffer) == 0)
-    ++mmap_buffer->trivial_buffer.data_revision;
+    pb_trivial_buffer_increment_data_revision(
+      &mmap_buffer->trivial_buffer.buffer);
 
   struct pb_mmap_allocator *mmap_allocator =
     (struct pb_mmap_allocator*)buffer->allocator;
@@ -1029,7 +1037,8 @@ uint64_t pb_mmap_buffer_write_buffer(
     (struct pb_mmap_buffer*)buffer;
 
   if (pb_buffer_get_data_size(buffer) == 0)
-    ++mmap_buffer->trivial_buffer.data_revision;
+    pb_trivial_buffer_increment_data_revision(
+      &mmap_buffer->trivial_buffer.buffer);
 
   struct pb_mmap_allocator *mmap_allocator =
     (struct pb_mmap_allocator*)buffer->allocator;

@@ -477,17 +477,39 @@ struct pb_buffer *pb_trivial_buffer_create_with_strategy_with_alloc(
 
 /*******************************************************************************
  */
-static void pb_trivial_buffer_increment_data_revision(
-    struct pb_buffer * const buffer) {
+uint64_t pb_trivial_buffer_get_data_revision(struct pb_buffer * const buffer) {
+  struct pb_trivial_buffer *trivial_buffer = (struct pb_trivial_buffer*)buffer;
+
+  return trivial_buffer->data_revision;
+}
+
+void pb_trivial_buffer_increment_data_revision(
+  struct pb_buffer * const buffer) {
   struct pb_trivial_buffer *trivial_buffer = (struct pb_trivial_buffer*)buffer;
 
   ++trivial_buffer->data_revision;
 }
 
-uint64_t pb_trivial_buffer_get_data_revision(struct pb_buffer * const buffer) {
+/*******************************************************************************
+ */
+uint64_t pb_trivial_buffer_get_data_size(struct pb_buffer * const buffer) {
   struct pb_trivial_buffer *trivial_buffer = (struct pb_trivial_buffer*)buffer;
 
-  return trivial_buffer->data_revision;
+  return trivial_buffer->data_size;
+}
+
+void pb_trivial_buffer_increment_data_size(
+  struct pb_buffer * const buffer, uint64_t size) {
+  struct pb_trivial_buffer *trivial_buffer = (struct pb_trivial_buffer*)buffer;
+
+  trivial_buffer->data_size += size;
+}
+
+void pb_trivial_buffer_decrement_data_size(
+  struct pb_buffer * const buffer, uint64_t size) {
+  struct pb_trivial_buffer *trivial_buffer = (struct pb_trivial_buffer*)buffer;
+
+  trivial_buffer->data_size -= size;
 }
 
 /*******************************************************************************
@@ -536,27 +558,8 @@ struct pb_page *pb_trivial_buffer_page_create_ref(
   return page;
 }
 
-/*******************************************************************************
- */
-static void pb_trivial_buffer_increment_data_size(
-    struct pb_buffer * const buffer, uint64_t size) {
-  struct pb_trivial_buffer *trivial_buffer = (struct pb_trivial_buffer*)buffer;
 
-  trivial_buffer->data_size += size;
-}
 
-static void pb_trivial_buffer_decrement_data_size(
-    struct pb_buffer * const buffer, uint64_t size) {
-  struct pb_trivial_buffer *trivial_buffer = (struct pb_trivial_buffer*)buffer;
-
-  trivial_buffer->data_size -= size;
-}
-
-uint64_t pb_trivial_buffer_get_data_size(struct pb_buffer * const buffer) {
-  struct pb_trivial_buffer *trivial_buffer = (struct pb_trivial_buffer*)buffer;
-
-  return trivial_buffer->data_size;
-}
 
 /*******************************************************************************
  */
