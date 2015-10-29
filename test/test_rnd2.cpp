@@ -94,14 +94,16 @@ void read_stream(
 class TestCase {
   public:
     TestCase(const std::string& description,
-        pb_buffer *buffer1, pb_buffer * buffer2) :
+        pb_buffer *buffer1, pb_buffer * buffer2,
+        bool write_ref) :
       description(description),
       buffer1(buffer1),
       buffer2(buffer2),
       line_reader(pb_trivial_line_reader_create(buffer2)),
       md5ctx(new EVP_MD_CTX),
       digest(new unsigned char[EVP_MAX_MD_SIZE]),
-      digest_len(0) {
+      digest_len(0),
+      write_ref(write_ref) {
       EVP_MD_CTX_init(md5ctx);
       EVP_DigestInit_ex(md5ctx, EVP_md5(), NULL);
 
@@ -152,6 +154,8 @@ class TestCase {
 
     unsigned char *digest;
     unsigned int digest_len;
+
+    bool write_ref;
 };
 
 
@@ -161,6 +165,7 @@ class TestCase {
 class LineProfile {
   public:
     LineProfile(size_t len, bool has_cr) :
+      data(new uint8_t[len + ((has_cr) ? 2 : 1)]),
       len(len),
       full_len(len  + ((has_cr) ? 2 : 1)),
       has_cr(has_cr) {
@@ -168,12 +173,16 @@ class LineProfile {
 
   public:
     ~LineProfile() {
+      delete [] data;
+      data = NULL;
+
       len = 0;
       full_len = 0;
       has_cr = false;
     }
 
   public:
+    uint8_t *data;
     size_t len;
     size_t full_len;
 
@@ -220,7 +229,7 @@ void transfer_data(
 
 uint64_t read_lines(
     TestCase* test_case,
-    std::list<LineProfile*>& line_profiles,
+    std::list<LineProfile*> &line_profiles,
     uint8_t *read_buf, uint64_t read_buf_size,
     uint64_t total_transfer_size, uint64_t total_read_size) {
   uint64_t seek_size = 0;
@@ -317,9 +326,6 @@ int main(int argc, char **argv) {
   uint8_t *stream_source_buf = new uint8_t[STREAM_BUF_SIZE + 1];
   generate_stream_source_buf(stream_source_buf, STREAM_BUF_SIZE);
 
-  uint8_t *stream_buf = NULL;
-  uint64_t stream_buf_size = 0;
-
   uint64_t total_write_size = 0;
   uint64_t total_transfer_size = 0;
   uint64_t total_read_size = 0;
@@ -341,9 +347,17 @@ int main(int argc, char **argv) {
 
   test_cases.push_back(
     new TestCase(
-      "Standard heap sourced pb_buffer                                       ",
+      "Standard heap sourced pb_buffer                                                   ",
       pb_trivial_buffer_create_with_strategy(&strategy),
-      pb_trivial_buffer_create_with_strategy(&strategy)));
+      pb_trivial_buffer_create_with_strategy(&strategy),
+      false));
+
+  test_cases.push_back(
+    new TestCase(
+      "Standard heap sourced pb_buffer (write ref)                                       ",
+      pb_trivial_buffer_create_with_strategy(&strategy),
+      pb_trivial_buffer_create_with_strategy(&strategy),
+      true));
 
   strategy.page_size = PB_BUFFER_DEFAULT_PAGE_SIZE;
   strategy.clone_on_write = false;
@@ -351,9 +365,17 @@ int main(int argc, char **argv) {
 
   test_cases.push_back(
     new TestCase(
-      "Standard heap sourced pb_buffer, fragment_as_target                   ",
+      "Standard heap sourced pb_buffer, fragment_as_target                               ",
       pb_trivial_buffer_create_with_strategy(&strategy),
-      pb_trivial_buffer_create_with_strategy(&strategy)));
+      pb_trivial_buffer_create_with_strategy(&strategy),
+      false));
+
+  test_cases.push_back(
+    new TestCase(
+      "Standard heap sourced pb_buffer, fragment_as_target (write ref)                   ",
+      pb_trivial_buffer_create_with_strategy(&strategy),
+      pb_trivial_buffer_create_with_strategy(&strategy),
+      true));
 
   strategy.page_size = PB_BUFFER_DEFAULT_PAGE_SIZE;
   strategy.clone_on_write = true;
@@ -361,9 +383,17 @@ int main(int argc, char **argv) {
 
   test_cases.push_back(
     new TestCase(
-      "Standard heap sourced pb_buffer, clone_on_Write                       ",
+      "Standard heap sourced pb_buffer, clone_on_Write                                   ",
       pb_trivial_buffer_create_with_strategy(&strategy),
-      pb_trivial_buffer_create_with_strategy(&strategy)));
+      pb_trivial_buffer_create_with_strategy(&strategy),
+      false));
+
+  test_cases.push_back(
+    new TestCase(
+      "Standard heap sourced pb_buffer, clone_on_Write                                   ",
+      pb_trivial_buffer_create_with_strategy(&strategy),
+      pb_trivial_buffer_create_with_strategy(&strategy),
+      true));
 
   strategy.page_size = PB_BUFFER_DEFAULT_PAGE_SIZE;
   strategy.clone_on_write = true;
@@ -371,25 +401,34 @@ int main(int argc, char **argv) {
 
   test_cases.push_back(
     new TestCase(
-      "Standard heap sourced pb_buffer, clone_on_Write and fragment_on_target",
+      "Standard heap sourced pb_buffer, clone_on_Write and fragment_on_target            ",
       pb_trivial_buffer_create_with_strategy(&strategy),
-      pb_trivial_buffer_create_with_strategy(&strategy)));
+      pb_trivial_buffer_create_with_strategy(&strategy),
+      false));
+
+  test_cases.push_back(
+    new TestCase(
+      "Standard heap sourced pb_buffer, clone_on_Write and fragment_on_target (write ref)",
+      pb_trivial_buffer_create_with_strategy(&strategy),
+      pb_trivial_buffer_create_with_strategy(&strategy),
+      true));
 
   char buffer1_name[34];
   char buffer2_name[34];
 
-  sprintf(buffer1_name, "/tmp/pb_test_rnd2_buffer1-%05d-1", getpid());
-  sprintf(buffer2_name, "/tmp/pb_test_rnd2_buffer1-%05d-2", getpid());
+  sprintf(buffer1_name, "/tmp/pb_test_rnd1_buffer1-%05d-1", getpid());
+  sprintf(buffer2_name, "/tmp/pb_test_rnd1_buffer1-%05d-2", getpid());
 
   test_cases.push_back(
     new TestCase(
-      "mmap file backed pb_buffer                                            ",
+      "mmap file backed pb_buffer                                                        ",
       pb_mmap_buffer_create(
         buffer1_name,
         pb_mmap_open_action_overwrite, pb_mmap_close_action_remove),
       pb_mmap_buffer_create(
         buffer2_name,
-        pb_mmap_open_action_overwrite, pb_mmap_close_action_remove)));
+        pb_mmap_open_action_overwrite, pb_mmap_close_action_remove),
+      false));
 
   EVP_MD_CTX control_mdctx;
 
@@ -408,26 +447,20 @@ int main(int argc, char **argv) {
     line_profiles.push_back(
       new LineProfile((random() % 1024), ((random() % 2) == 1)));
 
+    uint8_t *write_buf = line_profiles.back()->data;
     size_t write_size = line_profiles.back()->len;
     size_t full_write_size = line_profiles.back()->full_len;
     bool write_has_cr = line_profiles.back()->has_cr;
 
-    if ((full_write_size) > stream_buf_size) {
-      if (stream_buf)
-        delete [] stream_buf;
-      stream_buf = new uint8_t[full_write_size];
-      stream_buf_size = full_write_size;
-    }
+    read_stream(stream_source_buf, STREAM_BUF_SIZE, write_buf, write_size);
 
-    read_stream(stream_source_buf, STREAM_BUF_SIZE, stream_buf, write_size);
-
-    EVP_DigestUpdate(&control_mdctx, stream_buf, write_size);
+    EVP_DigestUpdate(&control_mdctx, write_buf, write_size);
 
     if (write_has_cr) {
-      stream_buf[write_size] = '\r';
-      stream_buf[write_size + 1] = '\n';
+      write_buf[write_size] = '\r';
+      write_buf[write_size + 1] = '\n';
     } else {
-      stream_buf[write_size] = '\n';
+      write_buf[write_size] = '\n';
     }
 
     uint64_t transfer_size =
@@ -440,7 +473,7 @@ int main(int argc, char **argv) {
 
       write_line(
         test_case,
-        stream_buf, full_write_size,
+        write_buf, full_write_size,
         total_write_size, total_transfer_size);
     }
 
@@ -477,29 +510,33 @@ int main(int argc, char **argv) {
       ++complete_counter;
     }
 
-    for (test_itr = test_cases.begin();
-         test_itr != test_cases.end();
-         ++test_itr) {
-      test_case = *test_itr;
+    if (read_size > 0) {
+      uint8_t *read_buf = new uint8_t[read_size];
 
-      uint64_t seek_size = read_lines(
-        test_case,
-        line_profiles,
-        stream_buf, stream_buf_size,
-        total_transfer_size, total_read_size);
+      for (test_itr = test_cases.begin();
+           test_itr != test_cases.end();
+           ++test_itr) {
+        test_case = *test_itr;
 
-      assert(seek_size == read_size);
-    }
+        uint64_t seek_size = read_lines(
+          test_case,
+          line_profiles,
+          read_buf, read_size,
+          total_transfer_size, total_read_size);
 
-    total_read_size += read_size;
+        assert(seek_size == read_size);
+      }
 
-    while (complete_counter > 0) {
-      LineProfile *line_profile = line_profiles.front();
-      line_profiles.pop_front();
+      total_read_size += read_size;
 
-      delete line_profile;
+      while (complete_counter > 0) {
+        LineProfile *line_profile = line_profiles.front();
+        line_profiles.pop_front();
 
-      --complete_counter;
+        delete line_profile;
+
+        --complete_counter;
+      }
     }
 
     ++iterations;
@@ -542,27 +579,31 @@ int main(int argc, char **argv) {
       ++complete_counter;
     }
 
-    for (test_itr = test_cases.begin();
-         test_itr != test_cases.end();
-         ++test_itr) {
-      test_case = *test_itr;
+    if (read_size > 0) {
+      uint8_t *read_buf = new uint8_t[read_size];
 
-      uint64_t seek_size = read_lines(
-        test_case,
-        line_profiles,
-        stream_buf, stream_buf_size,
-        total_transfer_size, total_read_size);
+      for (test_itr = test_cases.begin();
+           test_itr != test_cases.end();
+           ++test_itr) {
+        test_case = *test_itr;
 
-      assert(seek_size == read_size);
-    }
+        uint64_t seek_size = read_lines(
+          test_case,
+          line_profiles,
+          read_buf, read_size,
+          total_transfer_size, total_read_size);
 
-    while (complete_counter > 0) {
-      LineProfile *line_profile = line_profiles.front();
-      line_profiles.pop_front();
+        assert(seek_size == read_size);
+      }
 
-      delete line_profile;
+      while (complete_counter > 0) {
+        LineProfile *line_profile = line_profiles.front();
+        line_profiles.pop_front();
 
-      --complete_counter;
+        delete line_profile;
+
+        --complete_counter;
+      }
     }
 
     total_read_size += read_size;
@@ -629,10 +670,6 @@ int main(int argc, char **argv) {
   }
 
   EVP_MD_CTX_cleanup(&control_mdctx);
-
-  delete [] stream_buf;
-  stream_buf = NULL;
-  stream_buf_size = 0;
 
   delete [] stream_source_buf;
   stream_source_buf = NULL;

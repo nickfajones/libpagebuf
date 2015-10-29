@@ -94,13 +94,15 @@ void read_stream(
 class TestCase {
   public:
     TestCase(const std::string& description,
-        pb_buffer *buffer1, pb_buffer * buffer2) :
+        pb_buffer *buffer1, pb_buffer * buffer2,
+        bool write_ref) :
       description(description),
       buffer1(buffer1),
       buffer2(buffer2),
       md5ctx(new EVP_MD_CTX),
       digest(new unsigned char[EVP_MAX_MD_SIZE]),
-      digest_len(0) {
+      digest_len(0),
+      write_ref(write_ref) {
       EVP_MD_CTX_init(md5ctx);
       EVP_DigestInit_ex(md5ctx, EVP_md5(), NULL);
 
@@ -154,13 +156,40 @@ class TestCase {
 
     unsigned char *digest;
     unsigned int digest_len;
+
+    bool write_ref;
 };
 
 
 
 /*******************************************************************************
  */
-void write_line(
+class DataProfile {
+  public:
+    explicit DataProfile(size_t len) :
+      data(new uint8_t[len]),
+      len(len)
+      {
+      }
+
+    ~DataProfile()
+      {
+      assert(len == 0);
+
+      delete [] data;
+      data = NULL;
+      }
+
+  public:
+    uint8_t *data;
+    size_t len;
+};
+
+
+
+/*******************************************************************************
+ */
+void write_data(
     TestCase* test_case,
     uint8_t *stream_buf, uint64_t full_write_size,
     uint64_t total_write_size, uint64_t total_transfer_size) {
@@ -168,7 +197,9 @@ void write_line(
   assert(current_size == (total_write_size - total_transfer_size));
 
   uint64_t written =
-    pb_buffer_write_data(test_case->buffer1, stream_buf, full_write_size);
+    (!test_case->write_ref) ?
+       pb_buffer_write_data(test_case->buffer1, stream_buf, full_write_size) :
+       pb_buffer_write_data_ref(test_case->buffer1, stream_buf, full_write_size);
   assert(written == full_write_size);
 
   current_size = pb_buffer_get_data_size(test_case->buffer1);
@@ -196,6 +227,7 @@ void transfer_data(
 
 uint64_t read_data(
     TestCase* test_case,
+    std::list<DataProfile*> &data_profiles,
     uint8_t *read_buf, uint64_t read_size,
     uint64_t total_transfer_size, uint64_t total_read_size) {
   uint64_t current_size = pb_buffer_get_data_size(test_case->buffer2);
@@ -275,9 +307,6 @@ int main(int argc, char **argv) {
   uint8_t *stream_source_buf = new uint8_t[STREAM_BUF_SIZE + 1];
   generate_stream_source_buf(stream_source_buf, STREAM_BUF_SIZE);
 
-  uint8_t *stream_buf = NULL;
-  uint64_t stream_buf_size = 0;
-
   uint64_t total_write_size = 0;
   uint64_t total_transfer_size = 0;
   uint64_t total_read_size = 0;
@@ -285,6 +314,8 @@ int main(int argc, char **argv) {
   std::list<TestCase*> test_cases;
   std::list<TestCase*>::iterator test_itr;
   TestCase *test_case;
+
+  std::list<DataProfile*> data_profiles;
 
   struct pb_buffer_strategy strategy;
   memset(&strategy, 0, sizeof(strategy));
@@ -297,9 +328,17 @@ int main(int argc, char **argv) {
 
   test_cases.push_back(
     new TestCase(
-      "Standard heap sourced pb_buffer                                       ",
+      "Standard heap sourced pb_buffer                                                   ",
       pb_trivial_buffer_create_with_strategy(&strategy),
-      pb_trivial_buffer_create_with_strategy(&strategy)));
+      pb_trivial_buffer_create_with_strategy(&strategy),
+      false));
+
+  test_cases.push_back(
+    new TestCase(
+      "Standard heap sourced pb_buffer (write ref)                                       ",
+      pb_trivial_buffer_create_with_strategy(&strategy),
+      pb_trivial_buffer_create_with_strategy(&strategy),
+      true));
 
   strategy.page_size = PB_BUFFER_DEFAULT_PAGE_SIZE;
   strategy.clone_on_write = false;
@@ -307,9 +346,17 @@ int main(int argc, char **argv) {
 
   test_cases.push_back(
     new TestCase(
-      "Standard heap sourced pb_buffer, fragment_as_target                   ",
+      "Standard heap sourced pb_buffer, fragment_as_target                               ",
       pb_trivial_buffer_create_with_strategy(&strategy),
-      pb_trivial_buffer_create_with_strategy(&strategy)));
+      pb_trivial_buffer_create_with_strategy(&strategy),
+      false));
+
+  test_cases.push_back(
+    new TestCase(
+      "Standard heap sourced pb_buffer, fragment_as_target (write ref)                   ",
+      pb_trivial_buffer_create_with_strategy(&strategy),
+      pb_trivial_buffer_create_with_strategy(&strategy),
+      true));
 
   strategy.page_size = PB_BUFFER_DEFAULT_PAGE_SIZE;
   strategy.clone_on_write = true;
@@ -317,9 +364,17 @@ int main(int argc, char **argv) {
 
   test_cases.push_back(
     new TestCase(
-      "Standard heap sourced pb_buffer, clone_on_Write                       ",
+      "Standard heap sourced pb_buffer, clone_on_Write                                   ",
       pb_trivial_buffer_create_with_strategy(&strategy),
-      pb_trivial_buffer_create_with_strategy(&strategy)));
+      pb_trivial_buffer_create_with_strategy(&strategy),
+      false));
+
+  test_cases.push_back(
+    new TestCase(
+      "Standard heap sourced pb_buffer, clone_on_Write                                   ",
+      pb_trivial_buffer_create_with_strategy(&strategy),
+      pb_trivial_buffer_create_with_strategy(&strategy),
+      true));
 
   strategy.page_size = PB_BUFFER_DEFAULT_PAGE_SIZE;
   strategy.clone_on_write = true;
@@ -327,9 +382,17 @@ int main(int argc, char **argv) {
 
   test_cases.push_back(
     new TestCase(
-      "Standard heap sourced pb_buffer, clone_on_Write and fragment_on_target",
+      "Standard heap sourced pb_buffer, clone_on_Write and fragment_on_target            ",
       pb_trivial_buffer_create_with_strategy(&strategy),
-      pb_trivial_buffer_create_with_strategy(&strategy)));
+      pb_trivial_buffer_create_with_strategy(&strategy),
+      false));
+
+  test_cases.push_back(
+    new TestCase(
+      "Standard heap sourced pb_buffer, clone_on_Write and fragment_on_target (write ref)",
+      pb_trivial_buffer_create_with_strategy(&strategy),
+      pb_trivial_buffer_create_with_strategy(&strategy),
+      true));
 
   char buffer1_name[34];
   char buffer2_name[34];
@@ -339,13 +402,14 @@ int main(int argc, char **argv) {
 
   test_cases.push_back(
     new TestCase(
-      "mmap file backed pb_buffer                                            ",
+      "mmap file backed pb_buffer                                                        ",
       pb_mmap_buffer_create(
         buffer1_name,
         pb_mmap_open_action_overwrite, pb_mmap_close_action_remove),
       pb_mmap_buffer_create(
         buffer2_name,
-        pb_mmap_open_action_overwrite, pb_mmap_close_action_remove)));
+        pb_mmap_open_action_overwrite, pb_mmap_close_action_remove),
+      false));
 
   EVP_MD_CTX control_mdctx;
 
@@ -361,31 +425,29 @@ int main(int argc, char **argv) {
   gettimeofday(&start_time, NULL);
 
   while (iterations < iterations_limit) {
-    size_t write_size = 64 + (random() % (4 * 1024));
-    if (write_size > stream_buf_size) {
-      delete [] stream_buf;
-      stream_buf = new uint8_t[write_size];
-      stream_buf_size = write_size;
-    }
+    data_profiles.push_back(new DataProfile(64 + (random() % (4 * 1024))));
 
-    read_stream(stream_source_buf, STREAM_BUF_SIZE, stream_buf, write_size);
+    uint8_t *write_buf = data_profiles.back()->data;
+    size_t write_size = data_profiles.back()->len;
 
-    EVP_DigestUpdate(&control_mdctx, stream_buf, write_size);
+    read_stream(stream_source_buf, STREAM_BUF_SIZE, write_buf, write_size);
+
+    EVP_DigestUpdate(&control_mdctx, write_buf, write_size);
 
     uint64_t transfer_size =
       random() % (total_write_size + write_size - total_transfer_size);
 
     uint64_t read_size =
-      random() & (total_transfer_size + transfer_size- total_read_size);
+      random() & (total_transfer_size + transfer_size - total_read_size);
 
     for (test_itr = test_cases.begin();
          test_itr != test_cases.end();
          ++test_itr) {
       test_case = *test_itr;
 
-      write_line(
+      write_data(
         test_case,
-        stream_buf, write_size,
+        write_buf, write_size,
         total_write_size, total_transfer_size);
     }
 
@@ -413,8 +475,24 @@ int main(int argc, char **argv) {
 
       read_data(
         test_case,
+        data_profiles,
         read_buf, read_size,
         total_transfer_size, total_read_size);
+    }
+
+    uint64_t used = read_size;
+    while (used > 0) {
+      DataProfile *data_profile = data_profiles.front();
+      size_t to_use = (data_profile->len < used) ? data_profile->len : used;
+
+      data_profile->len -= to_use;
+      if (data_profile->len == 0) {
+        data_profiles.pop_front();
+
+        delete data_profile;
+      }
+
+      used -= to_use;
     }
 
     total_read_size += read_size;
@@ -459,8 +537,24 @@ int main(int argc, char **argv) {
 
       read_data(
         test_case,
+        data_profiles,
         read_buf, read_size,
         total_transfer_size, total_read_size);
+    }
+
+    uint64_t used = read_size;
+    while (used > 0) {
+      DataProfile *data_profile = data_profiles.front();
+      size_t to_use = (data_profile->len < used) ? data_profile->len : used;
+
+      data_profile->len -= to_use;
+      if (data_profile->len == 0) {
+        data_profiles.pop_front();
+
+        delete data_profile;
+      }
+
+      used -= to_use;
     }
 
     total_read_size += read_size;
@@ -529,10 +623,6 @@ int main(int argc, char **argv) {
   }
 
   EVP_MD_CTX_cleanup(&control_mdctx);
-
-  delete [] stream_buf;
-  stream_buf = NULL;
-  stream_buf_size = 0;
 
   delete [] stream_source_buf;
   stream_source_buf = NULL;
