@@ -623,6 +623,8 @@ struct pb_buffer_operations {
    * necessary.
    */
   uint64_t (*insert_buffer)(struct pb_buffer * const buffer,
+                            struct pb_buffer_iterator * const buffer_iterator,
+                            size_t offset,
                             struct pb_buffer * const src_buffer,
                             uint64_t len);
 
@@ -762,6 +764,8 @@ uint64_t pb_buffer_insert_data_ref(
                                uint64_t len);
 uint64_t pb_buffer_insert_buffer(
                                struct pb_buffer * const buffer,
+                               struct pb_buffer_iterator * const buffer_iterator,
+                               size_t offset,
                                struct pb_buffer * const src_buffer,
                                uint64_t len);
 
@@ -936,6 +940,8 @@ uint64_t pb_trivial_buffer_insert_data_ref(
                                        uint64_t len);
 uint64_t pb_trivial_buffer_insert_buffer(
                                        struct pb_buffer * const buffer,
+                                       struct pb_buffer_iterator * const buffer_iterator,
+                                       size_t offset,
                                        struct pb_buffer * const src_buffer,
                                        uint64_t len);
 

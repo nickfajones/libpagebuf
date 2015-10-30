@@ -425,14 +425,19 @@ uint64_t pb_buffer_insert_data_ref(
     const uint8_t *buf,
     uint64_t len) {
   return
-    buffer->operations->insert_data_ref(buffer, buffer_iterator, offset, buf, len);
+    buffer->operations->insert_data_ref(
+      buffer, buffer_iterator, offset, buf, len);
 }
 
 uint64_t pb_buffer_insert_buffer(
     struct pb_buffer * const buffer,
+    struct pb_buffer_iterator * const buffer_iterator,
+    size_t offset,
     struct pb_buffer * const src_buffer,
     uint64_t len) {
-  return buffer->operations->insert_buffer(buffer, src_buffer, len);
+  return
+    buffer->operations->insert_buffer(
+      buffer, buffer_iterator, offset, src_buffer, len);
 }
 
 uint64_t pb_buffer_overwrite_data(struct pb_buffer * const buffer,
@@ -1367,6 +1372,8 @@ uint64_t pb_trivial_buffer_insert_data_ref(
 
 uint64_t pb_trivial_buffer_insert_buffer(
     struct pb_buffer * const buffer,
+    struct pb_buffer_iterator * const buffer_iterator,
+    size_t offset,
     struct pb_buffer * const src_buffer,
     uint64_t len) {
   return 0;
