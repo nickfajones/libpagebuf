@@ -520,7 +520,7 @@ struct pb_buffer_operations {
   uint64_t (*rewind)(
                    struct pb_buffer * const buffer,
                    uint64_t len);
-  /** Seek the buffer by len bytes.
+  /** Seek the buffer by len bytes starting at the beginning of the buffer.
    *
    * This is a private function and should not be called externally.
    *
@@ -532,7 +532,18 @@ struct pb_buffer_operations {
    */
   uint64_t (*seek)(struct pb_buffer * const buffer,
                    uint64_t len);
-
+  /** Trim the buffer by len bytes starting at the end of the buffer.
+   *
+   * This is a private function and should not be called externally.
+   *
+   * len indicates the amount of data to trim, in bytes.
+   *
+   * The trim operation may cause internal pages to be consumed depending on
+   * the buffer implementation details.  These pb_pages will be destroyed during
+   * the trim operation and their respective data 'put'd.
+   */
+  uint64_t (*trim)(struct pb_buffer * const buffer,
+                   uint64_t len);
 
   /** Write data from a memory region to the pb_buffer instance.
    *
@@ -737,6 +748,7 @@ uint64_t pb_buffer_extend(
 uint64_t pb_buffer_rewind(
                         struct pb_buffer * const buffer, uint64_t len);
 uint64_t pb_buffer_seek(struct pb_buffer * const buffer, uint64_t len);
+uint64_t pb_buffer_trim(struct pb_buffer * const buffer, uint64_t len);
 
 
 uint64_t pb_buffer_write_data(struct pb_buffer * const buffer,
@@ -911,6 +923,8 @@ uint64_t pb_trivial_buffer_rewind(
                                 struct pb_buffer * const buffer,
                                 uint64_t len);
 uint64_t pb_trivial_buffer_seek(struct pb_buffer * const buffer,
+                                uint64_t len);
+uint64_t pb_trivial_buffer_trim(struct pb_buffer * const buffer,
                                 uint64_t len);
 
 

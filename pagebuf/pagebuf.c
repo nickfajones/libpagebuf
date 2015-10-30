@@ -267,6 +267,7 @@ static struct pb_buffer_operations pb_trivial_buffer_operations = {
   .extend = &pb_trivial_buffer_extend,
   .rewind = &pb_trivial_buffer_rewind,
   .seek = &pb_trivial_buffer_seek,
+  .trim = &pb_trivial_buffer_trim,
 
   .write_data = &pb_trivial_buffer_write_data,
   .write_data_ref = &pb_trivial_buffer_write_data_ref,
@@ -387,6 +388,10 @@ uint64_t pb_buffer_rewind(struct pb_buffer * const buffer, uint64_t len) {
 
 uint64_t pb_buffer_seek(struct pb_buffer * const buffer, uint64_t len) {
   return buffer->operations->seek(buffer, len);
+}
+
+uint64_t pb_buffer_trim(struct pb_buffer * const buffer, uint64_t len) {
+  return buffer->operations->trim(buffer, len);
 }
 
 /*******************************************************************************
@@ -903,6 +908,12 @@ uint64_t pb_trivial_buffer_seek(struct pb_buffer * const buffer, uint64_t len) {
   }
 
   return seeked;
+}
+
+/*******************************************************************************
+ */
+uint64_t pb_trivial_buffer_trim(struct pb_buffer * const buffer, uint64_t len) {
+  return 0;
 }
 
 

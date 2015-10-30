@@ -750,10 +750,15 @@ static struct pb_buffer_operations pb_mmap_buffer_operations = {
   .extend = &pb_mmap_buffer_extend,
   .rewind = &pb_mmap_buffer_rewind,
   .seek = &pb_mmap_buffer_seek,
+  .trim = NULL,
 
   .write_data = &pb_mmap_buffer_write_data,
   .write_data_ref = &pb_mmap_buffer_write_data_ref,
   .write_buffer = &pb_mmap_buffer_write_buffer,
+
+  .insert_data = &pb_trivial_buffer_insert_data,
+  .insert_data_ref = &pb_trivial_buffer_insert_data_ref,
+  .insert_buffer = &pb_trivial_buffer_insert_buffer,
 
   .overwrite_data = &pb_trivial_buffer_overwrite_data,
 
@@ -883,6 +888,7 @@ uint64_t pb_mmap_buffer_insert(struct pb_buffer * const buffer,
     struct pb_buffer_iterator * const buffer_iterator,
     size_t offset,
     struct pb_page * const page) {
+  assert(0);
   return pb_trivial_buffer_insert(buffer, buffer_iterator, offset, page);
 }
 
