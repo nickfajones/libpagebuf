@@ -1,9 +1,12 @@
-ACLOCAL_AMFLAGS=-I m4
+ACLOCAL_AMFLAGS = -I m4
 
-SUBDIRS=$(GENERIC_LIBRARY_NAME) test
+SUBDIRS = pagebuf test
 
-DIST_SUBDIRS=$(GENERIC_LIBRARY_NAME) test
-EXTRA_DIST=LICENSE NOTICE
+DIST_SUBDIRS = pagebuf test
+EXTRA_DIST = LICENSE NOTICE
 
-pkgconfigdir=$(libdir)/pkgconfig
-pkgconfig_DATA=pagebuf.pc
+pkgconfigdir = $(libdir)/pkgconfig
+pkgconfig_DATA = pagebuf.pc
+
+test: all
+	@(cd test && $(MAKE) $@)

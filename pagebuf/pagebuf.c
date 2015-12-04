@@ -47,7 +47,7 @@ static void *pb_trivial_alloc(const struct pb_allocator *allocator,
     memset(obj, 0, size);
 
   return obj;
-};
+}
 
 static void pb_trivial_free(const struct pb_allocator *allocator,
     enum pb_allocator_type type, void *obj, size_t size) {

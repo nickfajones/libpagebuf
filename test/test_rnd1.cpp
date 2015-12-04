@@ -371,7 +371,7 @@ int main(int argc, char **argv) {
 
   test_cases.push_back(
     new TestCase(
-      "Standard heap sourced pb_buffer, clone_on_Write                                   ",
+      "Standard heap sourced pb_buffer, clone_on_Write (write ref)                       ",
       pb_trivial_buffer_create_with_strategy(&strategy),
       pb_trivial_buffer_create_with_strategy(&strategy),
       true));
