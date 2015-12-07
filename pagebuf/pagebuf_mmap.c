@@ -426,15 +426,6 @@ static struct pb_page *pb_mmap_allocator_page_create_reverse(
 
 /*******************************************************************************
  */
-static uint64_t pb_mmap_allocator_extend(
-    struct pb_mmap_allocator *mmap_allocator,
-    size_t len) {
-
-  assert(0);
-
-  return 0;
-}
-
 static uint64_t pb_mmap_allocator_seek(
     struct pb_mmap_allocator *mmap_allocator,
     size_t len) {
@@ -894,14 +885,13 @@ uint64_t pb_mmap_buffer_insert(struct pb_buffer * const buffer,
 
 uint64_t pb_mmap_buffer_extend(struct pb_buffer * const buffer,
     uint64_t len) {
-  struct pb_mmap_allocator *mmap_allocator =
-    (struct pb_mmap_allocator*)buffer->allocator;
-
-  return pb_mmap_allocator_extend(mmap_allocator, len);
+  assert(0);
+  return pb_trivial_buffer_extend(buffer, len);
 }
 
 uint64_t pb_mmap_buffer_rewind(struct pb_buffer * const buffer,
     uint64_t len) {
+  assert(0);
   return pb_trivial_buffer_rewind(buffer, len);
 }
 
