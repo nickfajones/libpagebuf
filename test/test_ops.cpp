@@ -100,10 +100,11 @@ class test_case_insert1 : public test_case<test_case_insert1> {
       pb_buffer_iterator buf_itr;
       pb_buffer_get_iterator(buffer, &buf_itr);
 
-      pb_buffer_insert_data(
-        buffer,
-        &buf_itr, 5,
-        reinterpret_cast<const uint8_t*>(input2), 4);
+      if (pb_buffer_insert_data(
+            buffer,
+            &buf_itr, 5,
+            reinterpret_cast<const uint8_t*>(input2), 4) != 5)
+        return 1;
 
       if (pb_buffer_get_data_size(buffer) != 26)
         return 1;
@@ -111,7 +112,7 @@ class test_case_insert1 : public test_case<test_case_insert1> {
       pb_buffer_byte_iterator byte_itr;
       pb_buffer_get_byte_iterator(buffer, &byte_itr);
 
-      for (int i = 0; i < 26; ++i) {
+      for (unsigned int i = 0; i < strlen(output); ++i) {
         if (*byte_itr.current_byte != output[i])
           return 1;
 
@@ -122,6 +123,42 @@ class test_case_insert1 : public test_case<test_case_insert1> {
     }
 };
 
+
+
+/*******************************************************************************
+ */
+class test_case_trim1 : public test_case<test_case_trim1> {
+  public:
+    static constexpr const char *input1 = "abcdefghijklmnopqrstuvwxyz";
+    static constexpr const char *output = "abcdefghijklmnop";
+
+  public:
+    virtual int run_test(struct pb_buffer *buffer) {
+      pb_buffer_clear(buffer);
+
+      pb_buffer_write_data(
+        buffer,
+        reinterpret_cast<const u_int8_t*>(input1), strlen(input1));
+
+      if (pb_buffer_trim(buffer, 10) != 10)
+        return 1;
+
+      if (pb_buffer_get_data_size(buffer) != 16)
+        return 1;
+
+      pb_buffer_byte_iterator byte_itr;
+      pb_buffer_get_byte_iterator(buffer, &byte_itr);
+
+      for (unsigned int i = 0; i < strlen(output); ++i) {
+        if (*byte_itr.current_byte != output[i])
+          return 1;
+
+        pb_buffer_byte_iterator_next(buffer, &byte_itr);
+      }
+
+      return 0;
+    }
+};
 
 
 /*******************************************************************************
@@ -175,8 +212,8 @@ int main(int argc, char **argv) {
   char buffer1_name[34];
   char buffer2_name[34];
 
-  sprintf(buffer1_name, "/tmp/pb_test_rnd2_buffer1-%05d-1", getpid());
-  sprintf(buffer2_name, "/tmp/pb_test_rnd2_buffer1-%05d-2", getpid());
+  sprintf(buffer1_name, "/tmp/pb_test_ops_buffer1-%05d-1", getpid());
+  sprintf(buffer2_name, "/tmp/pb_test_ops_buffer1-%05d-2", getpid());
 
   test_subjects.push_back(
     new test_subject(
@@ -186,6 +223,7 @@ int main(int argc, char **argv) {
         pb_mmap_open_action_overwrite, pb_mmap_close_action_remove)));
 
   test_case<test_case_insert1>::run_test(test_subjects);
+  test_case<test_case_trim1>::run_test(test_subjects);
 
   while (!test_subjects.empty()) {
     delete test_subjects.back();
