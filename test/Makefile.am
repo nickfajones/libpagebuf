@@ -15,8 +15,14 @@ test_ops_SOURCES = test_ops.cpp
 test_rnd1_SOURCES = test_rnd1.cpp
 test_rnd2_SOURCES = test_rnd2.cpp
 
-TESTS = test
+TESTS = test_ops test_rnd1 test_rnd2
 
-test: $(check_PROGRAMS)
+test: check
 	@echo
+
+test-compile-only: all-am
+	$(MAKE) $(AM_MAKEFLAGS) $(check_PROGRAMS)
+
+check-compile-only: all-am
+	$(MAKE) $(AM_MAKEFLAGS) ${check_PROGRAMS)
 
