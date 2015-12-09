@@ -913,7 +913,29 @@ uint64_t pb_trivial_buffer_seek(struct pb_buffer * const buffer, uint64_t len) {
 /*******************************************************************************
  */
 uint64_t pb_trivial_buffer_trim(struct pb_buffer * const buffer, uint64_t len) {
-  return 0;
+  struct pb_buffer_iterator buffer_iterator;
+  pb_buffer_get_iterator_end(buffer, &buffer_iterator);
+  pb_buffer_iterator_prev(buffer, &buffer_iterator);
+
+  uint64_t trimmed = 0;
+
+  while ((len > 0) &&
+         (!pb_buffer_iterator_is_end(buffer, &buffer_iterator))) {
+    size_t trim_len =
+      (buffer_iterator.page->data_vec.len < len) ?
+       buffer_iterator.page->data_vec.len : len;
+
+    buffer_iterator.page->data_vec.len -= trim_len;
+
+    len -= trim_len;
+    trimmed += trim_len;
+
+    pb_trivial_buffer_decrement_data_size(buffer, trim_len);
+
+    pb_buffer_iterator_prev(buffer, &buffer_iterator);
+  }
+
+  return trimmed;
 }
 
 

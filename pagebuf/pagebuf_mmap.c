@@ -442,6 +442,75 @@ static uint64_t pb_mmap_allocator_seek(
   return len;
 }
 
+static uint64_t pb_mmap_allocator_trim(
+    struct pb_mmap_allocator *mmap_allocator,
+    size_t len) {
+  uint64_t data_size = pb_mmap_allocator_get_data_size(mmap_allocator);
+  uint64_t data_end = data_size;
+  data_end = 0;
+
+  if (len > data_size)
+    len = data_size;
+
+  uint64_t trimmed =
+    ((data_size - mmap_allocator->file_tail_offset) < len) ?
+     (data_size - mmap_allocator->file_tail_offset) : len;
+
+  len -= trimmed;
+
+  while (len > 0) {
+    struct pb_mmap_data *mmap_data;
+
+    uint64_t file_offset = mmap_allocator->file_tail_offset;
+    uint64_t mmap_offset =
+      (file_offset / PB_MMAP_ALLOCATOR_BASE_MMAP_SIZE) *
+         PB_MMAP_ALLOCATOR_BASE_MMAP_SIZE;
+
+    size_t trim_len = 0;
+
+    PB_HASH_FIND_UINT64(mmap_allocator->data_tree, &mmap_offset, mmap_data);
+    if (mmap_data) {
+      size_t mmap_len = mmap_data->data.data_vec.len;
+
+      trim_len = (mmap_len < len) ? mmap_len : len;
+
+      if (trim_len < mmap_len) {
+        mmap_len -= trim_len;
+
+        struct pb_mmap_data *new_mmap_data =
+          pb_mmap_allocator_data_create(mmap_allocator, mmap_offset, mmap_len);
+        if (!new_mmap_data)
+          break;
+
+        PB_HASH_DEL(mmap_allocator->data_tree, mmap_data);
+        mmap_data->obsolete = true;
+
+        PB_HASH_ADD_UINT64(mmap_allocator->data_tree, file_offset, mmap_data);
+        pb_data_get(&mmap_data->data);
+      } else {
+        PB_HASH_DEL(mmap_allocator->data_tree, mmap_data);
+        mmap_data->obsolete = true;
+      }
+
+      pb_data_put(&mmap_data->data);
+    } else {
+      trim_len =
+        ((file_offset - mmap_offset) < len) ?
+         (file_offset - mmap_offset) : len;
+    }
+
+    len -= trim_len;
+    trimmed += trim_len;
+
+    mmap_allocator->file_tail_offset -= trim_len;
+  }
+
+  if (ftruncate64(mmap_allocator->file_fd, (data_size - trimmed)) == -1)
+    trimmed = 0;
+
+  return trimmed;
+}
+
 /*******************************************************************************
  */
 static uint64_t pb_mmap_allocator_write_data(
@@ -687,7 +756,9 @@ static uint64_t pb_mmap_buffer_extend(
 static uint64_t pb_mmap_buffer_rewind(
                                     struct pb_buffer * const buffer,
                                     uint64_t len);
-
+static uint64_t pb_mmap_buffer_trim(
+                                    struct pb_buffer * const buffer,
+                                    uint64_t len);
 
 uint64_t pb_mmap_buffer_write_data(struct pb_buffer * const buffer,
                                    const uint8_t *buf,
@@ -741,7 +812,7 @@ static struct pb_buffer_operations pb_mmap_buffer_operations = {
   .extend = &pb_mmap_buffer_extend,
   .rewind = &pb_mmap_buffer_rewind,
   .seek = &pb_mmap_buffer_seek,
-  .trim = NULL,
+  .trim = &pb_mmap_buffer_trim,
 
   .write_data = &pb_mmap_buffer_write_data,
   .write_data_ref = &pb_mmap_buffer_write_data_ref,
@@ -875,38 +946,6 @@ static struct pb_page *pb_mmap_buffer_page_create_ref(
 
 /*******************************************************************************
  */
-uint64_t pb_mmap_buffer_insert(struct pb_buffer * const buffer,
-    struct pb_buffer_iterator * const buffer_iterator,
-    size_t offset,
-    struct pb_page * const page) {
-  assert(0);
-  return pb_trivial_buffer_insert(buffer, buffer_iterator, offset, page);
-}
-
-uint64_t pb_mmap_buffer_extend(struct pb_buffer * const buffer,
-    uint64_t len) {
-  assert(0);
-  return pb_trivial_buffer_extend(buffer, len);
-}
-
-uint64_t pb_mmap_buffer_rewind(struct pb_buffer * const buffer,
-    uint64_t len) {
-  assert(0);
-  return pb_trivial_buffer_rewind(buffer, len);
-}
-
-uint64_t pb_mmap_buffer_seek(struct pb_buffer * const buffer,
-    uint64_t len) {
-  struct pb_mmap_allocator *mmap_allocator =
-    (struct pb_mmap_allocator*)buffer->allocator;
-
-  uint64_t seeked = pb_mmap_allocator_seek(mmap_allocator, len);
-
-  return pb_trivial_buffer_seek(buffer, seeked);
-}
-
-/*******************************************************************************
- */
 void pb_mmap_buffer_get_iterator(struct pb_buffer * const buffer,
     struct pb_buffer_iterator * const buffer_iterator) {
   pb_trivial_buffer_get_iterator(buffer, buffer_iterator);
@@ -989,6 +1028,48 @@ void pb_mmap_buffer_iterator_prev(struct pb_buffer * const buffer,
   }
 
   pb_trivial_buffer_get_iterator(buffer, buffer_iterator);
+}
+
+/*******************************************************************************
+ */
+uint64_t pb_mmap_buffer_insert(struct pb_buffer * const buffer,
+    struct pb_buffer_iterator * const buffer_iterator,
+    size_t offset,
+    struct pb_page * const page) {
+  assert(0);
+  return pb_trivial_buffer_insert(buffer, buffer_iterator, offset, page);
+}
+
+uint64_t pb_mmap_buffer_extend(struct pb_buffer * const buffer,
+    uint64_t len) {
+  assert(0);
+  return pb_trivial_buffer_extend(buffer, len);
+}
+
+uint64_t pb_mmap_buffer_rewind(struct pb_buffer * const buffer,
+    uint64_t len) {
+  assert(0);
+  return pb_trivial_buffer_rewind(buffer, len);
+}
+
+uint64_t pb_mmap_buffer_seek(struct pb_buffer * const buffer,
+    uint64_t len) {
+  struct pb_mmap_allocator *mmap_allocator =
+    (struct pb_mmap_allocator*)buffer->allocator;
+
+  uint64_t seeked = pb_mmap_allocator_seek(mmap_allocator, len);
+
+  return pb_trivial_buffer_seek(buffer, seeked);
+}
+
+uint64_t pb_mmap_buffer_trim(struct pb_buffer * const buffer,
+    uint64_t len) {
+  struct pb_mmap_allocator *mmap_allocator =
+    (struct pb_mmap_allocator*)buffer->allocator;
+
+  uint64_t trimmed = pb_trivial_buffer_trim(buffer, len);
+
+  return pb_mmap_allocator_trim(mmap_allocator, trimmed);
 }
 
 /*******************************************************************************
