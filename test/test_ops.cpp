@@ -164,19 +164,17 @@ class test_case_trim1 : public test_case<test_case_trim1> {
 /*******************************************************************************
  */
 int main(int argc, char **argv) {
-
   std::list<test_subject*> test_subjects;
   std::list<test_subject*>::iterator test_itr;
 
   struct pb_buffer_strategy strategy;
   memset(&strategy, 0, sizeof(strategy));
 
-  strategy.rejects_insert = false;
-
   strategy.page_size = PB_BUFFER_DEFAULT_PAGE_SIZE;
   strategy.clone_on_write = false;
   strategy.fragment_as_target = false;
 
+  /*
   test_subjects.push_back(
     new test_subject(
       "Standard heap sourced pb_buffer                                       ",
@@ -208,18 +206,17 @@ int main(int argc, char **argv) {
     new test_subject(
       "Standard heap sourced pb_buffer, clone_on_Write and fragment_on_target",
       pb_trivial_buffer_create_with_strategy(&strategy)));
+*/
 
-  char buffer1_name[34];
-  char buffer2_name[34];
+  char buffer_name[34];
 
-  sprintf(buffer1_name, "/tmp/pb_test_ops_buffer1-%05d-1", getpid());
-  sprintf(buffer2_name, "/tmp/pb_test_ops_buffer1-%05d-2", getpid());
+  sprintf(buffer_name, "/tmp/pb_test_ops_buffer-%05d", getpid());
 
   test_subjects.push_back(
     new test_subject(
       "mmap file backed pb_buffer                                            ",
       pb_mmap_buffer_create(
-        buffer1_name,
+        buffer_name,
         pb_mmap_open_action_overwrite, pb_mmap_close_action_remove)));
 
   test_case<test_case_insert1>::run_test(test_subjects);
@@ -227,7 +224,6 @@ int main(int argc, char **argv) {
 
   while (!test_subjects.empty()) {
     delete test_subjects.back();
-    test_subjects.back() = NULL;
     test_subjects.pop_back();
   }
 

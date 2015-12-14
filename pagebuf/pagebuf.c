@@ -701,6 +701,7 @@ void pb_trivial_buffer_byte_iterator_prev(struct pb_buffer * const buffer,
  */
 struct pb_page *pb_trivial_buffer_page_create(
     struct pb_buffer * const buffer,
+    struct pb_buffer_iterator * const buffer_iterator,
     size_t len,
     bool is_rewind) {
   const struct pb_allocator *allocator = buffer->allocator;
@@ -723,6 +724,7 @@ struct pb_page *pb_trivial_buffer_page_create(
 
 struct pb_page *pb_trivial_buffer_page_create_ref(
     struct pb_buffer * const buffer,
+    struct pb_buffer_iterator * const buffer_iterator,
     const uint8_t *buf, size_t len,
     bool is_rewind) {
   const struct pb_allocator *allocator = buffer->allocator;
@@ -807,21 +809,21 @@ uint64_t pb_trivial_buffer_extend(struct pb_buffer * const buffer,
   uint64_t extended = 0;
 
   while (len > 0) {
-    uint64_t extend_len =
-      (buffer->strategy->page_size != 0) ?
-      (buffer->strategy->page_size < len) ?
-      buffer->strategy->page_size : len :
-      len;
+    size_t extend_len =
+      ((buffer->strategy->page_size != 0) &&
+       (buffer->strategy->page_size < len)) ?
+      buffer->strategy->page_size : len;
+
+    struct pb_buffer_iterator buffer_iterator;
+    pb_buffer_get_iterator_end(buffer, &buffer_iterator);
 
     struct pb_page *page =
-      buffer->operations->page_create(buffer, extend_len, false);
+      buffer->operations->page_create(
+        buffer, &buffer_iterator, extend_len, false);
     if (!page)
       return extended;
 
-    struct pb_buffer_iterator end_buffer_iterator;
-    pb_buffer_get_iterator_end(buffer, &end_buffer_iterator);
-
-    extend_len = pb_buffer_insert(buffer, &end_buffer_iterator, 0, page);
+    extend_len = pb_buffer_insert(buffer, &buffer_iterator, 0, page);
     if (extend_len == 0)
       break;
 
@@ -842,18 +844,18 @@ uint64_t pb_trivial_buffer_rewind(struct pb_buffer * const buffer,
 
   while (len > 0) {
     uint64_t extend_len =
-      (buffer->strategy->page_size != 0) ?
-      (buffer->strategy->page_size < len) ?
-      buffer->strategy->page_size : len :
-      len;
-
-    struct pb_page *page =
-      buffer->operations->page_create(buffer, extend_len, false);
-    if (!page)
-      return rewinded;
+      ((buffer->strategy->page_size != 0) &&
+       (buffer->strategy->page_size < len)) ?
+      buffer->strategy->page_size : len;
 
     struct pb_buffer_iterator buffer_iterator;
     pb_buffer_get_iterator(buffer, &buffer_iterator);
+
+    struct pb_page *page =
+      buffer->operations->page_create(
+        buffer, &buffer_iterator, extend_len, true);
+    if (!page)
+      return rewinded;
 
     extend_len = pb_buffer_insert(buffer, &buffer_iterator, 0, page);
     if (extend_len == 0)
@@ -1048,7 +1050,8 @@ uint64_t pb_trivial_buffer_write_data_ref1(struct pb_buffer * const buffer,
     const uint8_t *buf,
     uint64_t len) {
   struct pb_page *page =
-    buffer->operations->page_create_ref(buffer, buf, len, false);
+    buffer->operations->page_create_ref(
+      buffer, buffer_iterator, buf, len, false);
   if (!page)
     return 0;
 
@@ -1080,7 +1083,7 @@ uint64_t pb_trivial_buffer_write_data_ref2(struct pb_buffer * const buffer,
 
     struct pb_page *page =
       buffer->operations->page_create_ref(
-        buffer, buf + written, write_len, false);
+        buffer, buffer_iterator, buf + written, write_len, false);
     if (!page)
       return 0;
 
@@ -1394,8 +1397,7 @@ uint64_t pb_trivial_buffer_insert_data(struct pb_buffer * const buffer,
   return 0;
 }
 
-uint64_t pb_trivial_buffer_insert_data_ref(
-    struct pb_buffer * const buffer,
+uint64_t pb_trivial_buffer_insert_data_ref(struct pb_buffer * const buffer,
     struct pb_buffer_iterator * const buffer_iterator,
     size_t offset,
     const uint8_t *buf,
@@ -1403,8 +1405,7 @@ uint64_t pb_trivial_buffer_insert_data_ref(
   return 0;
 }
 
-uint64_t pb_trivial_buffer_insert_buffer(
-    struct pb_buffer * const buffer,
+uint64_t pb_trivial_buffer_insert_buffer(struct pb_buffer * const buffer,
     struct pb_buffer_iterator * const buffer_iterator,
     size_t offset,
     struct pb_buffer * const src_buffer,

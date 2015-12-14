@@ -446,8 +446,6 @@ static uint64_t pb_mmap_allocator_trim(
     struct pb_mmap_allocator *mmap_allocator,
     size_t len) {
   uint64_t data_size = pb_mmap_allocator_get_data_size(mmap_allocator);
-  uint64_t data_end = data_size;
-  data_end = 0;
 
   if (len > data_size)
     len = data_size;
@@ -733,32 +731,34 @@ static void pb_mmap_buffer_iterator_prev(
 
 
 static struct pb_page *pb_mmap_buffer_page_create(
-                                    struct pb_buffer * const buffer,
-                                    size_t len,
-                                    bool is_rewind);
+                              struct pb_buffer * const buffer,
+                              struct pb_buffer_iterator * const buffer_iterator,
+                              size_t len,
+                              bool is_rewind);
 
 static struct pb_page *pb_mmap_buffer_page_create_ref(
-                                    struct pb_buffer * const buffer,
-                                    const uint8_t *buf, size_t len,
-                                    bool is_rewind);
+                              struct pb_buffer * const buffer,
+                              struct pb_buffer_iterator * const buffer_iterator,
+                              const uint8_t *buf, size_t len,
+                              bool is_rewind);
 
 
 static uint64_t pb_mmap_buffer_insert(
-                                    struct pb_buffer * const buffer,
-                                    struct pb_buffer_iterator * const buffer_iterator,
-                                    size_t offset,
-                                    struct pb_page * const page);
+                              struct pb_buffer * const buffer,
+                              struct pb_buffer_iterator * const buffer_iterator,
+                              size_t offset,
+                              struct pb_page * const page);
 static uint64_t pb_mmap_buffer_seek(struct pb_buffer * const buffer,
-                                    uint64_t len);
+                              uint64_t len);
 static uint64_t pb_mmap_buffer_extend(
-                                    struct pb_buffer * const buffer,
-                                    uint64_t len);
+                              struct pb_buffer * const buffer,
+                              uint64_t len);
 static uint64_t pb_mmap_buffer_rewind(
-                                    struct pb_buffer * const buffer,
-                                    uint64_t len);
+                              struct pb_buffer * const buffer,
+                              uint64_t len);
 static uint64_t pb_mmap_buffer_trim(
-                                    struct pb_buffer * const buffer,
-                                    uint64_t len);
+                              struct pb_buffer * const buffer,
+                              uint64_t len);
 
 uint64_t pb_mmap_buffer_write_data(struct pb_buffer * const buffer,
                                    const uint8_t *buf,
@@ -914,13 +914,16 @@ static uint64_t pb_mmap_buffer_get_data_size(struct pb_buffer * const buffer) {
  */
 static struct pb_page *pb_mmap_buffer_page_create(
     struct pb_buffer * const buffer,
+    struct pb_buffer_iterator * const buffer_iterator,
     size_t len,
     bool is_rewind) {
   struct pb_mmap_allocator *mmap_allocator =
     (struct pb_mmap_allocator*)buffer->allocator;
 
   struct pb_page *page =
-    pb_mmap_allocator_page_create_forward(mmap_allocator, len);
+    (!is_rewind) ?
+       pb_mmap_allocator_page_create_forward(mmap_allocator, len) :
+       pb_mmap_allocator_page_create_reverse(mmap_allocator, len);
   if (!page)
     return NULL;
 
@@ -929,13 +932,16 @@ static struct pb_page *pb_mmap_buffer_page_create(
 
 static struct pb_page *pb_mmap_buffer_page_create_ref(
     struct pb_buffer * const buffer,
+    struct pb_buffer_iterator * const buffer_iterator,
     const uint8_t *buf, size_t len,
     bool is_rewind) {
   struct pb_mmap_allocator *mmap_allocator =
     (struct pb_mmap_allocator*)buffer->allocator;
 
   struct pb_page *page =
-    pb_mmap_allocator_page_create_forward(mmap_allocator, len);
+    (!is_rewind) ?
+       pb_mmap_allocator_page_create_forward(mmap_allocator, len) :
+       pb_mmap_allocator_page_create_reverse(mmap_allocator, len);
   if (!page)
     return NULL;
 
@@ -1048,7 +1054,6 @@ uint64_t pb_mmap_buffer_extend(struct pb_buffer * const buffer,
 
 uint64_t pb_mmap_buffer_rewind(struct pb_buffer * const buffer,
     uint64_t len) {
-  assert(0);
   return pb_trivial_buffer_rewind(buffer, len);
 }
 

@@ -665,7 +665,6 @@ int main(int argc, char **argv) {
 
   while (!test_cases.empty()) {
     delete test_cases.back();
-    test_cases.back() = NULL;
     test_cases.pop_back();
   }
 

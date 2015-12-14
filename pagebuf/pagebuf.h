@@ -447,9 +447,11 @@ struct pb_buffer_operations {
    * is_rewind indicates whether the region is to be placed at the beginning
    *           of the buffer in a rewind situation.
    */
-  struct pb_page *(*page_create)(struct pb_buffer * const buffer,
-                                 size_t len,
-                                 bool is_rewind);
+  struct pb_page *(*page_create)(
+                             struct pb_buffer * const buffer,
+                             struct pb_buffer_iterator * const buffer_iterator,
+                             size_t len,
+                             bool is_rewind);
   /** Create a pb_page instance with accompanying pb_data.
    *
    * This is a private function and should not be called externally.
@@ -462,9 +464,10 @@ struct pb_buffer_operations {
    * Memory region buf will not owned by the accompanying pb_data instance.
    */
   struct pb_page *(*page_create_ref)(
-                                 struct pb_buffer * const buffer,
-                                 const uint8_t *buf, size_t len,
-                                 bool is_rewind);
+                             struct pb_buffer * const buffer,
+                             struct pb_buffer_iterator * const buffer_iterator,
+                             const uint8_t *buf, size_t len,
+                             bool is_rewind);
 
 
   /** Append a pb_page instance to the pb_buffer.
@@ -902,30 +905,33 @@ void pb_trivial_buffer_byte_iterator_prev(
                          struct pb_buffer_byte_iterator * const byte_iterator);
 
 
-struct pb_page *pb_trivial_buffer_page_create(struct pb_buffer * const buffer,
-                                              size_t len,
-                                              bool is_rewind);
+struct pb_page *pb_trivial_buffer_page_create(
+                              struct pb_buffer * const buffer,
+                              struct pb_buffer_iterator * const buffer_iterator,
+                              size_t len,
+                              bool is_rewind);
 struct pb_page *pb_trivial_buffer_page_create_ref(
-  struct pb_buffer * const buffer,
-  const uint8_t *buf, size_t len,
-  bool is_rewind);
+                              struct pb_buffer * const buffer,
+                              struct pb_buffer_iterator * const buffer_iterator,
+                              const uint8_t *buf, size_t len,
+                              bool is_rewind);
 
 
 uint64_t pb_trivial_buffer_insert(
-                                struct pb_buffer * const buffer,
-                                struct pb_buffer_iterator * const buffer_iterator,
-                                size_t offset,
-                                struct pb_page * const page);
+                              struct pb_buffer * const buffer,
+                              struct pb_buffer_iterator * const buffer_iterator,
+                              size_t offset,
+                              struct pb_page * const page);
 uint64_t pb_trivial_buffer_extend(
-                                struct pb_buffer * const buffer,
-                                uint64_t len);
+                              struct pb_buffer * const buffer,
+                              uint64_t len);
 uint64_t pb_trivial_buffer_rewind(
-                                struct pb_buffer * const buffer,
-                                uint64_t len);
+                              struct pb_buffer * const buffer,
+                              uint64_t len);
 uint64_t pb_trivial_buffer_seek(struct pb_buffer * const buffer,
-                                uint64_t len);
+                              uint64_t len);
 uint64_t pb_trivial_buffer_trim(struct pb_buffer * const buffer,
-                                uint64_t len);
+                              uint64_t len);
 
 
 uint64_t pb_trivial_buffer_write_data(struct pb_buffer * const buffer,
@@ -941,23 +947,24 @@ uint64_t pb_trivial_buffer_write_buffer(
                                       uint64_t len);
 
 
-uint64_t pb_trivial_buffer_insert_data(struct pb_buffer * const buffer,
-                                       struct pb_buffer_iterator * const buffer_iterator,
-                                       size_t offset,
-                                       const uint8_t *buf,
-                                       uint64_t len);
+uint64_t pb_trivial_buffer_insert_data(
+                              struct pb_buffer * const buffer,
+                              struct pb_buffer_iterator * const buffer_iterator,
+                              size_t offset,
+                              const uint8_t *buf,
+                              uint64_t len);
 uint64_t pb_trivial_buffer_insert_data_ref(
-                                       struct pb_buffer * const buffer,
-                                       struct pb_buffer_iterator * const buffer_iterator,
-                                       size_t offset,
-                                       const uint8_t *buf,
-                                       uint64_t len);
+                              struct pb_buffer * const buffer,
+                              struct pb_buffer_iterator * const buffer_iterator,
+                              size_t offset,
+                              const uint8_t *buf,
+                              uint64_t len);
 uint64_t pb_trivial_buffer_insert_buffer(
-                                       struct pb_buffer * const buffer,
-                                       struct pb_buffer_iterator * const buffer_iterator,
-                                       size_t offset,
-                                       struct pb_buffer * const src_buffer,
-                                       uint64_t len);
+                              struct pb_buffer * const buffer,
+                              struct pb_buffer_iterator * const buffer_iterator,
+                              size_t offset,
+                              struct pb_buffer * const src_buffer,
+                              uint64_t len);
 
 
 uint64_t pb_trivial_buffer_overwrite_data(struct pb_buffer * const buffer,
