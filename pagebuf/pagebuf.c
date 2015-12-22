@@ -1109,20 +1109,20 @@ uint64_t pb_trivial_buffer_write_data_ref(struct pb_buffer * const buffer,
   struct pb_buffer_iterator buffer_iterator;
   pb_buffer_get_iterator_end(buffer, &buffer_iterator);
 
-  if ((!buffer->strategy->clone_on_write) &&
-      (!buffer->strategy->fragment_as_target)) {
+  if (!buffer->strategy->clone_on_write &&
+      !buffer->strategy->fragment_as_target) {
     return
       pb_trivial_buffer_write_data_ref1(buffer, &buffer_iterator, 0, buf, len);
-  } else if ((!buffer->strategy->clone_on_write) &&
-             (buffer->strategy->fragment_as_target)) {
+  } else if (!buffer->strategy->clone_on_write &&
+              buffer->strategy->fragment_as_target) {
     return
       pb_trivial_buffer_write_data_ref2(buffer, &buffer_iterator, 0, buf, len);
-  } else if ((buffer->strategy->clone_on_write) &&
-             (!buffer->strategy->fragment_as_target)) {
+  } else if ( buffer->strategy->clone_on_write &&
+             !buffer->strategy->fragment_as_target) {
     return pb_trivial_buffer_write_data1(buffer, buf, len);
   }
-  /*else if ((buffer->strategy->clone_on_write) &&
-             (buffer->strategy->fragment_as_target)) {*/
+  /*else if (buffer->strategy->clone_on_write &&
+             buffer->strategy->fragment_as_target) {*/
   return pb_trivial_buffer_write_data2(buffer, buf, len);
 }
 
@@ -1365,18 +1365,18 @@ uint64_t pb_trivial_buffer_write_buffer4(struct pb_buffer * const buffer,
 uint64_t pb_trivial_buffer_write_buffer(struct pb_buffer * const buffer,
     struct pb_buffer * const src_buffer,
     uint64_t len) {
-  if ((!buffer->strategy->clone_on_write) &&
-      (!buffer->strategy->fragment_as_target)) {
+  if (!buffer->strategy->clone_on_write &&
+      !buffer->strategy->fragment_as_target) {
     return pb_trivial_buffer_write_buffer1(buffer, src_buffer, len);
-  } else if ((!buffer->strategy->clone_on_write) &&
-             (buffer->strategy->fragment_as_target)) {
+  } else if (!buffer->strategy->clone_on_write &&
+              buffer->strategy->fragment_as_target) {
     return pb_trivial_buffer_write_buffer2(buffer, src_buffer, len);
-  } else if ((buffer->strategy->clone_on_write) &&
-             (!buffer->strategy->fragment_as_target)) {
+  } else if ( buffer->strategy->clone_on_write &&
+             !buffer->strategy->fragment_as_target) {
     return pb_trivial_buffer_write_buffer3(buffer, src_buffer, len);
   }
-  /*else if ((buffer->strategy->clone_on_write) &&
-             (buffer->strategy->fragment_as_target)) {*/
+  /*else if (buffer->strategy->clone_on_write &&
+             buffer->strategy->fragment_as_target) {*/
   return pb_trivial_buffer_write_buffer4(buffer, src_buffer, len);
 }
 
