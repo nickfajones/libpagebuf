@@ -33,8 +33,6 @@ void pb_allocator_free(const struct pb_allocator *allocator,
   allocator->free(allocator, type, obj, size);
 }
 
-
-
 /*******************************************************************************
  */
 static void *pb_trivial_alloc(const struct pb_allocator *allocator,

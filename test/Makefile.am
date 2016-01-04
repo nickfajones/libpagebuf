@@ -1,5 +1,7 @@
 LDADD = $(top_builddir)/pagebuf/libpagebuf.la -lcrypto
 
+AM_LDFLAGS = -no-install
+
 AM_CFLAGS = -D_GNU_SOURCE -O0 -g3 -Wall -Wextra -std=gnu99 -pedantic \
   -Wextra -Wno-missing-field-initializers -Wshadow -Wpointer-arith \
   -Wstrict-prototypes -Wmissing-prototypes -Wno-unused-parameter
