@@ -1,5 +1,5 @@
 /*******************************************************************************
- *  Copyright 2015 Nick Jones <nick.fa.jones@gmail.com>
+ *  Copyright 2015, 2016 Nick Jones <nick.fa.jones@gmail.com>
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -33,9 +33,9 @@
  */
 class test_subject {
   public:
-    test_subject(const std::string& description, struct pb_buffer *buffer) :
+    test_subject(const std::string& description, struct pb_buffer *_buffer) :
       description(description),
-      buffer(buffer) {
+      buffer(_buffer) {
     }
 
     ~test_subject() {
@@ -85,13 +85,16 @@ int test_case<T>::result = 0;
  */
 class test_case_insert1 : public test_case<test_case_insert1> {
   public:
-    static constexpr const char *input1 = "abcdejklmnopqrstuvwxyz";
-    static constexpr const char *input2 = "fghi";
-    static constexpr const char *output = "abcdefghijklmnopqrstuvwxyz";
+    static const char *input1;
+    static const char *input2;
+    static const char *output;
 
   public:
     virtual int run_test(struct pb_buffer *buffer) {
       pb_buffer_clear(buffer);
+
+      if (buffer->strategy->rejects_insert)
+        return 0;
 
       pb_buffer_write_data(
         buffer,
@@ -123,14 +126,18 @@ class test_case_insert1 : public test_case<test_case_insert1> {
     }
 };
 
+const char *test_case_insert1::input1 = "abcdejklmnopqrstuvwxyz";
+const char *test_case_insert1::input2 = "fghi";
+const char *test_case_insert1::output = "abcdefghijklmnopqrstuvwxyz";
+
 
 
 /*******************************************************************************
  */
 class test_case_trim1 : public test_case<test_case_trim1> {
   public:
-    static constexpr const char *input1 = "abcdefghijklmnopqrstuvwxyz";
-    static constexpr const char *output = "abcdefghijklmnop";
+    static const char *input1;
+    static const char *output;
 
   public:
     virtual int run_test(struct pb_buffer *buffer) {
@@ -159,6 +166,10 @@ class test_case_trim1 : public test_case<test_case_trim1> {
       return 0;
     }
 };
+
+const char *test_case_trim1::input1 = "abcdefghijklmnopqrstuvwxyz";
+const char *test_case_trim1::output = "abcdefghijklmnop";
+
 
 
 /*******************************************************************************

@@ -1,5 +1,5 @@
 /*******************************************************************************
- *  Copyright 2013 Nick Jones <nick.fa.jones@gmail.com>
+ *  Copyright 2015, 2016 Nick Jones <nick.fa.jones@gmail.com>
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -21,7 +21,15 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/time.h>
+#ifndef __STDC_LIMIT_MACROS
+#define __STDC_LIMIT_MACROS
+#endif
+#include <stdint.h>
+#ifndef __STDC_FORMAT_MACROS
+#define __STDC_FORMAT_MACROS
+#endif
 #include <stdlib.h>
+#include <inttypes.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <string.h>
@@ -93,17 +101,17 @@ void read_stream(
  */
 class TestCase {
   public:
-    TestCase(const std::string& description,
-        pb_buffer *buffer1, pb_buffer * buffer2,
-        bool write_ref) :
-      description(description),
-      buffer1(buffer1),
-      buffer2(buffer2),
+    TestCase(const std::string& _description,
+        pb_buffer *_buffer1, pb_buffer * _buffer2,
+        bool _write_ref) :
+      description(_description),
+      buffer1(_buffer1),
+      buffer2(_buffer2),
       line_reader(pb_trivial_line_reader_create(buffer2)),
       md5ctx(new EVP_MD_CTX),
       digest(new unsigned char[EVP_MAX_MD_SIZE]),
       digest_len(0),
-      write_ref(write_ref) {
+      write_ref(_write_ref) {
       EVP_MD_CTX_init(md5ctx);
       EVP_DigestInit_ex(md5ctx, EVP_md5(), NULL);
 
@@ -164,11 +172,11 @@ class TestCase {
  */
 class LineProfile {
   public:
-    LineProfile(size_t len, bool has_cr) :
-      data(new uint8_t[len + ((has_cr) ? 2 : 1)]),
-      len(len),
-      full_len(len  + ((has_cr) ? 2 : 1)),
-      has_cr(has_cr) {
+    LineProfile(size_t _len, bool _has_cr) :
+      data(new uint8_t[_len + ((_has_cr) ? 2 : 1)]),
+      len(_len),
+      full_len(_len  + ((_has_cr) ? 2 : 1)),
+      has_cr(_has_cr) {
     }
 
   public:
@@ -659,7 +667,7 @@ int main(int argc, char **argv) {
   }
 
   printf(
-    "Total bytes transferred: %ld Bytes (%ld bps)\n",
+    "Total bytes transferred: %"PRIu64" Bytes (%"PRIu64" bps)\n",
       (total_read_size * test_cases.size()),
       (total_read_size * test_cases.size() * 8 * 1000) / millisecs);
 

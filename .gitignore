@@ -1,3 +1,4 @@
+/*~
 /Makefile
 /Makefile.in
 /aclocal.m4
@@ -37,3 +38,4 @@
 /test/Makefile
 /test/test_rnd1
 /test/test_rnd2
+/test/test_ops

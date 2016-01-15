@@ -7,10 +7,12 @@ c_sources = pagebuf.c pagebuf_mmap.c
 library_includedir = $(includedir)/$(GENERIC_LIBRARY_NAME)
 library_include_HEADERS = $(h_sources)
 
-AM_CPPFLAGS = -I$(top_srcdir)
-AM_CFLAGS = -D_GNU_SOURCE -Wall -Wextra -std=gnu99 -pedantic \
+AM_CPPFLAGS = -I$(top_srcdir) -D_GNU_SOURCE
+AM_CFLAGS = -Wall -Wextra -pedantic \
+  -Wstrict-overflow -fno-strict-aliasing \
   -Wno-missing-field-initializers -Wshadow -Wpointer-arith \
-  -Wstrict-prototypes -Wmissing-prototypes -Wno-unused-parameter
+  -Wstrict-prototypes -Wmissing-prototypes -Wno-unused-parameter \
+  -std=c99
 
 noinst_LTLIBRARIES = libpagebuf-c.la
 libpagebuf_c_la_SOURCES = $(h_sources) $(h_sources_private) $(c_sources)

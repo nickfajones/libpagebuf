@@ -1,5 +1,5 @@
 /*******************************************************************************
- *  Copyright 2015 Nick Jones <nick.fa.jones@gmail.com>
+ *  Copyright 2015, 2016 Nick Jones <nick.fa.jones@gmail.com>
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -20,6 +20,8 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <string.h>
+
+
 
 
 /*******************************************************************************
@@ -1732,7 +1734,7 @@ void pb_line_reader_terminate_line_check_cr(
   line_reader->operations->terminate_line_check_cr(line_reader);
 }
 
-uint64_t pb_line_reader_seek_line(struct pb_line_reader * const line_reader) {
+size_t pb_line_reader_seek_line(struct pb_line_reader * const line_reader) {
   return line_reader->operations->seek_line(line_reader);
 }
 
@@ -1868,7 +1870,7 @@ size_t pb_trivial_line_reader_get_line_data(
 
   size_t getted = 0;
 
-  uint64_t line_len = pb_line_reader_get_line_len(line_reader);
+  size_t line_len = pb_line_reader_get_line_len(line_reader);
 
   struct pb_buffer_iterator buffer_iterator;
   pb_buffer_get_iterator(buffer, &buffer_iterator);
@@ -1898,7 +1900,7 @@ size_t pb_trivial_line_reader_get_line_data(
 
 /*******************************************************************************
  */
-uint64_t pb_trivial_line_reader_seek_line(
+size_t pb_trivial_line_reader_seek_line(
     struct pb_line_reader * const line_reader) {
   struct pb_trivial_line_reader *trivial_line_reader =
     (struct pb_trivial_line_reader*)line_reader;
@@ -1911,7 +1913,7 @@ uint64_t pb_trivial_line_reader_seek_line(
   if (!trivial_line_reader->has_line)
     return 0;
 
-  uint64_t to_seek =
+  size_t to_seek =
     (trivial_line_reader->is_terminated) ?
       trivial_line_reader->buffer_offset :
       trivial_line_reader->buffer_offset + 1;

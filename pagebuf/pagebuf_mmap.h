@@ -79,7 +79,7 @@ struct pb_buffer *pb_mmap_buffer_create_with_alloc(const char *file_path,
 
 
 #ifdef __cplusplus
-}; /* extern "C" */
+} /* extern "C" */
 #endif
 
 #endif /* PAGEBUF_MMAP_H */

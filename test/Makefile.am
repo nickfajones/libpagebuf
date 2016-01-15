@@ -2,12 +2,12 @@ LDADD = $(top_builddir)/pagebuf/libpagebuf.la -lcrypto
 
 AM_LDFLAGS = -no-install
 
-AM_CFLAGS = -D_GNU_SOURCE -O0 -g3 -Wall -Wextra -std=gnu99 -pedantic \
-  -Wextra -Wno-missing-field-initializers -Wshadow -Wpointer-arith \
-  -Wstrict-prototypes -Wmissing-prototypes -Wno-unused-parameter
-
-AM_CPPFLAGS = -I$(top_srcdir) -I$(top_builddir)/pagebuf -Wno-write-strings \
-  -D_GNU_SOURCE -O0 -g3 -Wall -Wextra -Wno-unused-parameter
+AM_CPPFLAGS = -I$(top_srcdir) -I$(top_builddir)/pagebuf -D_GNU_SOURCE
+AM_CXXFLAGS = -Wall -Wextra -pedantic \
+  -Wstrict-overflow -fno-strict-aliasing \
+  -Wno-missing-field-initializers -Wshadow -Wpointer-arith \
+  -Wno-unused-parameter \
+  -std=c++0x
 
 AUTOMAKE_OPTIONS = subdir-objects
 EXTRA_DIST = files
