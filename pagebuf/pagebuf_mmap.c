@@ -455,34 +455,16 @@ static struct pb_page *pb_mmap_allocator_page_map_backward(
 
 /*******************************************************************************
  */
-static const uint8_t extend_buf[256] = {0};
-
-/*******************************************************************************
- */
 static uint64_t pb_mmap_allocator_extend(
     struct pb_mmap_allocator * const mmap_allocator,
     size_t len) {
-  int iovpos = len % 256;
-  int iovlim = (len + 255) / 256;
+  uint64_t file_size = pb_mmap_allocator_get_file_size(mmap_allocator);
+  file_size += len;
 
-  struct iovec *iov =
-    pb_allocator_alloc(
-      mmap_allocator->struct_allocator,
-      pb_alloc_type_struct, sizeof(struct iovec) * iovlim);
+  if (ftruncate64(mmap_allocator->file_fd, file_size) == -1)
+    return 0;
 
-    ...
-    
-    
-  ssize_t extended = writev(mmap_allocator->file_fd, iov, iovpos);
-  if (extended < 0)
-    extended = 0;
-
-  pb_allocator_free(
-    mmap_allocator->struct_allocator,
-    pb_alloc_type_struct,
-    iov, sizeof(struct iovec) * iovlim);
-
-  return extended;
+  return len;
 }
 
 static uint64_t pb_mmap_allocator_rewind(
@@ -1158,9 +1140,9 @@ uint64_t pb_mmap_buffer_trim(struct pb_buffer * const buffer,
   struct pb_mmap_allocator *mmap_allocator =
     (struct pb_mmap_allocator*)buffer->allocator;
 
-  uint64_t trimmed = pb_trivial_buffer_trim(buffer, len);
+  uint64_t trimmed = pb_mmap_allocator_trim(mmap_allocator, len);
 
-  pb_trivial_buffer_clear(mmap_allocator);
+  pb_trivial_buffer_clear(buffer);
 
   return trimmed;
 }

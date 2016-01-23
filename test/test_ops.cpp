@@ -19,6 +19,10 @@
 #endif
 
 #include <sys/types.h>
+#ifndef __STDC_FORMAT_MACROS
+#define __STDC_FORMAT_MACROS
+#endif
+#include <inttypes.h>
 #include <unistd.h>
 #include <string.h>
 
@@ -33,8 +37,8 @@
  */
 class test_subject {
   public:
-    test_subject(const std::string& description, struct pb_buffer *_buffer) :
-      description(description),
+    test_subject(const std::string& _description, struct pb_buffer *_buffer) :
+      description(_description),
       buffer(_buffer) {
     }
 

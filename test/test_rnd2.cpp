@@ -667,7 +667,7 @@ int main(int argc, char **argv) {
   }
 
   printf(
-    "Total bytes transferred: %"PRIu64" Bytes (%"PRIu64" bps)\n",
+    "Total bytes transferred: %" PRIu64 " Bytes (%" PRIu64 " bps)\n",
       (total_read_size * test_cases.size()),
       (total_read_size * test_cases.size() * 8 * 1000) / millisecs);
 
