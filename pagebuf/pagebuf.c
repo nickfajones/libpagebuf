@@ -574,6 +574,22 @@ void pb_trivial_buffer_increment_data_revision(
 uint64_t pb_trivial_buffer_get_data_size(struct pb_buffer * const buffer) {
   struct pb_trivial_buffer *trivial_buffer = (struct pb_trivial_buffer*)buffer;
 
+#ifndef NDEBUG
+  // Audit the data_size figure
+  uint64_t audit_size = 0;
+
+  struct pb_buffer_iterator buffer_iterator;
+  pb_trivial_buffer_get_iterator(buffer, &buffer_iterator);
+
+  while (!pb_trivial_buffer_iterator_is_end(buffer, &buffer_iterator)) {
+    audit_size += pb_buffer_iterator_get_len(&buffer_iterator);
+
+    pb_trivial_buffer_iterator_next(buffer, &buffer_iterator);
+  }
+
+  assert(audit_size == trivial_buffer->data_size);
+#endif
+
   return trivial_buffer->data_size;
 }
 
