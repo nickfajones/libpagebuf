@@ -992,6 +992,8 @@ uint64_t pb_trivial_buffer_read_data(struct pb_buffer * const buffer,
 
 
 void pb_trivial_buffer_clear(struct pb_buffer * const buffer);
+void pb_trivial_pure_buffer_clear(
+                             struct pb_buffer * const buffer);
 void pb_trivial_buffer_destroy(
                              struct pb_buffer * const buffer);
 

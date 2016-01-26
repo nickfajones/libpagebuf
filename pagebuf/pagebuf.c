@@ -1502,10 +1502,45 @@ uint64_t pb_trivial_buffer_read_data(struct pb_buffer * const buffer,
 
 /*******************************************************************************
  */
-void pb_trivial_buffer_clear(struct pb_buffer * const buffer) {
-  uint64_t data_size = pb_buffer_get_data_size(buffer);
+static void pb_trivial_buffer_clear_impl(struct pb_buffer * const buffer,
+    void (*get_iterator)(struct pb_buffer * const buffer,
+                         struct pb_buffer_iterator * const buffer_iterator),
+    bool (*iterator_is_end)(struct pb_buffer * const buffer,
+                            struct pb_buffer_iterator * const buffer_iterator),
+    void (*iterator_next)(struct pb_buffer * const buffer,
+                          struct pb_buffer_iterator * const buffer_iterator)) {
+  struct pb_buffer_iterator buffer_iterator;
+  get_iterator(buffer, &buffer_iterator);
 
-  pb_buffer_seek(buffer, data_size);
+  while (!iterator_is_end(buffer, &buffer_iterator)) {
+    struct pb_page *page = buffer_iterator.page;
+
+    iterator_next(buffer, &buffer_iterator);
+
+    page->prev->next = buffer_iterator.page;
+    buffer_iterator.page->prev = page->prev;
+
+    page->prev = NULL;
+    page->next = NULL;
+
+    pb_page_destroy(page, buffer->allocator);
+  }
+}
+
+void pb_trivial_buffer_clear(struct pb_buffer * const buffer) {
+  pb_trivial_buffer_clear_impl(
+    buffer,
+    &pb_buffer_get_iterator,
+    &pb_buffer_iterator_is_end,
+    &pb_buffer_iterator_next);
+}
+
+void pb_trivial_pure_buffer_clear(struct pb_buffer * const buffer) {
+  pb_trivial_buffer_clear_impl(
+    buffer,
+    &pb_trivial_buffer_get_iterator,
+    &pb_trivial_buffer_iterator_is_end,
+    &pb_trivial_buffer_iterator_next);
 }
 
 /*******************************************************************************

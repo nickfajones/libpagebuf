@@ -1118,7 +1118,7 @@ uint64_t pb_mmap_buffer_rewind(struct pb_buffer * const buffer,
 
   uint64_t rewinded = pb_mmap_allocator_rewind(mmap_allocator, len);
 
-  pb_trivial_buffer_clear(buffer);
+  pb_trivial_pure_buffer_clear(buffer);
 
   return rewinded;
 }
@@ -1130,7 +1130,7 @@ uint64_t pb_mmap_buffer_seek(struct pb_buffer * const buffer,
 
   uint64_t seeked = pb_mmap_allocator_seek(mmap_allocator, len);
 
-  pb_trivial_buffer_clear(buffer);
+  pb_trivial_pure_buffer_clear(buffer);
 
   return seeked;
 }
@@ -1142,7 +1142,7 @@ uint64_t pb_mmap_buffer_trim(struct pb_buffer * const buffer,
 
   uint64_t trimmed = pb_mmap_allocator_trim(mmap_allocator, len);
 
-  pb_trivial_buffer_clear(buffer);
+  pb_trivial_pure_buffer_clear(buffer);
 
   return trimmed;
 }
@@ -1212,7 +1212,7 @@ uint64_t pb_mmap_buffer_overwrite_data(
 /*******************************************************************************
  */
 static void pb_mmap_buffer_clear(struct pb_buffer * const buffer) {
-  pb_trivial_buffer_clear(buffer);
+  pb_trivial_pure_buffer_clear(buffer);
 
   struct pb_mmap_allocator *mmap_allocator =
     (struct pb_mmap_allocator*)buffer->allocator;
