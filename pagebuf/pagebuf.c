@@ -896,8 +896,6 @@ uint64_t pb_trivial_buffer_rewind(struct pb_buffer * const buffer,
 /*******************************************************************************
  */
 uint64_t pb_trivial_buffer_seek(struct pb_buffer * const buffer, uint64_t len) {
-  const struct pb_allocator *allocator = buffer->allocator;
-
   buffer->operations->increment_data_revision(buffer);
 
   uint64_t seeked = 0;
@@ -925,7 +923,7 @@ uint64_t pb_trivial_buffer_seek(struct pb_buffer * const buffer, uint64_t len) {
       page->prev = NULL;
       page->next = NULL;
 
-      pb_page_destroy(page, allocator);
+      pb_page_destroy(page, buffer->allocator);
     }
 
     len -= seek_len;
@@ -953,6 +951,20 @@ uint64_t pb_trivial_buffer_trim(struct pb_buffer * const buffer, uint64_t len) {
        pb_buffer_iterator_get_len(&buffer_iterator) : len;
 
     buffer_iterator.page->data_vec.len -= trim_len;
+
+    if (pb_buffer_iterator_get_len(&buffer_iterator) == 0) {
+      struct pb_page *page = buffer_iterator.page;
+
+      pb_buffer_iterator_prev(buffer, &buffer_iterator);
+
+      page->next->prev = buffer_iterator.page;
+      buffer_iterator.page->next = page->next;
+
+      page->prev = NULL;
+      page->next = NULL;
+
+      pb_page_destroy(page, buffer->allocator);
+    }
 
     len -= trim_len;
     trimmed += trim_len;
