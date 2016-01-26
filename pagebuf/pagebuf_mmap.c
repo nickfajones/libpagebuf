@@ -620,10 +620,10 @@ static uint64_t pb_mmap_allocator_write_data_buffer(
     }
 
     uint64_t iov_len =
-      (src_buffer_iterator.page->data_vec.len < len) ?
-       src_buffer_iterator.page->data_vec.len : len;
+      (pb_buffer_iterator_get_len(&src_buffer_iterator) < len) ?
+       pb_buffer_iterator_get_len(&src_buffer_iterator) : len;
 
-    iov[iovpos].iov_base = src_buffer_iterator.page->data_vec.base;
+    iov[iovpos].iov_base = pb_buffer_iterator_get_base(&src_buffer_iterator);
     iov[iovpos].iov_len = iov_len;
 
     len -= iov_len;

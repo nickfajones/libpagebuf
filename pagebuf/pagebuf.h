@@ -247,14 +247,28 @@ struct pb_buffer_iterator {
 
 
 
+/** Functional interfaces for the pb_buffer_iterator class. */
+uint8_t * pb_buffer_iterator_get_base(
+                             const struct pb_buffer_iterator *buffer_iterator);
+size_t pb_buffer_iterator_get_len(
+                             const struct pb_buffer_iterator *buffer_iterator);
+
+
+
 /** A structure used to iterate over buffer bytes. */
 struct pb_buffer_byte_iterator {
   struct pb_buffer_iterator buffer_iterator;
 
   size_t page_offset;
 
-  char *current_byte;
+  const char *current_byte;
 };
+
+
+
+/** Functional interfaces for the pb_buffer_byte_iterator class. */
+const char *pb_buffer_byte_iterator_get_current_byte(
+                   const struct pb_buffer_byte_iterator *buffer_byte_iterator);
 
 
 
