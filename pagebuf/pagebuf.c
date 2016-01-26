@@ -807,6 +807,9 @@ uint64_t pb_trivial_buffer_insert(struct pb_buffer * const buffer,
       offset = 0;
   }
 
+  if (!pb_buffer_iterator_is_end(buffer, buffer_iterator))
+    pb_trivial_buffer_increment_data_revision(buffer);
+
   struct pb_page *page1;
   struct pb_page *page2;
 
@@ -879,7 +882,7 @@ uint64_t pb_trivial_buffer_extend(struct pb_buffer * const buffer,
  */
 uint64_t pb_trivial_buffer_rewind(struct pb_buffer * const buffer,
     uint64_t len) {
-  buffer->operations->increment_data_revision(buffer);
+  pb_trivial_buffer_increment_data_revision(buffer);
 
   uint64_t rewinded = 0;
 
@@ -912,7 +915,7 @@ uint64_t pb_trivial_buffer_rewind(struct pb_buffer * const buffer,
 /*******************************************************************************
  */
 uint64_t pb_trivial_buffer_seek(struct pb_buffer * const buffer, uint64_t len) {
-  buffer->operations->increment_data_revision(buffer);
+  pb_trivial_buffer_increment_data_revision(buffer);
 
   uint64_t seeked = 0;
 
@@ -954,11 +957,13 @@ uint64_t pb_trivial_buffer_seek(struct pb_buffer * const buffer, uint64_t len) {
 /*******************************************************************************
  */
 uint64_t pb_trivial_buffer_trim(struct pb_buffer * const buffer, uint64_t len) {
+  pb_trivial_buffer_increment_data_revision(buffer);
+
+  uint64_t trimmed = 0;
+
   struct pb_buffer_iterator buffer_iterator;
   pb_buffer_get_iterator_end(buffer, &buffer_iterator);
   pb_buffer_iterator_prev(buffer, &buffer_iterator);
-
-  uint64_t trimmed = 0;
 
   while ((len > 0) &&
          (!pb_buffer_iterator_is_end(buffer, &buffer_iterator))) {
@@ -1005,7 +1010,7 @@ uint64_t pb_trivial_buffer_write_data1(struct pb_buffer * const buffer,
     const uint8_t *buf,
     uint64_t len) {
   if (pb_buffer_get_data_size(buffer) == 0)
-    buffer->operations->increment_data_revision(buffer);
+    pb_trivial_buffer_increment_data_revision(buffer);
 
   struct pb_buffer_iterator buffer_iterator;
   pb_buffer_get_iterator_end(buffer, &buffer_iterator);
@@ -1052,7 +1057,7 @@ uint64_t pb_trivial_buffer_write_data2(struct pb_buffer * const buffer,
     const uint8_t *buf,
     uint64_t len) {
   if (pb_buffer_get_data_size(buffer) == 0)
-    buffer->operations->increment_data_revision(buffer);
+    pb_trivial_buffer_increment_data_revision(buffer);
 
   struct pb_buffer_iterator buffer_iterator;
   pb_buffer_get_iterator_end(buffer, &buffer_iterator);
@@ -1199,7 +1204,7 @@ uint64_t pb_trivial_buffer_write_buffer1(struct pb_buffer * const buffer,
   const struct pb_allocator *allocator = buffer->allocator;
 
   if (pb_buffer_get_data_size(buffer) == 0)
-    buffer->operations->increment_data_revision(buffer);
+    pb_trivial_buffer_increment_data_revision(buffer);
 
   struct pb_buffer_iterator buffer_iterator;
   pb_buffer_get_iterator_end(buffer, &buffer_iterator);
@@ -1245,7 +1250,7 @@ uint64_t pb_trivial_buffer_write_buffer2(struct pb_buffer * const buffer,
   const struct pb_allocator *allocator = buffer->allocator;
 
   if (pb_buffer_get_data_size(buffer) == 0)
-    buffer->operations->increment_data_revision(buffer);
+    pb_trivial_buffer_increment_data_revision(buffer);
 
   struct pb_buffer_iterator buffer_iterator;
   pb_buffer_get_iterator_end(buffer, &buffer_iterator);
@@ -1302,7 +1307,7 @@ uint64_t pb_trivial_buffer_write_buffer3(struct pb_buffer * const buffer,
     struct pb_buffer * const src_buffer,
     uint64_t len) {
   if (pb_buffer_get_data_size(buffer) == 0)
-    buffer->operations->increment_data_revision(buffer);
+    pb_trivial_buffer_increment_data_revision(buffer);
 
   struct pb_buffer_iterator buffer_iterator;
   pb_buffer_get_iterator_end(buffer, &buffer_iterator);
@@ -1364,7 +1369,7 @@ uint64_t pb_trivial_buffer_write_buffer4(struct pb_buffer * const buffer,
     struct pb_buffer * const src_buffer,
     uint64_t len) {
   if (pb_buffer_get_data_size(buffer) == 0)
-    buffer->operations->increment_data_revision(buffer);
+    pb_trivial_buffer_increment_data_revision(buffer);
 
   struct pb_buffer_iterator buffer_iterator;
   pb_buffer_get_iterator_end(buffer, &buffer_iterator);
@@ -1451,7 +1456,7 @@ uint64_t pb_trivial_buffer_insert_data(struct pb_buffer * const buffer,
     return 0;
   }
 
-  buffer->operations->increment_data_revision(buffer);
+  pb_trivial_buffer_increment_data_revision(buffer);
 
   return 0;
 }
@@ -1477,7 +1482,7 @@ uint64_t pb_trivial_buffer_insert_buffer(struct pb_buffer * const buffer,
 uint64_t pb_trivial_buffer_overwrite_data(struct pb_buffer * const buffer,
     const uint8_t *buf,
     uint64_t len) {
-  buffer->operations->increment_data_revision(buffer);
+  pb_trivial_buffer_increment_data_revision(buffer);
 
   struct pb_buffer_iterator buffer_iterator;
   pb_buffer_get_iterator(buffer, &buffer_iterator);
@@ -1556,6 +1561,8 @@ static void pb_trivial_buffer_clear_impl(struct pb_buffer * const buffer,
 }
 
 void pb_trivial_buffer_clear(struct pb_buffer * const buffer) {
+  pb_trivial_buffer_increment_data_revision(buffer);
+
   pb_trivial_buffer_clear_impl(
     buffer,
     &pb_buffer_get_iterator,
@@ -1564,6 +1571,8 @@ void pb_trivial_buffer_clear(struct pb_buffer * const buffer) {
 }
 
 void pb_trivial_pure_buffer_clear(struct pb_buffer * const buffer) {
+  pb_trivial_buffer_increment_data_revision(buffer);
+
   pb_trivial_buffer_clear_impl(
     buffer,
     &pb_trivial_buffer_get_iterator,

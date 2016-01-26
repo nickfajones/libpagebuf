@@ -1152,12 +1152,8 @@ uint64_t pb_mmap_buffer_trim(struct pb_buffer * const buffer,
 uint64_t pb_mmap_buffer_write_data(struct pb_buffer * const buffer,
     const uint8_t *buf,
     uint64_t len) {
-  struct pb_mmap_buffer *mmap_buffer =
-    (struct pb_mmap_buffer*)buffer;
-
   if (pb_buffer_get_data_size(buffer) == 0)
-    buffer->operations->increment_data_revision(
-      &mmap_buffer->trivial_buffer.buffer);
+    pb_trivial_buffer_increment_data_revision(buffer);
 
   struct pb_mmap_allocator *mmap_allocator =
     (struct pb_mmap_allocator*)buffer->allocator;
@@ -1169,12 +1165,8 @@ uint64_t pb_mmap_buffer_write_data_ref(
     struct pb_buffer * const buffer,
     const uint8_t *buf,
     uint64_t len) {
-  struct pb_mmap_buffer *mmap_buffer =
-    (struct pb_mmap_buffer*)buffer;
-
   if (pb_buffer_get_data_size(buffer) == 0)
-    buffer->operations->increment_data_revision(
-      &mmap_buffer->trivial_buffer.buffer);
+    pb_trivial_buffer_increment_data_revision(buffer);
 
   struct pb_mmap_allocator *mmap_allocator =
     (struct pb_mmap_allocator*)buffer->allocator;
@@ -1186,12 +1178,8 @@ uint64_t pb_mmap_buffer_write_buffer(
     struct pb_buffer * const buffer,
     struct pb_buffer * const src_buffer,
     uint64_t len) {
-  struct pb_mmap_buffer *mmap_buffer =
-    (struct pb_mmap_buffer*)buffer;
-
   if (pb_buffer_get_data_size(buffer) == 0)
-    buffer->operations->increment_data_revision(
-      &mmap_buffer->trivial_buffer.buffer);
+    pb_trivial_buffer_increment_data_revision(buffer);
 
   struct pb_mmap_allocator *mmap_allocator =
     (struct pb_mmap_allocator*)buffer->allocator;
@@ -1203,6 +1191,8 @@ uint64_t pb_mmap_buffer_overwrite_data(
     struct pb_buffer * const buffer,
     const uint8_t *buf,
     uint64_t len) {
+  pb_trivial_buffer_increment_data_revision(buffer);
+
   struct pb_mmap_allocator *mmap_allocator =
     (struct pb_mmap_allocator*)buffer->allocator;
 
