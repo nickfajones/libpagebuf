@@ -3,7 +3,7 @@ LDADD = $(top_builddir)/pagebuf/libpagebuf.la -lcrypto
 AM_LDFLAGS = -no-install
 
 AM_CPPFLAGS = -I$(top_srcdir) -I$(top_builddir)/pagebuf -D_GNU_SOURCE
-AM_CXXFLAGS = -Wall -Wextra -pedantic \
+AM_CXXFLAGS = -Wall -Wextra \
   -Wstrict-overflow -fno-strict-aliasing \
   -Wno-missing-field-initializers -Wshadow -Wpointer-arith \
   -Wno-unused-parameter \
