@@ -1445,13 +1445,16 @@ uint64_t pb_trivial_buffer_insert_data(struct pb_buffer * const buffer,
     const uint8_t *buf,
     uint64_t len) {
   if (!buffer->strategy->rejects_insert &&
-      !pb_buffer_iterator_is_end(buffer, buffer_iterator)) {
+      !pb_buffer_iterator_is_end(buffer, buffer_iterator))
     return 0;
-  }
 
-  pb_trivial_buffer_increment_data_revision(buffer);
+  struct pb_page *page =
+    buffer->operations->page_create(
+      buffer, buffer_iterator, len, false);
+  if (!page)
+    return 0;
 
-  return 0;
+  return pb_buffer_insert(buffer, buffer_iterator, offset, page);
 }
 
 uint64_t pb_trivial_buffer_insert_data_ref(struct pb_buffer * const buffer,
@@ -1459,7 +1462,17 @@ uint64_t pb_trivial_buffer_insert_data_ref(struct pb_buffer * const buffer,
     size_t offset,
     const uint8_t *buf,
     uint64_t len) {
-  return 0;
+  if (!buffer->strategy->rejects_insert &&
+      !pb_buffer_iterator_is_end(buffer, buffer_iterator))
+    return 0;
+  
+  struct pb_page *page =
+    buffer->operations->page_create_ref(
+      buffer, buffer_iterator, buf, len, false);
+  if (!page)
+    return 0;
+  
+  return pb_buffer_insert(buffer, buffer_iterator, offset, page);
 }
 
 uint64_t pb_trivial_buffer_insert_buffer(struct pb_buffer * const buffer,
@@ -1467,7 +1480,38 @@ uint64_t pb_trivial_buffer_insert_buffer(struct pb_buffer * const buffer,
     size_t offset,
     struct pb_buffer * const src_buffer,
     uint64_t len) {
-  return 0;
+  const struct pb_allocator *allocator = buffer->allocator;
+
+  if (pb_buffer_get_data_size(buffer) == 0)
+    pb_trivial_buffer_increment_data_revision(buffer);
+
+  struct pb_buffer_iterator src_buffer_iterator;
+  pb_buffer_get_iterator(src_buffer, &src_buffer_iterator);
+
+  uint64_t inserted = 0;
+
+  while ((len > 0) &&
+         (!pb_buffer_iterator_is_end(src_buffer, &src_buffer_iterator))) {
+    uint64_t write_len =
+      (pb_buffer_iterator_get_len(&src_buffer_iterator) < len) ?
+       pb_buffer_iterator_get_len(&src_buffer_iterator) : len;
+
+    struct pb_page *page =
+      pb_page_transfer(src_buffer_iterator.page, write_len, 0, allocator);
+    if (!page)
+      return inserted;
+
+    write_len = pb_buffer_insert(buffer, buffer_iterator, offset, page);
+
+    offset = 0;
+
+    len -= write_len;
+    inserted += write_len;
+
+    pb_buffer_iterator_next(src_buffer, &src_buffer_iterator);
+  }
+
+  return inserted;
 }
 
 /*******************************************************************************
