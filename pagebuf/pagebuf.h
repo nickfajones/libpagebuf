@@ -839,7 +839,7 @@ struct pb_trivial_buffer {
  *
  * fragment_as_source is false
  *
- * supports_insert is true
+ * rejects_insert is false
  */
 const struct pb_buffer_strategy *pb_get_trivial_buffer_strategy(void);
 
