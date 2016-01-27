@@ -1454,7 +1454,7 @@ uint64_t pb_trivial_buffer_insert_data_ref(struct pb_buffer * const buffer,
       buffer, buffer_iterator, buf, len, false);
   if (!page)
     return 0;
-  
+
   return pb_buffer_insert(buffer, buffer_iterator, offset, page);
 }
 
@@ -1476,21 +1476,21 @@ uint64_t pb_trivial_buffer_insert_buffer(struct pb_buffer * const buffer,
 
   while ((len > 0) &&
          (!pb_buffer_iterator_is_end(src_buffer, &src_buffer_iterator))) {
-    uint64_t write_len =
+    uint64_t insert_len =
       (pb_buffer_iterator_get_len(&src_buffer_iterator) < len) ?
        pb_buffer_iterator_get_len(&src_buffer_iterator) : len;
 
     struct pb_page *page =
-      pb_page_transfer(src_buffer_iterator.page, write_len, 0, allocator);
+      pb_page_transfer(src_buffer_iterator.page, insert_len, 0, allocator);
     if (!page)
       return inserted;
 
-    write_len = pb_buffer_insert(buffer, buffer_iterator, offset, page);
+    insert_len = pb_buffer_insert(buffer, buffer_iterator, offset, page);
 
     offset = 0;
 
-    len -= write_len;
-    inserted += write_len;
+    len -= insert_len;
+    inserted += insert_len;
 
     pb_buffer_iterator_next(src_buffer, &src_buffer_iterator);
   }

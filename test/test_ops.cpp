@@ -60,11 +60,19 @@ class test_subject {
 
 /*******************************************************************************
  */
-template <typename T>
-class test_case {
+class test_base {
   public:
-    static int result;
+    static int final_result;
+};
 
+int test_base::final_result = 0;
+
+
+
+/*******************************************************************************
+ */
+template <typename T>
+class test_case : public test_base {
   public:
     virtual int run_test(struct pb_buffer *buffer) = 0;
 
@@ -75,13 +83,11 @@ class test_case {
       for (std::list<test_subject*>::const_iterator itr = test_subjects.begin();
            itr != test_subjects.end();
            ++itr) {
-        result |= test_case.run_test((*itr)->buffer);
+        int result = test_case.run_test((*itr)->buffer);
+        final_result = ((final_result == 0) && (result == 0)) ? 0 : 1;
       }
     }
 };
-
-template <typename T>
-int test_case<T>::result = 0;
 
 
 
@@ -110,7 +116,7 @@ class test_case_insert1 : public test_case<test_case_insert1> {
       if (pb_buffer_insert_data(
             buffer,
             &buf_itr, 5,
-            reinterpret_cast<const uint8_t*>(input2), 4) != 5)
+            reinterpret_cast<const uint8_t*>(input2), strlen(input2)) != 4)
         return 1;
 
       if (pb_buffer_get_data_size(buffer) != 26)
@@ -133,6 +139,113 @@ class test_case_insert1 : public test_case<test_case_insert1> {
 const char *test_case_insert1::input1 = "abcdejklmnopqrstuvwxyz";
 const char *test_case_insert1::input2 = "fghi";
 const char *test_case_insert1::output = "abcdefghijklmnopqrstuvwxyz";
+
+
+
+/*******************************************************************************
+ */
+class test_case_insert2 : public test_case<test_case_insert2> {
+  public:
+    static const char *input1;
+    static const char *input2;
+    static const char *output;
+
+  public:
+    virtual int run_test(struct pb_buffer *buffer) {
+      pb_buffer_clear(buffer);
+
+      if (buffer->strategy->rejects_insert)
+        return 0;
+
+      pb_buffer_write_data(
+        buffer,
+        reinterpret_cast<const u_int8_t*>(input1), strlen(input1));
+
+      pb_buffer_iterator buf_itr;
+      pb_buffer_get_iterator(buffer, &buf_itr);
+
+      if (pb_buffer_insert_data_ref(
+            buffer,
+            &buf_itr, 5,
+            reinterpret_cast<const uint8_t*>(input2), strlen(input2)) != 4)
+        return 1;
+
+      if (pb_buffer_get_data_size(buffer) != 26)
+        return 1;
+
+      pb_buffer_byte_iterator byte_itr;
+      pb_buffer_get_byte_iterator(buffer, &byte_itr);
+
+      for (unsigned int i = 0; i < strlen(output); ++i) {
+        if (*byte_itr.current_byte != output[i])
+          return 1;
+
+        pb_buffer_byte_iterator_next(buffer, &byte_itr);
+      }
+
+      return 0;
+    }
+};
+
+const char *test_case_insert2::input1 = "abcdejklmnopqrstuvwxyz";
+const char *test_case_insert2::input2 = "fghi";
+const char *test_case_insert2::output = "abcdefghijklmnopqrstuvwxyz";
+
+
+
+/*******************************************************************************
+ */
+class test_case_insert3 : public test_case<test_case_insert3> {
+  public:
+    static const char *input1;
+    static const char *input2;
+    static const char *output;
+
+  public:
+    virtual int run_test(struct pb_buffer *buffer) {
+      pb_buffer_clear(buffer);
+
+      if (buffer->strategy->rejects_insert)
+        return 0;
+
+      pb_buffer_write_data(
+        buffer,
+        reinterpret_cast<const u_int8_t*>(input1), strlen(input1));
+
+      pb_buffer_iterator buf_itr;
+      pb_buffer_get_iterator(buffer, &buf_itr);
+
+      struct pb_buffer *src_buffer = pb_trivial_buffer_create();
+      pb_buffer_write_data(
+        src_buffer,
+        reinterpret_cast<const u_int8_t*>(input2), strlen(input2));
+
+      if (pb_buffer_insert_buffer(
+            buffer,
+            &buf_itr, 5,
+            src_buffer, pb_buffer_get_data_size(src_buffer)) != 4)
+        return 1;
+
+      if (pb_buffer_get_data_size(buffer) != 26)
+        return 1;
+
+      pb_buffer_byte_iterator byte_itr;
+      pb_buffer_get_byte_iterator(buffer, &byte_itr);
+
+      for (unsigned int i = 0; i < strlen(output); ++i) {
+        if (*byte_itr.current_byte != output[i])
+          return 1;
+
+        pb_buffer_byte_iterator_next(buffer, &byte_itr);
+      }
+
+      return 0;
+    }
+};
+
+const char *test_case_insert3::input1 = "abcdejklmnopqrstuvwxyz";
+const char *test_case_insert3::input2 = "fghi";
+const char *test_case_insert3::output = "abcdefghijklmnopqrstuvwxyz";
 
 
 
@@ -189,7 +302,6 @@ int main(int argc, char **argv) {
   strategy.clone_on_write = false;
   strategy.fragment_as_target = false;
 
-  /*
   test_subjects.push_back(
     new test_subject(
       "Standard heap sourced pb_buffer                                       ",
@@ -221,10 +333,8 @@ int main(int argc, char **argv) {
     new test_subject(
       "Standard heap sourced pb_buffer, clone_on_Write and fragment_on_target",
       pb_trivial_buffer_create_with_strategy(&strategy)));
-*/
 
   char buffer_name[34];
-
   sprintf(buffer_name, "/tmp/pb_test_ops_buffer-%05d", getpid());
 
   test_subjects.push_back(
@@ -235,6 +345,8 @@ int main(int argc, char **argv) {
         pb_mmap_open_action_overwrite, pb_mmap_close_action_remove)));
 
   test_case<test_case_insert1>::run_test(test_subjects);
+  test_case<test_case_insert2>::run_test(test_subjects);
+  test_case<test_case_insert3>::run_test(test_subjects);
   test_case<test_case_trim1>::run_test(test_subjects);
 
   while (!test_subjects.empty()) {
@@ -242,5 +354,5 @@ int main(int argc, char **argv) {
     test_subjects.pop_back();
   }
 
-  return 0;
+  return test_base::final_result;
 }
