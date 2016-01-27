@@ -1435,6 +1435,8 @@ uint64_t pb_trivial_buffer_insert_data(struct pb_buffer * const buffer,
   if (!page)
     return 0;
 
+  memcpy(page->data_vec.base, buf, page->data_vec.len);
+
   return pb_buffer_insert(buffer, buffer_iterator, offset, page);
 }
 
