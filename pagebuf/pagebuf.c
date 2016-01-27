@@ -1425,8 +1425,8 @@ uint64_t pb_trivial_buffer_insert_data(struct pb_buffer * const buffer,
     size_t offset,
     const uint8_t *buf,
     uint64_t len) {
-  if (!buffer->strategy->rejects_insert &&
-      !pb_buffer_iterator_is_end(buffer, buffer_iterator))
+  if (!pb_buffer_iterator_is_end(buffer, buffer_iterator) &&
+      buffer->strategy->rejects_insert)
     return 0;
 
   struct pb_page *page =
@@ -1443,8 +1443,8 @@ uint64_t pb_trivial_buffer_insert_data_ref(struct pb_buffer * const buffer,
     size_t offset,
     const uint8_t *buf,
     uint64_t len) {
-  if (!buffer->strategy->rejects_insert &&
-      !pb_buffer_iterator_is_end(buffer, buffer_iterator))
+  if (!pb_buffer_iterator_is_end(buffer, buffer_iterator) &&
+      buffer->strategy->rejects_insert)
     return 0;
   
   struct pb_page *page =
@@ -1461,6 +1461,10 @@ uint64_t pb_trivial_buffer_insert_buffer(struct pb_buffer * const buffer,
     size_t offset,
     struct pb_buffer * const src_buffer,
     uint64_t len) {
+  if (!pb_buffer_iterator_is_end(buffer, buffer_iterator) &&
+      buffer->strategy->rejects_insert)
+    return 0;
+
   const struct pb_allocator *allocator = buffer->allocator;
 
   struct pb_buffer_iterator src_buffer_iterator;
