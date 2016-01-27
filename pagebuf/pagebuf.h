@@ -29,39 +29,43 @@ extern "C" {
 
 
 
-/** Indicates how the allocated memory region will be used. */
+/** Indicates the intended use of an allocated memory block. */
 enum pb_allocator_type {
-  pb_alloc_type_struct =                                  1,
-  pb_alloc_type_region =                                  2,
+  pb_alloc_type_struct,
+  pb_alloc_type_region,
 };
 
-/** Wrapper for allocation and freeing of data regions
+/** Wrapper for allocation and freeing of blocks of memory
  *
- * Allocate data memory regions through these interfaces.
+ * Allocate and free memory blocks through these interfaces.  The allocated
+ * blocks will be used to hold data structures (pb_alloc_type_struct) or
+ * for use as memory regions (pb_alloc_type_region), as indicated by the
+ * caller.
  *
- * Allocators must zero memory regions designated for use in structs.
+ * Memory to be used for structs must be zero'd after allocation and before
+ * returning to the caller, and zero'd again after being handed back to the
+ * allocator and before being freed.
  *
- * These functions receive a reference to their parent as a parameter so that
- * implementations may use the pointer to hold additional information.
+ * Memory to be used as a data region, storage areas for user data, need not be
+ * treated in any special way by an allocator.
  */
 struct pb_allocator {
-  /** Allocate a memory region.
+  /** Allocate a memory block.
    *
-   * type indicates whether the memory allocated will be used for a data
-   * structure, or as a memory region.
+   * type indicates what the allocated memory block will be used for
    *
-   * size indicates the size of the memory region to allocate.
+   * size is the size of the memory block to allocate.
    */
   void *(*alloc)(const struct pb_allocator *allocator,
                  enum pb_allocator_type type, size_t size);
-  /** Free a memory region.
+  /** Free a memory block.
    *
-   * type indicates whether the memory allocated was used for a data
-   * structure, or as a memory region.
+   * type indicates how the memory block was used.
    *
    * obj is the address of beginning of the memory region.
    *
-   * size indicates the size of the memory region that was allocated.
+   * size indicates the size of the memory region that was allocated and now
+   *      freed.
    */
   void  (*free)(const struct pb_allocator *allocator,
                 enum pb_allocator_type type, void *obj, size_t size);
@@ -75,17 +79,17 @@ void pb_allocator_free(const struct pb_allocator *allocator,
                        enum pb_allocator_type type, void *obj, size_t size);
 
 
+
+
 /** Get a built in, trivial heap based allocator. */
 const struct pb_allocator *pb_get_trivial_allocator(void);
 
 
 
-/** The pb_data and its supporting classes and functions. */
-struct pb_data;
 
 
 
-/** A structure used to represent a data region.
+/** A structure used to describe a data region.
  */
 struct pb_data_vec {
   /** The starting address of the region. */
@@ -96,13 +100,22 @@ struct pb_data_vec {
 
 
 
-/** Responsibility that the pb_data instance has over the data region.
+
+
+
+/** The pb_data and its supporting classes and functions. */
+struct pb_data;
+
+
+
+/** Indicates the responsibility of a pb_data instance has over its data region.
  *
- * Either owned, thus freed when use count reaches zero,
- * or merely referenced.
+ * Either owned exclusively by the pb_data instance (pb_data_owned), thus freed
+ * when pb_data use count reaches zero, or merely referenced by the pb_data
+ * instance, whereby the data region is not freed when the pb_data use_count
+ * reaches zero.
  */
 enum pb_data_responsibility {
-  pb_data_none =                                          0,
   pb_data_owned,
   pb_data_referenced,
 };
