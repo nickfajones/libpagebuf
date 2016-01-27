@@ -797,15 +797,8 @@ uint64_t pb_trivial_buffer_insert(struct pb_buffer * const buffer,
       buffer->strategy->rejects_insert)
     return 0;
 
-  while ((offset > 0) &&
-         (offset >= pb_buffer_iterator_get_len(buffer_iterator))) {
-    pb_buffer_iterator_next(buffer, buffer_iterator);
-
-    if (!pb_buffer_iterator_is_end(buffer, buffer_iterator))
-      offset -= pb_buffer_iterator_get_len(buffer_iterator);
-    else
-      offset = 0;
-  }
+  if (offset > pb_buffer_iterator_get_len(buffer_iterator))
+    offset = pb_buffer_iterator_get_len(buffer_iterator);
 
   if (!pb_buffer_iterator_is_end(buffer, buffer_iterator))
     pb_trivial_buffer_increment_data_revision(buffer);
@@ -814,22 +807,22 @@ uint64_t pb_trivial_buffer_insert(struct pb_buffer * const buffer,
   struct pb_page *page2;
 
   if (offset != 0) {
-    page1 = buffer_iterator->page;
-    page2 =
+    page2 = buffer_iterator->page;
+    page1 =
       pb_page_transfer(
-        page1, page1->data_vec.len, 0,
+        page2, page2->data_vec.len, 0,
         buffer->allocator);
-    if (!page2)
+    if (!page1)
       return 0;
+
+    page1->data_vec.len = offset;
+    page1->prev = page2->prev;
+    page1->next = page2;
 
     page2->data_vec.base += offset;
     page2->data_vec.len -= offset;
+    page2->prev->next = page1;
     page2->prev = page1;
-    page2->next = page1->next;
-
-    page1->data_vec.len = offset;
-    page1->next->prev = page2;
-    page1->next = page2;
   } else {
     page1 = buffer_iterator->page->prev;
     page2 = buffer_iterator->page;
