@@ -1,5 +1,5 @@
 /*******************************************************************************
- *  Copyright 2015 Nick Jones <nick.fa.jones@gmail.com>
+ *  Copyright 2015, 2016 Nick Jones <nick.fa.jones@gmail.com>
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -322,6 +322,18 @@ class buffer {
       return pb_buffer_write_buffer(buffer_, src_buf.buffer_, len);
     }
 
+    uint64_t insert(const uint8_t *buf, uint64_t len) {
+      return pb_buffer_insert_data(buffer_, buf, len);
+    }
+
+    uint64_t insert_ref(const uint8_t *buf, uint64_t len) {
+      return pb_buffer_insert_data_ref(buffer_, buf, len);
+    }
+
+    uint64_t insert(const buffer& src_buf, uint64_t len) {
+      return pb_buffer_insert_buffer(buffer_, src_buf.buffer_, len);
+    }
+
     uint64_t overwrite(const uint8_t *buf, uint64_t len) {
       return pb_buffer_overwrite_data(buffer_, buf, len);
     }
@@ -333,7 +345,7 @@ class buffer {
 
   public:
     void clear() {
-    pb_buffer_clear(buffer_);
+      pb_buffer_clear(buffer_);
     }
 
   protected:
