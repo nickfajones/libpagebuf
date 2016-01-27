@@ -1561,6 +1561,11 @@ static void pb_trivial_buffer_clear_impl(struct pb_buffer * const buffer,
                             struct pb_buffer_iterator * const buffer_iterator),
     void (*iterator_next)(struct pb_buffer * const buffer,
                           struct pb_buffer_iterator * const buffer_iterator)) {
+  pb_trivial_buffer_increment_data_revision(buffer);
+
+  struct pb_trivial_buffer *trivial_buffer = (struct pb_trivial_buffer*)buffer;
+  trivial_buffer->data_size = 0;
+
   struct pb_buffer_iterator buffer_iterator;
   get_iterator(buffer, &buffer_iterator);
 
@@ -1580,8 +1585,6 @@ static void pb_trivial_buffer_clear_impl(struct pb_buffer * const buffer,
 }
 
 void pb_trivial_buffer_clear(struct pb_buffer * const buffer) {
-  pb_trivial_buffer_increment_data_revision(buffer);
-
   pb_trivial_buffer_clear_impl(
     buffer,
     &pb_buffer_get_iterator,
@@ -1590,8 +1593,6 @@ void pb_trivial_buffer_clear(struct pb_buffer * const buffer) {
 }
 
 void pb_trivial_pure_buffer_clear(struct pb_buffer * const buffer) {
-  pb_trivial_buffer_increment_data_revision(buffer);
-
   pb_trivial_buffer_clear_impl(
     buffer,
     &pb_trivial_buffer_get_iterator,
