@@ -1,0 +1,3 @@
+- Make pb_data::data_vec const
+- Document as thread unsafe.  Reference counting to be non atomic.
+- Add a thread usage debugging API
