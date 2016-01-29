@@ -672,9 +672,9 @@ struct pb_buffer_operations {
                                buffer_byte_iterator);
 
 
-  /** Create a pb_page instance with accompanying pb_data.
+  /** Create a pb_page instance with an attached pb_data.
    *
-   * This is a private function and should not be called externally.
+   * This is a protected function and should not be called externally.
    *
    * len: the size of the memory region to allocate.
    */
@@ -683,14 +683,13 @@ struct pb_buffer_operations {
                              struct pb_buffer_iterator * const buffer_iterator,
                              size_t len,
                              bool is_rewind);
-  /** Create a pb_page instance with accompanying pb_data.
+  /** Create a pb_page instance with an attached pb_data that references the
+   *  provided memory region.
    *
-   * This is a private function and should not be called externally.
+   * This is a protected function and should not be called externally.
    *
    * buf: the memory region to reference.
-   * len: the size of the memory region being referenced.
-   *
-   * Memory region buf will not owned by the embeded pb_data instance.
+   * len: the size of the memory region to referenced.
    */
   struct pb_page *(*page_create_ref)(
                              struct pb_buffer * const buffer,
@@ -699,80 +698,85 @@ struct pb_buffer_operations {
                              bool is_rewind);
 
 
-  /** Append a pb_page instance to the pb_buffer.
+  /** Insert a pb_page instance into the pb_buffer.
    *
    * This is a private function and should not be called externally.
    *
-   * buffer_iterator is the position in the buffer to update the pb_buffer.  The
-   *                 pb_page will be inserted in front of the iterator position.
-   * offset is the offset within the iterator page to insert the new pb_page
-   *        into.
-   * page is the page to insert.  The data base and len values must be set
-   *      before this operation is called.
+   * buffer_iterator: the position in the buffer, before which or into which
+   *                  the page will be inserted.
+   * offset: the position within the iterator page, before which the page will
+   *         be inserted.
    *
-   * If the offset is zero, the new pb_page will be inserted before the
-   * iterator page.  If the offset is non zero, then the iterator page may be
-   * split according to the pb_buffer instances internal implementation.
-   * If the offset is greater than or equal to the iterator page len, then the
-   * new pb_page will be inserted after the iterator page, or at the head of
-   * the pb_buffer if the iterator is an end iterator.
+   * page: the new page to insert into the buffer.  This page is created
+   *       elsewhere within the buffer, using the buffers allocator.
    *
-   * This operation will affect the data size of the pb_buffer instance.
+   * If the offset is zero, the page will be inserted in front of the iterator
+   * page.  If the offset is non-zero, the iterator page will be split into
+   * two sub-pages at the point of the offset, and the page will be inserted
+   * between them.
    *
-   * The return value is the amount of data actually inserted to the
-   * pb_buffer instance.  Users of the insert operation must reflect the value
-   * returned back to their own callers.
+   * The return value is the amount of data successfully inserted into the
+   * buffer.
    */
   uint64_t (*insert)(
                    struct pb_buffer * const buffer,
                    struct pb_buffer_iterator * const buffer_iterator,
                    size_t offset,
                    struct pb_page * const page);
-  /** Increase the size of the buffer by adding len bytes of data to the end.
+  /** Increase the size of the buffer by adding data to the end.
    *
    * This is a private function and should not be called externally.
    *
-   * len indicates the amount of data to add in bytes.
+   * len: the amount of data to add in bytes.
    *
-   * Depending on the buffer implementation details, the total len may be split
-   * across multiple pages.
+   * Depending on the buffer implementation details, the extended data may be
+   * comprised of multiple pages.
+   *
+   * The return value is the amount of data successfully added to the buffer.
    */
   uint64_t (*extend)(
                    struct pb_buffer * const buffer,
                    uint64_t len);
-  /** Increases the size of the buffer by adding len bytes of data to the head.
+  /** Increase the size of the buffer by adding data to the head.
    *
    * This is a private function and should not be called externally.
    *
-   * len indicates the amount of data to ad in bytes.
+   * len: the amount of data to add in bytes.
    *
-   * Depending on the buffer implementation details, the total len may be split
-   * across multiple pages.
+   * Depending on the buffer implementation details, the rewound data may be
+   * comprised of multiple pages.
+   *
+   * The return value is the amount of data successfully added to the buffer.
    */
   uint64_t (*rewind)(
                    struct pb_buffer * const buffer,
                    uint64_t len);
-  /** Seek the buffer by len bytes starting at the beginning of the buffer.
+  /** Seek the starting point of the buffer data.
    *
    * This is a private function and should not be called externally.
    *
-   * len indicates the amount of data to seek, in bytes.
+   * len: the amount of data to seek in bytes.
    *
-   * The seek operation may cause internal pages to be consumed depending on
-   * the buffer implementation details.  These pb_pages will be destroyed during
-   * the seek operation and their respective data 'put'd.
+   * Depending on the buffer implementation details, the seek operation may
+   * zero one or more pages in the buffer, causing those pages to be freed,
+   * and their corresponding data pages to have their use count decremented.
+   *
+   * The return value is the amount of data successfully seeked in the buffer.
    */
   uint64_t (*seek)(struct pb_buffer * const buffer,
                    uint64_t len);
-  /** Trim the buffer by len bytes starting at the end of the buffer.
+  /** Trim the end of the buffer data.
    *
    * This is a private function and should not be called externally.
    *
-   * len indicates the amount of data to trim, in bytes.
+   * len: the amount of data to seek in bytes.
    *
-   * The trim operation may cause internal pages to be consumed depending on
-   * the buffer implementation details.  These pb_pages will be destroyed during
-   * the trim operation and their respective data 'put'd.
+   * Depending on the buffer implementation details, the trim operation may
+   * zero one or more pages in the buffer, causing those pages to be freed,
+   * and their corresponding data pages to have their use count decremented.
+   *
+   * The return value is the amount of data successfully trimmed from the
+   * buffer.
    */
   uint64_t (*trim)(struct pb_buffer * const buffer,
                    uint64_t len);
