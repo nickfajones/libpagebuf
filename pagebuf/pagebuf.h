@@ -474,6 +474,7 @@ struct pb_buffer_operations {
    */
   void (*get_iterator_end)(struct pb_buffer * const buffer,
                            struct pb_buffer_iterator * const buffer_iterator);
+
   /** Indicates whether an iterator is currently pointing to the 'end' of
    *  a buffer or not.
    *
@@ -482,7 +483,6 @@ struct pb_buffer_operations {
    */
   bool (*iterator_is_end)(struct pb_buffer * const buffer,
                           struct pb_buffer_iterator * const buffer_iterator);
-
   /** Compare two iterators and indicate whether they are equal where equal is
    *  defined as pointing to the same page in the same buffer.
    *
@@ -493,16 +493,14 @@ struct pb_buffer_operations {
                        const struct pb_buffer_iterator *lvalue,
                        const struct pb_buffer_iterator *rvalue);
 
-  /** Moves an iterator to the next page in the data sequence, according to
-   *  the buffers implementation specific arrangement of that sequence.
+  /** Moves an iterator to the next page in the data sequence.
    *
    * The iterator passed to this function must be initialised using one of the
    * get_iterator* functions above.
    */
   void (*iterator_next)(struct pb_buffer * const buffer,
                         struct pb_buffer_iterator * const buffer_iterator);
-  /** Moves an iterator to the previous page in the data sequence, according to
-   *  the buffers implementation specific arrangement of that sequence.
+  /** Moves an iterator to the previous page in the data sequence.
    *
    * The iterator passed to this function must be initialised using one of the
    * get_iterator* functions above.
@@ -511,48 +509,55 @@ struct pb_buffer_operations {
                         struct pb_buffer_iterator * const buffer_iterator);
 
 
-  /** Initialise a byte iterator to the start of the pb_buffer instance data.
+  /** Initialise a byte iterator to the first byte of the first page in the
+   *  buffer, or to the 'end' byte if the buffer is empty.
    *
-   * The byte iterator should be a pointer to an object on the stack that must
-   * be manipulated only by the iterator methods of the same buffer instance.
+   * The iterator parameter is best to be a pointer to a stack object.
    */
   void (*get_byte_iterator)(struct pb_buffer * const buffer,
                             struct pb_buffer_byte_iterator * const
                               buffer_byte_iterator);
-  /** Initialise an iterator to the end of the pb_buffer instance data.
+  /** Initialise a byte iterator to the 'end' of the pb_buffer instance data.
    *
-   * The iterator should be a pointer to an object on the stack that must
-   * be manipulated only by the iterator methods of the same buffer instance.
+   * The iterator parameter is best to be a pointer to a stack object.
    */
   void (*get_byte_iterator_end)(struct pb_buffer * const buffer,
                                 struct pb_buffer_byte_iterator * const
                                   buffer_byte_iterator);
-  /** Indicates whether an iterator has traversed to the end of a buffers
-   *  internal chain of pages.
+
+  /** Indicates whether a byte iterator is currently pointing to the 'end' of
+   *  a buffer or not.
    *
-   * This function must always be called, and return false, before the data
-   * vector of the pb_page of the iterator can be used.  The value of the
-   * pb_page pointer is undefined when the iterator end function returns true.
+   * The iterator passed to this function must be initialised using one of the
+   * get_byte_iterator* functions above.
    */
   bool (*byte_iterator_is_end)(struct pb_buffer * const buffer,
                                struct pb_buffer_byte_iterator * const
                                  buffer_byte_iterator);
-
+  /** Compare two byte iterators and indicate whether they are equal where
+   *  equal is defined as pointing to the same byte in the same page in the
+   *  same buffer.
+   *
+   * The iterators passed to this function must be initialised using one of the
+   * get_byte_iterator* functions above.
+   */
   bool (*byte_iterator_cmp)(struct pb_buffer * const buffer,
                             const struct pb_buffer_byte_iterator *lvalue,
                             const struct pb_buffer_byte_iterator *rvalue);
 
-  /** Increments an iterator to the next pb_page in a buffer's internal chain. */
+  /** Moves a byte iterator to the next byte in the data sequence.
+   *
+   * The iterator passed to this function must be initialised using one of the
+   * get_byte_iterator* functions above.
+   */
   void (*byte_iterator_next)(struct pb_buffer * const buffer,
                              struct pb_buffer_byte_iterator * const
                                buffer_byte_iterator);
-  /** Decrements an iterator to the previous pb_page in a buffer's internal
-   *  chain.
+  /** Moves a byte iterator to the previous byte in the data sequence.
    *
-   * It is valid to call this function on an iterator that is the end
-   * iterator, according to is_iterator_end.  If this function is called on such
-   * an iterator, the buffer implementation must correctly decrement back to the
-   * position before end in this case. */
+   * The iterator passed to this function must be initialised using one of the
+   * get_byte_iterator* functions above.
+   */
   void (*byte_iterator_prev)(struct pb_buffer * const buffer,
                              struct pb_buffer_byte_iterator * const
                                buffer_byte_iterator);
@@ -562,9 +567,7 @@ struct pb_buffer_operations {
    *
    * This is a private function and should not be called externally.
    *
-   * len is the size of the memory region to allocate.
-   * is_rewind indicates whether the region is to be placed at the beginning
-   *           of the buffer in a rewind situation.
+   * len: the size of the memory region to allocate.
    */
   struct pb_page *(*page_create)(
                              struct pb_buffer * const buffer,
@@ -575,12 +578,10 @@ struct pb_buffer_operations {
    *
    * This is a private function and should not be called externally.
    *
-   * buf is the memory region to reference.
-   * len is the size of the memory region to allocate.
-   * is_rewind indicates whether the region is to be placed at the beginning
-   *           of the buffer in a rewind situation.
+   * buf: the memory region to reference.
+   * len: the size of the memory region being referenced.
    *
-   * Memory region buf will not owned by the accompanying pb_data instance.
+   * Memory region buf will not owned by the embeded pb_data instance.
    */
   struct pb_page *(*page_create_ref)(
                              struct pb_buffer * const buffer,

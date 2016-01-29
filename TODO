@@ -1,3 +1,6 @@
+- insert functions don't respect strategy.  Make them!
+- page_create doesn't need iterator or is_rewind marker
+- Add 'end' byte (\0)
 - Make pb_data::data_vec const
-- Document as thread unsafe.  Reference counting to be non atomic.
+- Document as thread unsafe.  Reference counting to be non atomic
 - Add a thread usage debugging API
