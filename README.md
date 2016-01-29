@@ -1,45 +1,48 @@
 libpagebuf
 ==========
 
-Buffer objects for use in socket programming.
+Developers of software that involves IO, for example networking IO, face
+the challenge of dealing with large amounts of data.  Whether the data is
+passing quickly through the system or not, this data will at the least need
+to be stored after it is received from the input side, then that same data
+may need to be arranged for writing back to the output side.
+Additionally, the data may require processing as it moves in then out of
+the system, processing such as parsing and even modification and
+manipulation.
 
-These buffer objects are made with the requirements of socket event based
-applications in mind.  The kind of operations that they support include:
-- Allocation of storage space to a buffer
-- Writing data to storage space
-- Transferring (committing) arbitrary amounts of data from one buffer to
-  another
-- Reading of data
+When that software system is non-blocking and event driven, additional
+challenges exist, such as the need to capture data that arrives in a
+piecewise manner, in uncertain size and delay patterns, then the need to
+gain access to that data in a linear form to allow proper parsing and
+manipulation.
 
-Some other types of operations may be performed on buffered data:
-- Seeking (consuming) of arbitrary amounts of buffered data
-- Truncation of arbitrary amounts of buffered data
-- Rewinding of buffer storage (prepending allocated storage space onto a
-  buffer)
-- Overwriting of existing buffer data
-- Insertion of new data into arbitrary points in buffered data
+And all of this needs to be done as resource and time efficiently as
+possible.
 
-libpagebuf pb_buffer objects do this with objects representing raw data
-and other objects representing views on that data.
+libpagebuf is designed to provide a solution to the data storage challenges
+faced in particular by developers of IO oriented, non-blocking event driven
+systems.  At its core, it implements a set of data structures and
+algorithms for the management of regions of system memory.  On the surface,
+through the use of the central pb_buffer class, it provides a means of
+reading and manipulating the data that is stored in those memory regions,
+that is abstracted away from the underlying arrangement of those memory
+regions in the system memory space.
 
-pb_buffer objects abstract the underlying arrangement of the raw data through
-the data views, so that the underlying data may be operated on as would a
-single contiguous array of bytes.  This design leads to pb_buffer being an
-effective implementor of zero copy and scatter-gather semantics.
+An author may use pb_buffer to receive data from input sources as
+fragments, then perform read actions such as searching and copying in
+addition to some more intrusive actions such as insertion or truncation on
+that data, without any regard for the underlying fragmentation of the
+memory regions that the data is stored in.
 
-pb_buffer objects also perform resource allocation and de-allocation of
-internally managed objects, and storage space (e.g memory) resources on
-behalf of the author.
+libpagebuf is also designed with concerns of non-blocking event driven
+and multithreaded systems in mind, through the inclusion of interfaces for
+the use of custom memory allocators, debugging to check internal structure
+integrity and thread exclusivity, interfaces in both C and C++,
+C++ interfaces complying to the ASIO ConstBufferSequence,
+MutableBufferSequence and DynamicBufferSequence concepts, as well as the
+BidirectionanIterator concept used in particular by boost::regex.
 
-pb_buffer objects further their usefulness in socket event based applications
-by allowing adjustment of internal data and data view management behaviour
-using creation time strategy configuration interfaces, and also support
-pluggable memory and storage space allocators to allow tighter integration
-with large data oriented systems.
-
-pb_buffer objects aim to be useful in many situations in application
-programming by means of:
-- Simple C++ class wrapper for pb_buffer and pb_buffer_iterator
-- Adaptors for boost::asio ConstBufferSequence, MutableBufferSequence and
-  DynamicBufferSequence concepts (pending)
-- An adaptor for boost::regex BidirectionalIterator (pending)
+libpagebuf is designed for efficiency, using reference counting and
+zero-copy semantics at its core, as well as providing a class like
+interface in C that provides a path for subclassing and modifying
+implementation details
