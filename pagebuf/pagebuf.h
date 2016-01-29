@@ -109,11 +109,34 @@ extern "C" {
  * expectation that it works properly)
  *
  * Concreate implementations do not need to to make their _operations
- * structures publicly available, the binding of and object to its _operations
- * can be done opaquely.
+ * structures publicly available, the binding of an object to its _operations
+ * can be done opaquely inside the factory function.
  *
- * In order to subclass an object, 
+ * In order to subclass an object, use the typical C object embedding method
+ * where an instance of the base class object is the first member of the
+ * subclass object.  The factory function will return the address of the
+ * embedded base instance which will have the same address as the subclass.
+ * Similarly, when a subclass specific over-ridden function receives the
+ * pointer to the base class object as a parameter, it can then 'upcast' the
+ * base back up to the subclass.
+ *
+ * libpagebuf allows subclassing of the following classes:
+ * pb_allocator,
+ * pb_data,
+ * pb_buffer
+ *
+ * libpagebuf provides a base implementation of allocator, data and buffer
+ * functionality named 'trivial', which uses a straight forward list based
+ * arrangement of pages, backed by heap sourced memory regions.
+ *
+ * In addition, libpagebuf provides a mmap buffer, which uses arranges data in
+ * a sparse list, backed by memory regions mapping to a file on disk.
  */
+
+
+
+
+
 
 /** Indicates the intended use of an allocated memory block. */
 enum pb_allocator_type {
