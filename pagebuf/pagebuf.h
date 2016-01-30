@@ -781,93 +781,110 @@ struct pb_buffer_operations {
   uint64_t (*trim)(struct pb_buffer * const buffer,
                    uint64_t len);
 
-  /** Write data from a memory region to the pb_buffer instance.
+
+  /** Write data from a memory region to the buffer.
    *
-   * buf indicates the start of the source memory region.
-   * len indicates the amount of data to write, in bytes.
+   * buf: the start of the source memory region.
+   * len: the amount of data to write in bytes.
    *
-   * returns the amount of data written.
+   * Data will be appended to the end of the buffer.
    *
-   * Data is appended to the tail of the buffer, allocating new storage if
-   * necessary.
+   * The return value is the amount of data successfully written to the
+   * buffer.
    */
   uint64_t (*write_data)(struct pb_buffer * const buffer,
                          const uint8_t *buf,
                          uint64_t len);
-  /** Write data from a referenced memory region to the pb_buffer instance.
+  /** Write data from memory region to the buffer, referencing only.
    *
-   * buf indicates the start of the source referenced memory region.
-   * len indicates the amount of data to write, in bytes.
+   * buf: the start of the source memory region.
+   * len: the amount of data to write in bytes.
    *
-   * returns the amount of data written.
+   * Data will be appended to the end of the buffer.
    *
-   * Data is appended to the tail of the buffer.  As the memory region is
-   * referenced, no storage needs to be allocated unless the buffer strategy
-   * indicates clone_on_write or fragment_as_target is true.
+   * The return value is the amount of data successfully written to the
+   * buffer.
    */
   uint64_t (*write_data_ref)(struct pb_buffer * const buffer,
                              const uint8_t *buf,
                              uint64_t len);
-  /** Write data from a source pb_buffer instance to the pb_buffer instance.
+  /** Write data from a source buffer to the buffer.
    *
-   * src_buffer is the buffer to write from.  This pb_buffer instance will not
-   *            have it's data modified, but it is not const because iterator
-   *            operations of this pb_buffer may cause internal state changes.
-   * len indicates the amount of data to write, in bytes.
+   * src_buffer: the buffer to write from.  This pb_buffer instance will not
+   *             have its data modified.
+   * len: the amount of data to insert in bytes.
    *
-   * returns the amount of data written.  This buffer will not be altered by
-   * this operation.
+   * Data will be appended to the end of the buffer.
    *
-   * Data is appended to the tail of the buffer, allocating new storage if
-   * necessary.
+   * The return value is the amount of data successfully inserted to the
+   * buffer.
    */
   uint64_t (*write_buffer)(struct pb_buffer * const buffer,
                            struct pb_buffer * const src_buffer,
                            uint64_t len);
 
-  /** Write data from a memory region to the pb_buffer instance.
+
+  /** Write data from a memory region to the buffer.
    *
-   * buf indicates the start of the source memory region.
-   * len indicates the amount of data to write, in bytes.
+   * buffer_iterator: the position in the buffer, before which or into which
+   *                  the data will be inserted.
+   * offset: the position within the iterator page, before which the data will
+   *         be inserted.
+   * buf: the start of the source memory region.
+   * len: the amount of data to insert in bytes.
    *
-   * returns the amount of data written.
+   * If the offset is zero, the data will be inserted in front of the iterator
+   * page.  If the offset is non-zero, the iterator page will be split into
+   * two sub-pages at the point of the offset, and the data will be inserted
+   * between them.
    *
-   * Data is appended to the tail of the buffer, allocating new storage if
-   * necessary.
+   * The return value is the amount of data successfully inserted to the
+   * buffer.
    */
   uint64_t (*insert_data)(struct pb_buffer * const buffer,
                           struct pb_buffer_iterator * const buffer_iterator,
                           size_t offset,
                           const uint8_t *buf,
                           uint64_t len);
-  /** Write data from a referenced memory region to the pb_buffer instance.
+  /** Write data from memory region to the buffer, referencing only.
    *
-   * buf indicates the start of the source referenced memory region.
-   * len indicates the amount of data to write, in bytes.
+   * buffer_iterator: the position in the buffer, before which or into which
+   *                  the data will be inserted.
+   * offset: the position within the iterator page, before which the data will
+   *         be inserted.
+   * buf: the start of the source memory region.
+   * len: the amount of data to write in bytes.
    *
-   * returns the amount of data written.
+   * If the offset is zero, the data will be inserted in front of the iterator
+   * page.  If the offset is non-zero, the iterator page will be split into
+   * two sub-pages at the point of the offset, and the data will be inserted
+   * between them.
    *
-   * Data is appended to the tail of the buffer.  As the memory region is
-   * referenced, no storage needs to be allocated unless the buffer strategy
-   * indicates clone_on_write or fragment_as_target is true.
+   * The return value is the amount of data successfully inserted to the
+   * buffer.
    */
   uint64_t (*insert_data_ref)(struct pb_buffer * const buffer,
                               struct pb_buffer_iterator * const buffer_iterator,
                               size_t offset,
                               const uint8_t *buf,
                               uint64_t len);
-  /** Write data from a source pb_buffer instance to the pb_buffer instance.
+  /** Write data from a source buffer to the buffer.
    *
-   * src_buffer is the buffer to write from.  This pb_buffer instance will not
-   *            have it's data modified, but it is not const because iterator
-   *            operations of this pb_buffer may cause internal state changes.
-   * len indicates the amount of data to write, in bytes.
+   * buffer_iterator: the position in the buffer, before which or into which
+   *                  the data will be inserted.
+   * offset: the position within the iterator page, before which the data will
+   *         be inserted.
+   * src_buffer: the buffer to write from.  This pb_buffer instance will not
+   *             have its data modified.
+   * len: the amount of data to write in bytes.
    *
-   * returns the amount of data written.  This buffer will not be altered by
-   * this operation.
+   * If the offset is zero, the data will be inserted in front of the iterator
+   * page.  If the offset is non-zero, the iterator page will be split into
+   * two sub-pages at the point of the offset, and the data will be inserted
+   * between them.
    *
-   * Data is appended to the tail of the buffer, allocating new storage if
-   * necessary.
+   * The return value is the amount of data successfully inserted to the
+   * buffer.
    */
   uint64_t (*insert_buffer)(struct pb_buffer * const buffer,
                             struct pb_buffer_iterator * const buffer_iterator,
@@ -875,35 +892,49 @@ struct pb_buffer_operations {
                             struct pb_buffer * const src_buffer,
                             uint64_t len);
 
-  /** Write data from a memory region to the pb_buffer instance.
+
+  /** Overwrite the head of a buffer with data from a memory region.
    *
-   * buf indicates the start of the source memory region.
-   * len indicates the amount of data to write, in bytes.
+   * buf: the start of the source memory region.
+   * len: the amount of data to write in bytes.
    *
-   * returns the amount of data written.
+   * Data is written to the head of the buffer, overwriting existing data.
+   * No new storage will be allocated if len is greater than the size of the
+   * buffer.
    *
-   * Data is written from the head of the source pb_buffer.  No new storage will
-   * be allocated if len is greater than the size of the target pb_buffer.
+   * The return value is the amount of data successfully written to the
+   * buffer.
    */
   uint64_t (*overwrite_data)(struct pb_buffer * const buffer,
                              const uint8_t *buf,
                              uint64_t len);
 
-  /** Read data from the start of a pb_buffer instance to a data region.
+
+  /** Read data from the head of a buffer to a memory region.
    *
-   * buf indicates the start of the target memory region.
-   * len indicates the amount of data to read, in bytes.
+   * buf: the start of the target memory region.
+   * len: the amount of data to read in bytes.
    *
-   * returns the amount of data read into the target buffer.
+   * The return value is the amount of data successfully read from the
+   * buffer.
    */
   uint64_t (*read_data)(struct pb_buffer * const buffer,
                         uint8_t * const buf,
                         uint64_t len);
 
-  /** Clear all data in the buffer. */
+
+  /** Clear all data in a buffer.
+   *
+   * Following this operation, the data size of the buffer will be zero.
+   */
   void (*clear)(struct pb_buffer * const buffer);
 
-  /** Destroy a pb_buffer. */
+
+  /** Destroy a buffer.
+   *
+   * Clear all data in the buffer and dismantle and clear all internal data
+   * structures.
+   */
   void (*destroy)(struct pb_buffer * const buffer);
 };
 
