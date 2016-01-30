@@ -1,8 +1,14 @@
 - object style structure for allocator, just like others
+- Implement write operations as calls to insert operations
 - insert functions don't respect strategy.  Make them!
 - page_create doesn't need iterator or is_rewind marker
+- Remove functional interfaces that shouldn't be called externally
 - Add 'end' byte (\0)
 - Add overwrite_buffer
 - Make pb_data::data_vec const
+- Convert some public uint8_t* interfaces to void* so end users are not
+  required to do casting.
+- fragment_as_target(false) should not even fragment to page_size, original
+  fragment sizes should remain unchanged.
 - Document as thread unsafe.  Reference counting to be non atomic
 - Add a thread exclusivity debugging API

@@ -180,7 +180,13 @@ struct pb_allocator {
                 enum pb_allocator_type type, void *obj, size_t size);
 };
 
-/** Functional interfaces for the pb_allocator class. */
+/** Functional interfaces for the pb_allocator class.
+ *
+ * These interfaces should be used to invoke the allocator operations.
+ *
+ * However, given that allocators are protected members of buffers, these
+ * operations are not intended to be called by end users.
+ */
 void *pb_allocator_alloc(
                        const struct pb_allocator *allocator,
                        enum pb_allocator_type type, size_t size);
@@ -190,7 +196,10 @@ void pb_allocator_free(const struct pb_allocator *allocator,
 
 
 
-/** Get a built in, trivial heap based allocator. */
+/** Get a built in, trivial heap based allocator.
+ *
+ * This function is public and available to end users.
+ */
 const struct pb_allocator *pb_get_trivial_allocator(void);
 
 
@@ -290,7 +299,8 @@ struct pb_data {
   /** Use count, maintained with atomic operations. */
   uint16_t use_count;
 
-  /** Operations for the pb_buffer instance.  Cannot be changed after creation. */
+  /** Operations for the pb_buffer instance.  Cannot be changed after creation.
+   */
   const struct pb_data_operations *operations;
 
   /** The allocator used to allocate memory blocks for this struct and its
@@ -301,19 +311,30 @@ struct pb_data {
 
 
 
-/** Functional interfaces for management of pb_data reference counts. */
+/** Functional interfaces for the pb_data class.
+ *
+ * These interfaces should be used to invoke the data operations.
+ *
+ * However, given that data intances are protected members of buffers, these
+ * operations are not intended to be called by end users.
+ */
 void pb_data_get(struct pb_data * const data);
 void pb_data_put(struct pb_data * const data);
 
 
 
-/** Get a built in, trivial set of pb_data operations. */
+/** Get a built in, trivial set of pb_data operations.
+ *
+ * This is a protected function and should not be called externally.
+ */
 const struct pb_data_operations *pb_get_trivial_data_operations(void);
 
 
 
 /** Factory functions for a trivial implementation of pb_data using trivial
  *  operations.
+ *
+ * These are protected functions and should not be called externally.
  */
 struct pb_data *pb_trivial_data_create(size_t len,
                                        const struct pb_allocator *allocator);
@@ -325,9 +346,14 @@ struct pb_data *pb_trivial_data_create_ref(
 /** Trivial implementations of pb_data reference count management functions.
  *  pb_trivial_data_put also performs object cleanup amd memory block frees
  *  through the associated allocator.
+ *
+ * These are protected functions and should not be called externally.
  */
 void pb_trivial_data_get(struct pb_data * const data);
 void pb_trivial_data_put(struct pb_data * const data);
+
+
+
 
 
 
@@ -378,12 +404,16 @@ struct pb_page {
 
 /** Create a pb_page instance.
  *
+ * This is a protected function and should not be called externally.
+ *
  * The pb_data instance has its use count incremented.
  */
 struct pb_page *pb_page_create(struct pb_data *data,
                                const struct pb_allocator *allocator);
 
 /** Create a pb_page using properties of another.
+ *
+ * This is a protected function and should not be called externally.
  *
  * The new pb_page instance will duplicate the base and len values of the
  * source page, and reference pb_data instance of the source page.
@@ -393,6 +423,8 @@ struct pb_page *pb_page_transfer(const struct pb_page *src_page,
                                  const struct pb_allocator *allocator);
 
 /** Destroy a pb_page instance.
+ *
+ * This is a protected function and should not be called externally.
  *
  * The pb_data instance will be de-referenced once.
  */
@@ -426,6 +458,8 @@ struct pb_buffer_iterator {
 
 /** Functional interfaces for accessing a memory region through the
  *  pb_buffer_iterator class.
+ *
+ * These functions are public and may be called by end users.
  */
 uint8_t *pb_buffer_iterator_get_base(
                              const struct pb_buffer_iterator *buffer_iterator);
@@ -447,7 +481,10 @@ struct pb_buffer_byte_iterator {
 
 
 /** Functional interfaces for accessing a byte in a memory region through the
- *  pb_buffer_byte_iterator class. */
+ *  pb_buffer_byte_iterator class.
+ *
+ * This function is public and may be called by end users.
+ */
 const char *pb_buffer_byte_iterator_get_current_byte(
                    const struct pb_buffer_byte_iterator *buffer_byte_iterator);
 
@@ -700,7 +737,7 @@ struct pb_buffer_operations {
 
   /** Insert a pb_page instance into the pb_buffer.
    *
-   * This is a private function and should not be called externally.
+   * This is a protected function and should not be called externally.
    *
    * buffer_iterator: the position in the buffer, before which or into which
    *                  the page will be inserted.
@@ -725,7 +762,7 @@ struct pb_buffer_operations {
                    struct pb_page * const page);
   /** Increase the size of the buffer by adding data to the end.
    *
-   * This is a private function and should not be called externally.
+   * This is a protected function and should not be called externally.
    *
    * len: the amount of data to add in bytes.
    *
@@ -739,7 +776,7 @@ struct pb_buffer_operations {
                    uint64_t len);
   /** Increase the size of the buffer by adding data to the head.
    *
-   * This is a private function and should not be called externally.
+   * This is a protected function and should not be called externally.
    *
    * len: the amount of data to add in bytes.
    *
@@ -753,7 +790,7 @@ struct pb_buffer_operations {
                    uint64_t len);
   /** Seek the starting point of the buffer data.
    *
-   * This is a private function and should not be called externally.
+   * This is a protected function and should not be called externally.
    *
    * len: the amount of data to seek in bytes.
    *
@@ -767,7 +804,7 @@ struct pb_buffer_operations {
                    uint64_t len);
   /** Trim the end of the buffer data.
    *
-   * This is a private function and should not be called externally.
+   * This is a protected function and should not be called externally.
    *
    * len: the amount of data to seek in bytes.
    *
@@ -940,26 +977,37 @@ struct pb_buffer_operations {
 
 
 
-/** Represents a buffer of pages, and operations for the manipulation of the
- * pages and the buffers of data therein.
+/** The base pb_buffer class.
  *
- * The buffer also represents the strategy for allocation and freeing of
- * data buffers.
+ * The base pb_buffer only references high level structures that are
+ * fundamental to the identity and operation a buffer:
  */
 struct pb_buffer {
-  /** Strategy for the pb_buffer instance.  Cannot be changed after creation. */
+  /** The description of the core behaviour of the buffer.  May or may not be
+   *  variable between buffer instances, depending on the specific buffer
+   *  class, however in all cases, these behaviours are not expected nor should
+   *  be permitted to change after a buffer instance is created.
+   */
   const struct pb_buffer_strategy *strategy;
 
-  /** Operations for the pb_buffer instance.  Cannot be changed after creation. */
+  /** The structure describing the concrete implementation of the buffer
+   *  functions.  Immutable and identical for all instances of same buffer
+   *  classes.
+   */
   const struct pb_buffer_operations *operations;
 
-  /** Allocator used to allocate storage for this struct and its pages. */
+  /** The allocator used by the buffer instance to perform all structure and
+   *  memory region allocations.
+   */
   const struct pb_allocator *allocator;
 };
 
 
 
-/** Functional interfaces for the generic pb_buffer class. */
+/** Functional interfaces for the generic pb_buffer class.
+ *
+ * These functions are public and may be called by end users.
+ */
 uint64_t pb_buffer_get_data_revision(struct pb_buffer * const buffer);
 
 uint64_t pb_buffer_get_data_size(struct pb_buffer * const buffer);
@@ -1067,8 +1115,11 @@ void pb_buffer_destroy(
 
 /** The trivial buffer implementation and its supporting functions.
  *
- * The trivial buffer defines a classic strategy and operations set, and uses
- * the trivial heap based allocator by default.
+ * The trivial buffer is a reference implementation of pb_buffer.
+ *
+ * It defines a classic strategy and operations structure and uses this when
+ * the user does not specifiy their own.  However, all permutations of
+ * strategy settings are supported internally by the trivial buffer.
  */
 struct pb_trivial_buffer {
   struct pb_buffer buffer;
@@ -1085,22 +1136,31 @@ struct pb_trivial_buffer {
  *
  * page_size is 4096
  *
- * clone_on_write is false
+ * clone_on_write is false: zero copy transfer of data from other buffers
  *
- * fragment_as_source is false
+ * fragment_as_source is false: fragments written from other buffers or memory
+ *                              regions are not additionally fragmented within
+ *                              the 4k page limit
  *
- * rejects_insert is false
+ * rejects_insert is false: inserts into the middle of the buffer are allowed.
  */
 const struct pb_buffer_strategy *pb_get_trivial_buffer_strategy(void);
 
 
 
-/** Get a trivial buffer operations structure. */
+/** Get a trivial buffer operations structure.
+ *
+ * This is a protected function and should not be called externally.
+ */
 const struct pb_buffer_operations *pb_get_trivial_buffer_operations(void);
 
 
 
-/** An implementation of pb_buffer using the default or supplied allocator. */
+/** Factory functions producing trivial buffer instances.
+ *
+ * Users may use either default, trivial strategy and allocator, or supply
+ * their own.
+ */
 struct pb_buffer *pb_trivial_buffer_create(void);
 struct pb_buffer *pb_trivial_buffer_create_with_strategy(
                                     const struct pb_buffer_strategy *strategy);
@@ -1112,7 +1172,10 @@ struct pb_buffer *pb_trivial_buffer_create_with_strategy_with_alloc(
 
 
 
-/** Trivial buffer operations. */
+/** Trivial buffer concrete implementations.
+ *
+ * These are protected functions and should not be called externally.
+ */
 uint64_t pb_trivial_buffer_get_data_revision(
                                          struct pb_buffer * const buffer);
 void pb_trivial_buffer_increment_data_revision(
@@ -1244,6 +1307,7 @@ uint64_t pb_trivial_buffer_read_data(struct pb_buffer * const buffer,
 void pb_trivial_buffer_clear(struct pb_buffer * const buffer);
 void pb_trivial_pure_buffer_clear(
                              struct pb_buffer * const buffer);
+
 void pb_trivial_buffer_destroy(
                              struct pb_buffer * const buffer);
 
