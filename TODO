@@ -13,5 +13,6 @@
 - fragment_as_target(false) should not even fragment to page_size, original
   fragment sizes should remain unchanged.
 - pagebuf_mmap.hpp
+- Consider making pb::line_reader and pb::data_reader non copy/= able
 - Document as thread unsafe.  Reference counting to be non atomic
 - Add a thread exclusivity debugging API

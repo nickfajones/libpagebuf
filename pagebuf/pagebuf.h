@@ -1174,7 +1174,7 @@ struct pb_buffer *pb_trivial_buffer_create_with_strategy_with_alloc(
 
 
 
-/** Trivial buffer concrete implementations.
+/** Specific implementations of pb_trivial_buffer operations.
  *
  * These are protected functions and should not be called externally.
  */
@@ -1394,9 +1394,9 @@ void pb_data_reader_destroy(
  *
  * The trivial data reader is a reference implementation of pb_data_reader.
  *
- * It interacts with its attached pb_buffer instance using only public,
- * functional interfaces, so it is independent of the internal implementation
- * details of any buffer subclass.
+ * It interacts with its attached pb_buffer instance using only the public,
+ * functional interfaces of pb_buffer, so it is independent of the internal
+ * implementation details of any buffer subclass.
  */
 
 
@@ -1414,6 +1414,12 @@ const struct pb_data_reader_operations
 struct pb_data_reader *pb_trivial_data_reader_create(
                                               struct pb_buffer * const buffer);
 
+
+
+/** Specific implementations of pb_trivial_data_reader operations.
+ *
+ * These are protected functions and should not be called externally.
+ */
 uint64_t pb_trivial_data_reader_read(struct pb_data_reader * const data_reader,
                                      uint8_t * const buf, uint64_t len);
 
@@ -1452,56 +1458,95 @@ struct pb_line_reader_operations {
    */
   bool (*has_line)(struct pb_line_reader * const line_reader);
 
-  /** Returns the length of the line discovered by has_line. */
-  size_t (*get_line_len)(struct pb_line_reader * const line_reader);
-  /** Extracts the data of the line discovered by has_line.
+  /** Returns the length of the line discovered by has_line.
    *
-   * base indicates the start of the destination memory region
-   * len indicates the shorter of the number of bytes to read or the length of
-   *     the memory region.
+   * If the has_line function has been previously called and retuned true,
+   * then this function will return the length of the line that was
+   * discovered.
+   * If no line was discovered or has_line was never called, zero will be
+   * returned.
+   */
+  size_t (*get_line_len)(struct pb_line_reader * const line_reader);
+  /** Read data from the discovered line into a memory region.
+   *
+   * buf: the start of the target memory region.
+   * len: the amount of data to read in bytes.
+   *
+   * Data is read from the head of the buffer.  The amount of data read is the
+   * lower of the length of the line and the value of len.
    */
   size_t (*get_line_data)(struct pb_line_reader * const line_reader,
-                          uint8_t * const base, uint64_t len);
+                          uint8_t * const buf, uint64_t len);
 
+  /** Seek the buffer data to the position after the line.
+   *
+   * This function will take into account the nature of the line end (whether
+   * it includes a '\r' or not).
+   */
   size_t (*seek_line)(struct pb_line_reader * const line_reader);
 
-  /** Marks the present position of line discovery as a line end.
+  /** Marks the present position of line search as a line end.
    *
-   * If the character proceeding the termination point is a cr, it will be
-   * ignored in the line length calculation and included in the line. */
+   * Even if no line end has yet been found, this function will allow the
+   * present search position to be treated as line end, allowing extraction of
+   * line data.
+   * If the character proceeding the termination point is a '\r', it will be
+   * ignored in the line length calculation and included in the line data.
+   */
   void (*terminate_line)(struct pb_line_reader * const line_reader);
-  /** Marks the present position of line discovery as a line end.
+  /** Marks the present position of line search as a line end.
    *
-   * If the character proceeding the termination point is a cr, it will be
-   * considered in the line length calculation. */
+   * Even if no line end has yet been found, this function will allow the
+   * present search position to be treated as line end, allowing extraction of
+   * line data.
+   * If the character proceeding the termination point is a '\r', it will be
+   * included in the line length calculation and excluded from the line data.
+   */
   void (*terminate_line_check_cr)(struct pb_line_reader * const line_reader);
 
-  /** Indicates whether the line discovered in has_line is:
-   *    LF (false) or CRLF (true) */
+  /** Indicates whether the line discovered by has_line is terminated by a
+   *  '\r\n' (true) or
+   *  '\n' (false)
+   */
   bool (*is_crlf)(struct pb_line_reader * const line_reader);
-  /** Indicates whether the line discovery has reached the end of the buffer.
-   *
-   * Buffer end may be used as line end if terminate_line is called. */
+  /** Indicates whether line search has reached the end of the buffer. */
   bool (*is_end)(struct pb_line_reader * const line_reader);
 
   /** Clone the state of the line reader into a new instance. */
   struct pb_line_reader *(*clone)(struct pb_line_reader * const line_reader);
 
-  /** Reset the current line discovery back to an initial state. */
+  /** Reset the current line discovery progress information, including
+   *  positions of discovered lines. */
   void (*reset)(struct pb_line_reader * const line_reader);
 
-  /** Destroy a line reader instance. */
+  /** Destroy the line reader.
+   *
+   * Dismantle and clear all internal data structures and free memory blocks
+   * associated with the line reader itself.
+   */
   void (*destroy)(struct pb_line_reader * const line_reader);
 };
 
 
 
-/** Lines in a buffer will be limited by implementations to no longer than
- * PB_TRIVIAL_LINE_READER_DEFAULT_LINE_MAX bytes.  Any lines that are longer
- * will be truncated to that length.
+/** The maximum size of lines supported by pb_line_reader will be limited to
+ *  this value. Any line discovery that reaches this position value during a
+ *  search will set an artificial newline at this point.
  */
 #define PB_LINE_READER_DEFAULT_LINE_MAX                   16777216L
 
+
+
+/** An interface for searching a pb_buffer for lines, delimited by either
+ *  '\r\n' or '\n'
+ *
+ * The line reader will use the subject buffers' data revision to monitor the
+ * state of the buffer data, which means that a search that previously failed
+ * to find a line end can be continued at the same point whe nnew data is
+ * wriitten to the end of the buffer.  However, modifications to the buffer
+ * that cause the data revision to be updated will invalidate the line search
+ * and require the line reader to re-start at the begining of the buffer.
+ */
 struct pb_line_reader {
   const struct pb_line_reader_operations *operations;
 
@@ -1511,7 +1556,10 @@ struct pb_line_reader {
 
 
 
-/** Functional infterface for the generic pb_buffer class. */
+/** Functional infterface for the generic pb_buffer class.
+ *
+ * These functions are public and may be called by end users.
+ */
 bool pb_line_reader_has_line(struct pb_line_reader * const line_reader);
 
 size_t pb_line_reader_get_line_len(struct pb_line_reader * const line_reader);
@@ -1538,7 +1586,14 @@ void pb_line_reader_destroy(
 
 
 
-/** The trivial line reader implementation and its supporting functions. */
+/** The trivial line reader implementation and its supporting functions.
+ *
+ * The trivial line reader is a reference implementation of pb_line_reader.
+ *
+ * It interacts with its attached pb_buffer instance using only the public,
+ * functional interfaces of pb_buffer, so it is independent of the internal
+ * implementation details of any buffer subclass.
+ */
 
 
 
@@ -1548,11 +1603,19 @@ const struct pb_line_reader_operations
 
 
 
-/** A trivial line reader implementation that searches for lines via iterators.
+/** Factory functions producing trivial pb_line_reader instances.
+ *
+ * buffer: the buffer to attach the data reader to.
  */
 struct pb_line_reader *pb_trivial_line_reader_create(
                                           struct pb_buffer * const buffer);
 
+
+
+/** Specific implementations of pb_trivial_line_reader operations.
+ *
+ * These are protected functions and should not be called externally.
+ */
 bool pb_trivial_line_reader_has_line(
                                     struct pb_line_reader * const line_reader);
 
