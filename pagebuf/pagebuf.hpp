@@ -26,16 +26,13 @@
 namespace pb
 {
 
-/** Pre-declare some friends
- */
 class data_reader;
 class byte_reader;
 class line_reader;
 
 
 
-/** C++ wrapper around pb_buffer, using trivial buffer in the base class.
- */
+/** C++ wrapper around pb_buffer, using a pb_trivial_buffer. */
 class buffer {
   public:
     friend class data_reader;
@@ -43,22 +40,21 @@ class buffer {
     friend class line_reader;
 
   public:
-    /** C++ wrapper around pb_buffer_iterator.
-     */
+    /** C++ wrapper around pb_buffer_iterator. */
     class iterator {
       public:
         friend class buffer;
 
       public:
         iterator() :
-          buffer_iterator_({}),
-          buffer_(0) {
+            buffer_iterator_({}),
+            buffer_(0) {
         }
 
       private:
         iterator(struct pb_buffer * const buffer, bool at_end) :
-          buffer_iterator_({}),
-          buffer_(buffer) {
+            buffer_iterator_({}),
+            buffer_(buffer) {
           if (!at_end)
             pb_buffer_get_iterator(buffer_, &buffer_iterator_);
           else
@@ -67,8 +63,8 @@ class buffer {
 
       public:
         iterator(const iterator& rvalue) :
-          buffer_iterator_({}),
-          buffer_(0) {
+            buffer_iterator_({}),
+            buffer_(0) {
           *this = rvalue;
         }
 
@@ -137,14 +133,14 @@ class buffer {
 
       public:
         byte_iterator() :
-          byte_iterator_({}),
-          buffer_(0) {
+            byte_iterator_({}),
+            buffer_(0) {
         }
 
       private:
         byte_iterator(struct pb_buffer * const buffer, bool at_end) :
-          byte_iterator_({}),
-          buffer_(buffer) {
+            byte_iterator_({}),
+            buffer_(buffer) {
           if (!at_end)
             pb_buffer_get_byte_iterator(buffer_, &byte_iterator_);
           else
@@ -153,8 +149,8 @@ class buffer {
 
       public:
         byte_iterator(const byte_iterator& rvalue) :
-          byte_iterator_({}),
-          buffer_(0) {
+            byte_iterator_({}),
+            buffer_(0) {
           *this = rvalue;
         }
 
@@ -218,15 +214,15 @@ class buffer {
 
   public:
     buffer() :
-      buffer_(pb_trivial_buffer_create()) {
+        buffer_(pb_trivial_buffer_create()) {
     }
 
     explicit buffer(const struct pb_buffer_strategy *strategy) :
-      buffer_(pb_trivial_buffer_create_with_strategy(strategy)) {
+        buffer_(pb_trivial_buffer_create_with_strategy(strategy)) {
     }
 
     explicit buffer(const struct pb_allocator *allocator) :
-      buffer_(pb_trivial_buffer_create_with_alloc(allocator)) {
+        buffer_(pb_trivial_buffer_create_with_alloc(allocator)) {
     }
 
     buffer(
@@ -239,18 +235,18 @@ class buffer {
 
   protected:
     explicit buffer(struct pb_buffer *buf) :
-      buffer_(buf) {
+        buffer_(buf) {
     }
 
   private:
     buffer(const buffer& rvalue) :
-      buffer_(0) {
+        buffer_(0) {
     }
 
   public:
     buffer(buffer&& rvalue) :
-      buffer_(rvalue.buffer_) {
-      rvalue.buffer_ = 0;
+        buffer_(rvalue.buffer_) {
+        rvalue.buffer_ = 0;
     }
 
     ~buffer() {
@@ -354,29 +350,28 @@ class buffer {
 
 
 
-/** C++ Wrapper around pb_line_reader
- */
+/** C++ Wrapper around pb_line_reader. */
 class line_reader {
   public:
     line_reader() :
-      line_reader_(0),
-      has_line_(false) {
+        line_reader_(0),
+        has_line_(false) {
     }
 
     explicit line_reader(buffer& buf) :
-      line_reader_(pb_trivial_line_reader_create(buf.buffer_)),
-      has_line_(false) {
+        line_reader_(pb_trivial_line_reader_create(buf.buffer_)),
+        has_line_(false) {
     }
 
     line_reader(const byte_reader& rvalue) :
-      line_reader_(0),
-      has_line_(false) {
+        line_reader_(0),
+        has_line_(false) {
       *this = rvalue;
     }
 
     line_reader(line_reader&& rvalue) :
-      line_reader_(0),
-      has_line_(false) {
+        line_reader_(0),
+        has_line_(false) {
       *this = rvalue;
     }
 

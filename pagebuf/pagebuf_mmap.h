@@ -40,7 +40,7 @@ enum pb_mmap_close_action {
 
 
 
-/** The mmap buffer implementation and its supporting functions.
+/** Factory functions for the mmap buffer implementation of pb_buffer.
  *
  * The mmap buffer has a specific strategy and customised operations that allow
  * it to use mmap'd memory regions backed by a file on a block storage device
@@ -52,7 +52,7 @@ enum pb_mmap_close_action {
  * allocator will be used for struct allocations.
  *
  * The mmap buffer requires some parameters for initialisation:
- * file_path is a full path and file name of the location of the file that the
+ * file_path: the full path and file name of the location of the file that the
  *           buffer is to use as storage.  It is up to the user of the mmap
  *           buffer to ensure the path both exists and is writable, and the
  *           file doesn't exist or is at least readable.
