@@ -952,8 +952,10 @@ struct pb_buffer_operations {
    * buf: the start of the target memory region.
    * len: the amount of data to read in bytes.
    *
-   * The return value is the amount of data successfully read from the
-   * buffer.
+   * Data is read from the head of the buffer.  The amount of data read is the
+   * lower of the size of the buffer and the value of len.
+   *
+   * The return value is the amount of data successfully read from the buffer.
    */
   uint64_t (*read_data)(struct pb_buffer * const buffer,
                         uint8_t * const buf,
@@ -969,8 +971,8 @@ struct pb_buffer_operations {
 
   /** Destroy a buffer.
    *
-   * Clear all data in the buffer and dismantle and clear all internal data
-   * structures.
+   * Clear all data in the buffer, dismantle and clear all internal data
+   * structures and free memory blocks associated with the buffer itself.
    */
   void (*destroy)(struct pb_buffer * const buffer);
 };
@@ -1156,7 +1158,7 @@ const struct pb_buffer_operations *pb_get_trivial_buffer_operations(void);
 
 
 
-/** Factory functions producing trivial buffer instances.
+/** Factory functions producing trivial pb_buffer instances.
  *
  * Users may use either default, trivial strategy and allocator, or supply
  * their own.
@@ -1321,41 +1323,52 @@ struct pb_data_reader;
 
 
 
-/**
- *
- * The operations structure of the data reader.
+/** The structure that holds the operations that implement pb_data_reader
+ *  functionality.
  */
 struct pb_data_reader_operations {
   /** Read data from the pb_buffer instance, into a memory region.
    *
-   * buf indicates the start of the target memory region.
-   * len indicates the amount of data to read, in bytes.
+   * buf: the start of the target memory region.
+   * len: the amount of data to read in bytes.
    *
-   * returns the amount of data read.
-   *
-   * Data is read from the head of the source pb_buffer.  The amount of data read
-   * is the lower of the size of the source pb_buffer and the value of len.
+   * Data is read from the head of the buffer.  The amount of data read is the
+   * lower of the size of the buffer and the value of len.
    *
    * Following a data read, the data reader will retain the position of the
-   * end of the read, thus, a subsequent call to read_buffer will continue from
-   * where the last read left off.
+   * end of the read, thus, a subsequent call to read will continue from
+   * where the last read finished.
    *
-   * However, if the pb_buffer undergoes an operation that alters its data
-   * revision, a subsequent call to read_buffer will read from the beginning
+   * However, if the buffer undergoes an operation that alters its data
+   * revision, a subsequent call to read on the data reader will read from the
+   * beginning of the buffer.
+   *
+   * The return value is the amount of data successfully read from the buffer.
    */
   uint64_t (*read)(struct pb_data_reader * const data_reader,
                    uint8_t * const buf, uint64_t len);
 
-  /** Reset the data reader back to the beginning of the pb_buffer instance. */
+  /** Reset the data reader so that subsequent reads start at the beginning of
+   *  the buffer. */
   void (*reset)(struct pb_data_reader * const data_reader);
 
-  /** Destroy the pb_data_reader instance. */
+  /** Destroy the data reader.
+   *
+   * Dismantle and clear all internal data structures and free memory blocks
+   * associated with the data reader itself.
+   */
   void (*destroy)(struct pb_data_reader * const data_reader);
 };
 
 
 
-/** An interface for reading data from a pb_buffer. */
+/** An interface for reading data from a pb_buffer.
+ *
+ * The data reader attaches to a pb_buffer instance and provides an interface
+ * for performing continuous reads from that buffer.  The reader keeps track
+ * of its last read position in the buffer as it completes one read and
+ * allows the user to continue reads from that same point in the next read.
+ */
 struct pb_data_reader {
   const struct pb_data_reader_operations *operations;
 
@@ -1364,7 +1377,10 @@ struct pb_data_reader {
 
 
 
-/** Functional interfaces for the generic pb_data_reader class. */
+/** Functional interfaces for the generic pb_data_reader class.
+ *
+ * These functions are public and may be called by end users.
+ */
 uint64_t pb_data_reader_read(struct pb_data_reader * const data_reader,
                              uint8_t * const buf, uint64_t len);
 
@@ -1374,7 +1390,14 @@ void pb_data_reader_destroy(
 
 
 
-/** The trivial data reader implementation and its supporting functions. */
+/** The trivial data reader implementation and its supporting functions.
+ *
+ * The trivial data reader is a reference implementation of pb_data_reader.
+ *
+ * It interacts with its attached pb_buffer instance using only public,
+ * functional interfaces, so it is independent of the internal implementation
+ * details of any buffer subclass.
+ */
 
 
 
@@ -1384,7 +1407,9 @@ const struct pb_data_reader_operations
 
 
 
-/** A trivial data reader implementation that reads data via iterators
+/** Factory functions producing trivial pb_data_reader instances.
+ *
+ * buffer: the buffer to attach the data reader to.
  */
 struct pb_data_reader *pb_trivial_data_reader_create(
                                               struct pb_buffer * const buffer);
@@ -1406,13 +1431,25 @@ struct pb_line_reader;
 
 
 
-/** An interface for discovering, reading and consuming LF or CRLF terminated
- *  lines in pb_buffer instances.
- *
- * The operations structure of the line reader.
+/** The structure that holds the operations that implement pb_line_reader
+ *  functionality.
  */
 struct pb_line_reader_operations {
-  /** Indicates whether a line exists at the head of a pb_buffer instance. */
+  /** Indicates whether a line exists at the head of a pb_buffer instance.
+   *
+   * This function will search the attached pb_buffer for either a '\n' or
+   * '\r\n' pattern.
+   * If one of these patterns is found, then the search position information
+   * is recorded and a true result will be returned.
+   * If no such pattern is found, then the position at the end of the search
+   * is recorded and a false result will be returned.
+   * New data may be added to the buffer and because this will not affect the
+   * data revision, subsequent calls to this function will also continue from
+   * the last search end position, allowing the user to run an active line end
+   * search while writing to the buffer.  However, if the buffer is modified
+   * in such a way that alters the data revision, line end searches will need
+   * to start at the head of the buffer again.
+   */
   bool (*has_line)(struct pb_line_reader * const line_reader);
 
   /** Returns the length of the line discovered by has_line. */
