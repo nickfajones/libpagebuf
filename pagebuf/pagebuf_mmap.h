@@ -52,17 +52,17 @@ enum pb_mmap_close_action {
  * allocator will be used for struct allocations.
  *
  * The mmap buffer requires some parameters for initialisation:
- * file_path: the full path and file name of the location of the file that the
- *           buffer is to use as storage.  It is up to the user of the mmap
- *           buffer to ensure the path both exists and is writable, and the
- *           file doesn't exist or is at least readable.
- *
- * open_action is the action to perform when the buffer is opened:
- *             append leaves the file unchanged and appends additional writes
- *             overwrite clears the file and writes start at the beginning
- * close_action is the action to perform when the buffer is closed:
- *              retain closes the file and leaves it as it is
- *              remove closes the file and deletes it
+ * file_path: the full path and file name of the file that the mmap buffer is
+ *            to use as storage.  It is up to the user of the mmap buffer to
+ *            ensure that the path either:
+ *            exists and is readale or,
+ *            doesn't exist and the directory writable
+ * open_action: the action to perform when the buffer is opened:
+ *              append: the file unchanged writes are appended to the end
+ *              overwrite: file is cleared if it exists already
+ * close_action: is the action to perform when the buffer is closed:
+ *               retain: leaves the file and its data as is
+ *               remove: clears all data and deletes the file
  *
  * Parameter validation errors during mmap buffer create will cause errno to be
  * set to EINVAL.
