@@ -3,7 +3,7 @@ dnl ----------------------
 dnl Initialization macros
 dnl ----------------------
 
-AC_INIT([libpagebuf], [0.1])
+AC_INIT([libpagebuf], [0.9])
 AM_INIT_AUTOMAKE()
 
 AC_CONFIG_HEADERS([config.h])
@@ -14,8 +14,8 @@ dnl -----------------------------------------------
 
 GENERIC_LIBRARY_NAME=pagebuf
 
-GENERIC_MAJOR_VERSION=1
-GENERIC_MINOR_VERSION=0
+GENERIC_MAJOR_VERSION=0
+GENERIC_MINOR_VERSION=9
 GENERIC_MICRO_VERSION=0
 
 # API version (often = GENERIC_MAJOR_VERSION.GENERIC_MINOR_VERSION)
