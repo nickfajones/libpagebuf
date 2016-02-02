@@ -28,11 +28,11 @@
  */
 void *pb_allocator_alloc(const struct pb_allocator *allocator,
     enum pb_allocator_type type, size_t size) {
-  return allocator->alloc(allocator, type, size);
+  return allocator->operations->alloc(allocator, type, size);
 }
 void pb_allocator_free(const struct pb_allocator *allocator,
     enum pb_allocator_type type, void *obj, size_t size) {
-  allocator->free(allocator, type, obj, size);
+  allocator->operations->free(allocator, type, obj, size);
 }
 
 /*******************************************************************************
@@ -56,14 +56,32 @@ static void pb_trivial_free(const struct pb_allocator *allocator,
   free(obj);
 }
 
-static struct pb_allocator pb_trivial_allocator = {
+
+/*******************************************************************************
+ */
+static struct pb_allocator_operations pb_trivial_allocator_operations = {
   .alloc = pb_trivial_alloc,
   .free = pb_trivial_free,
+};
+
+const struct pb_allocator_operations *pb_get_trivial_allocator_operations(void) {
+  return &pb_trivial_allocator_operations;
+}
+
+
+
+/*******************************************************************************
+ */
+static struct pb_allocator pb_trivial_allocator = {
+  .operations = &pb_trivial_allocator_operations,
 };
 
 const struct pb_allocator *pb_get_trivial_allocator(void) {
   return &pb_trivial_allocator;
 }
+
+
+
 
 
 
@@ -168,6 +186,7 @@ void pb_trivial_data_put(struct pb_data *data) {
 
 
 
+
 /*******************************************************************************
  */
 struct pb_page *pb_page_create(struct pb_data *data,
@@ -224,6 +243,8 @@ void pb_page_destroy(struct pb_page *page,
 
 
 
+
+
 /*******************************************************************************
  */
 uint8_t *pb_buffer_iterator_get_base(
@@ -239,12 +260,17 @@ size_t pb_buffer_iterator_get_len(
 
 
 
+
+
 /*******************************************************************************
  */
 const char *pb_buffer_byte_iterator_get_current_byte(
     const struct pb_buffer_byte_iterator *buffer_byte_iterator) {
   return buffer_byte_iterator->current_byte;
 }
+
+
+
 
 
 

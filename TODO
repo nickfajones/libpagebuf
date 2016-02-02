@@ -1,4 +1,3 @@
-- object style structure for allocator, just like others
 - Can object be declared before operations
 - Implement write operations as calls to insert operations
 - insert functions don't respect strategy.  Make them!

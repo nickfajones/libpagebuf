@@ -103,7 +103,7 @@ static void *pb_mmap_allocator_alloc(const struct pb_allocator *allocator,
     (struct pb_mmap_allocator*)allocator;
 
   if (type == pb_alloc_type_struct)
-    return mmap_allocator->struct_allocator->alloc(allocator, type, size);
+    return pb_allocator_alloc(mmap_allocator->struct_allocator, type, size);
 
   return NULL;
 }
@@ -118,8 +118,14 @@ static void pb_mmap_allocator_free(const struct pb_allocator *allocator,
 
     return;
   }
-
 }
+
+/*******************************************************************************
+ */
+struct pb_allocator_operations pb_mmap_allocator_operations = {
+  .alloc = &pb_mmap_allocator_alloc,
+  .free =&pb_mmap_allocator_free,
+};
 
 
 
@@ -143,10 +149,9 @@ static struct pb_mmap_allocator *pb_mmap_allocator_create(const char *file_path,
   if (!mmap_allocator)
     return NULL;
 
-  mmap_allocator->use_count = 1;
+  mmap_allocator->allocator.operations = &pb_mmap_allocator_operations;
 
-  mmap_allocator->allocator.alloc = &pb_mmap_allocator_alloc;
-  mmap_allocator->allocator.free = &pb_mmap_allocator_free;
+  mmap_allocator->use_count = 1;
 
   mmap_allocator->struct_allocator = allocator;
 

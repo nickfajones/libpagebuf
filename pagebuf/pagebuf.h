@@ -138,11 +138,18 @@ extern "C" {
 
 
 
+/* Pre-declare operations. */
+struct pb_allocator_operations;
+
+
+
 /** Indicates the intended use of an allocated memory block. */
 enum pb_allocator_type {
   pb_alloc_type_struct,
   pb_alloc_type_region,
 };
+
+
 
 /** Wrapper for allocation and freeing of blocks of memory
  *
@@ -159,6 +166,15 @@ enum pb_allocator_type {
  * treated in any special way by an allocator.
  */
 struct pb_allocator {
+  const struct pb_allocator_operations *operations;
+};
+
+
+
+/** The structure that holds the operations that implement pb_allocator
+ *  functionality.
+ */
+struct pb_allocator_operations {
   /** Allocate a memory block.
    *
    * type indicates what the allocated memory block will be used for
@@ -180,6 +196,8 @@ struct pb_allocator {
                 enum pb_allocator_type type, void *obj, size_t size);
 };
 
+
+
 /** Functional interfaces for the pb_allocator class.
  *
  * These interfaces should be used to invoke the allocator operations.
@@ -193,6 +211,13 @@ void *pb_allocator_alloc(
 void pb_allocator_free(const struct pb_allocator *allocator,
                        enum pb_allocator_type type, void *obj, size_t size);
 
+
+
+/** Get a built in, trivial set of pb_allocator operations.
+ *
+ * This is a protected function and should not be called externally.
+ */
+const struct pb_allocator_operations *pb_get_trivial_allocator_operations(void);
 
 
 
