@@ -245,28 +245,8 @@ struct pb_data_vec {
 
 
 
-/** The pb_data and its supporting classes and functions. */
-struct pb_data;
-
-
-
-/** The structure that holds the operations that implement pb_data
- *  functionality.
- */
-struct pb_data_operations {
-  /** Increment the use count of the pb_data instance. */
-  void (*get)(struct pb_data * const data);
-
-  /** Decrement the use count of the pb_data instance.
-   *
-   * Will destroy the instance if the use count becomes zero.
-   * The memory region of the instance will be freed if it is owned by the
-   * instance (see pb_data_responsibility below).
-   * The memory block associated with the pb_data instance itself will be
-   * freed.
-   */
-  void (*put)(struct pb_data * const data);
-};
+/* Pre-declare operations. */
+struct pb_data_operations;
 
 
 
@@ -332,6 +312,26 @@ struct pb_data {
    *  owned memory region, in addition to freeing these same blocks.
    */
   const struct pb_allocator *allocator;
+};
+
+
+
+/** The structure that holds the operations that implement pb_data
+ *  functionality.
+ */
+struct pb_data_operations {
+  /** Increment the use count of the pb_data instance. */
+  void (*get)(struct pb_data * const data);
+
+  /** Decrement the use count of the pb_data instance.
+   *
+   * Will destroy the instance if the use count becomes zero.
+   * The memory region of the instance will be freed if it is owned by the
+   * instance (see pb_data_responsibility below).
+   * The memory block associated with the pb_data instance itself will be
+   * freed.
+   */
+  void (*put)(struct pb_data * const data);
 };
 
 
@@ -409,7 +409,7 @@ void pb_trivial_data_put(struct pb_data * const data);
  * one pb_buffer to another, depending on the behaviour built into the target
  * pb_buffer.
  *
- * The pb_page class is thoroughly lightweigh and internal to pb_buffer so
+ * The pb_page class is thoroughly lightweight and internal to pb_buffer so
  * it should never be subclassed to provide buffer class specific behaviour.
  */
 struct pb_page {
@@ -461,8 +461,41 @@ void pb_page_destroy(struct pb_page *page,
 
 
 
-/** The pb_buffer and its supporting classes and functions. */
-struct pb_buffer;
+/* Pre-declare strategy and operations. */
+struct pb_buffer_strategy;
+struct pb_buffer_operations;
+
+
+
+/** The base pb_buffer class.
+ *
+ * The pb_buffer class is the focus of libpagebuf.  It represents the core
+ * functionality of the library and is the primary interface for accessing
+ * this functionality.
+ *
+ * The base pb_buffer only references high level structures that are
+ * fundamental to the identity and operation a buffer.
+ */
+struct pb_buffer {
+  /** The description of the core behaviour of the buffer.  May or may not be
+   *  variable between buffer instances, depending on the specific buffer
+   *  class, however in all cases, these behaviours are not expected nor should
+   *  be permitted to change after a buffer instance is created.
+   */
+  const struct pb_buffer_strategy *strategy;
+
+  /** The structure describing the concrete implementation of the buffer
+   *  functions.  Immutable and identical for all instances of same buffer
+   *  classes.
+   */
+  const struct pb_buffer_operations *operations;
+
+  /** The allocator used by the buffer instance to perform all structure and
+   *  memory region allocations.
+   */
+  const struct pb_allocator *allocator;
+};
+
 
 
 
@@ -1004,33 +1037,6 @@ struct pb_buffer_operations {
 
 
 
-/** The base pb_buffer class.
- *
- * The base pb_buffer only references high level structures that are
- * fundamental to the identity and operation a buffer:
- */
-struct pb_buffer {
-  /** The description of the core behaviour of the buffer.  May or may not be
-   *  variable between buffer instances, depending on the specific buffer
-   *  class, however in all cases, these behaviours are not expected nor should
-   *  be permitted to change after a buffer instance is created.
-   */
-  const struct pb_buffer_strategy *strategy;
-
-  /** The structure describing the concrete implementation of the buffer
-   *  functions.  Immutable and identical for all instances of same buffer
-   *  classes.
-   */
-  const struct pb_buffer_operations *operations;
-
-  /** The allocator used by the buffer instance to perform all structure and
-   *  memory region allocations.
-   */
-  const struct pb_allocator *allocator;
-};
-
-
-
 /** Functional interfaces for the generic pb_buffer class.
  *
  * These functions are public and may be called by end users.
@@ -1343,8 +1349,23 @@ void pb_trivial_buffer_destroy(
 
 
 
-/** The pb_data_reader and its supporting functions. */
-struct pb_data_reader;
+/* Pre-declare operations. */
+struct pb_data_reader_operations;
+
+
+
+/** An interface for reading data from a pb_buffer.
+ *
+ * The data reader attaches to a pb_buffer instance and provides an interface
+ * for performing continuous reads from that buffer.  The reader keeps track
+ * of its last read position in the buffer as it completes one read and
+ * allows the user to continue reads from that same point in the next read.
+ */
+struct pb_data_reader {
+  const struct pb_data_reader_operations *operations;
+
+  struct pb_buffer *buffer;
+};
 
 
 
@@ -1387,21 +1408,6 @@ struct pb_data_reader_operations {
 
 
 
-/** An interface for reading data from a pb_buffer.
- *
- * The data reader attaches to a pb_buffer instance and provides an interface
- * for performing continuous reads from that buffer.  The reader keeps track
- * of its last read position in the buffer as it completes one read and
- * allows the user to continue reads from that same point in the next read.
- */
-struct pb_data_reader {
-  const struct pb_data_reader_operations *operations;
-
-  struct pb_buffer *buffer;
-};
-
-
-
 /** Functional interfaces for the generic pb_data_reader class.
  *
  * These functions are public and may be called by end users.
@@ -1426,7 +1432,10 @@ void pb_data_reader_destroy(
 
 
 
-/** Get a trivial data reader operations structure. */
+/** Get a trivial data reader operations structure.
+ *
+ * This is a protected function and should not be called externally.
+ */
 const struct pb_data_reader_operations
   *pb_get_trivial_data_reader_operations(void);
 
@@ -1457,8 +1466,34 @@ void pb_trivial_data_reader_destroy(
 
 
 
-/** The pb_line_reader and its supporting functions. */
-struct pb_line_reader;
+/* Pre-declare the operations. */
+struct pb_line_reader_operations;
+
+
+
+/** An interface for searching a pb_buffer for lines, delimited by either
+ *  '\r\n' or '\n'
+ *
+ * The line reader will use the subject buffers' data revision to monitor the
+ * state of the buffer data, which means that a search that previously failed
+ * to find a line end can be continued at the same point whe nnew data is
+ * wriitten to the end of the buffer.  However, modifications to the buffer
+ * that cause the data revision to be updated will invalidate the line search
+ * and require the line reader to re-start at the begining of the buffer.
+ */
+struct pb_line_reader {
+  const struct pb_line_reader_operations *operations;
+
+  struct pb_buffer *buffer;
+};
+
+
+
+/** The maximum size of lines supported by pb_line_reader will be limited to
+ *  this value. Any line discovery that reaches this position value during a
+ *  search will set an artificial newline at this point.
+ */
+#define PB_LINE_READER_DEFAULT_LINE_MAX                   16777216L
 
 
 
@@ -1554,33 +1589,6 @@ struct pb_line_reader_operations {
 
 
 
-/** The maximum size of lines supported by pb_line_reader will be limited to
- *  this value. Any line discovery that reaches this position value during a
- *  search will set an artificial newline at this point.
- */
-#define PB_LINE_READER_DEFAULT_LINE_MAX                   16777216L
-
-
-
-/** An interface for searching a pb_buffer for lines, delimited by either
- *  '\r\n' or '\n'
- *
- * The line reader will use the subject buffers' data revision to monitor the
- * state of the buffer data, which means that a search that previously failed
- * to find a line end can be continued at the same point whe nnew data is
- * wriitten to the end of the buffer.  However, modifications to the buffer
- * that cause the data revision to be updated will invalidate the line search
- * and require the line reader to re-start at the begining of the buffer.
- */
-struct pb_line_reader {
-  const struct pb_line_reader_operations *operations;
-
-  struct pb_buffer *buffer;
-};
-
-
-
-
 /** Functional infterface for the generic pb_buffer class.
  *
  * These functions are public and may be called by end users.
@@ -1622,7 +1630,10 @@ void pb_line_reader_destroy(
 
 
 
-/** Get a trivial line reader operations structure. */
+/** Get a trivial line reader operations structure
+ *
+ * This is a protected function and should not be called externally.
+ */
 const struct pb_line_reader_operations
   *pb_get_trivial_line_reader_operations(void);
 
