@@ -18,16 +18,14 @@
 #define PAGEBUF_HPP
 
 
-#include <string>
-
 #include <pagebuf/pagebuf.h>
+
+#include <string>
 
 
 namespace pb
 {
 
-class data_reader;
-class byte_reader;
 class line_reader;
 
 
@@ -35,8 +33,6 @@ class line_reader;
 /** C++ wrapper around pb_buffer, using a pb_trivial_buffer. */
 class buffer {
   public:
-    friend class data_reader;
-    friend class byte_reader;
     friend class line_reader;
 
   public:
@@ -233,6 +229,11 @@ class buffer {
           strategy, allocator)) {
     }
 
+    buffer(buffer&& rvalue) :
+        buffer_(rvalue.buffer_) {
+        rvalue.buffer_ = 0;
+    }
+
   protected:
     explicit buffer(struct pb_buffer *buf) :
         buffer_(buf) {
@@ -244,11 +245,6 @@ class buffer {
     }
 
   public:
-    buffer(buffer&& rvalue) :
-        buffer_(rvalue.buffer_) {
-        rvalue.buffer_ = 0;
-    }
-
     ~buffer() {
       if (buffer_) {
         pb_buffer_destroy(buffer_);
@@ -318,16 +314,29 @@ class buffer {
       return pb_buffer_write_buffer(buffer_, src_buf.buffer_, len);
     }
 
-    uint64_t insert(const uint8_t *buf, uint64_t len) {
-      return pb_buffer_insert_data(buffer_, buf, len);
+    uint64_t insert(
+        const iterator& buffer_iterator, size_t offset,
+        const void *buf, uint64_t len) {
+      return
+        pb_buffer_insert_data(
+          buffer_, &buffer_iterator.buffer_iterator_, offset, buf, len);
     }
 
-    uint64_t insert_ref(const uint8_t *buf, uint64_t len) {
-      return pb_buffer_insert_data_ref(buffer_, buf, len);
+    uint64_t insert_ref(
+        const iterator& buffer_iterator, size_t offset,
+        const uint8_t *buf, uint64_t len) {
+      return
+        pb_buffer_insert_data_ref(
+          buffer_, &buffer_iterator.buffer_iterator_, offset, buf, len);
     }
 
-    uint64_t insert(const buffer& src_buf, uint64_t len) {
-      return pb_buffer_insert_buffer(buffer_, src_buf.buffer_, len);
+    uint64_t insert(
+        const iterator& buffer_iterator, size_t offset,
+        const buffer& src_buf, uint64_t len) {
+      return
+        pb_buffer_insert_buffer(
+          buffer_, &buffer_iterator.buffer_iterator_, offset,
+          src_buf.buffer_, len);
     }
 
     uint64_t overwrite(const uint8_t *buf, uint64_t len) {
@@ -361,12 +370,6 @@ class line_reader {
     explicit line_reader(buffer& buf) :
         line_reader_(pb_trivial_line_reader_create(buf.buffer_)),
         has_line_(false) {
-    }
-
-    line_reader(const byte_reader& rvalue) :
-        line_reader_(0),
-        has_line_(false) {
-      *this = rvalue;
     }
 
     line_reader(line_reader&& rvalue) :

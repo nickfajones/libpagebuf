@@ -15,6 +15,7 @@
  ******************************************************************************/
 
 #include "pagebuf.hpp"
+#include "pagebuf_mmap.hpp"
 
 
 namespace pb

@@ -18,6 +18,10 @@
 #define PAGEBUF_MMAP_HPP
 
 
+#include <string>
+
+#include <pagebuf/pagebuf_mmap.h>
+
 #include <pagebuf/pagebuf.hpp>
 
 
@@ -43,7 +47,9 @@ class mmap_buffer : public buffer {
                 enum close_action close_action) :
         buffer(
           pb_mmap_buffer_create(
-            file_path.c_str(), open_action, close_action),
+            file_path.c_str(),
+            pb_mmap_open_action(open_action),
+            pb_mmap_close_action(close_action))),
         file_path_(file_path) {
     }
 
@@ -53,21 +59,24 @@ class mmap_buffer : public buffer {
                 const struct pb_allocator *allocator) :
         buffer(
           pb_mmap_buffer_create_with_alloc(
-            file_path.c_str(), open_action, close_action, allocator),
+            file_path.c_str(),
+            pb_mmap_open_action(open_action),
+            pb_mmap_close_action(close_action),
+            allocator)),
         file_path_(file_path) {
     }
 
+    mmap_buffer(mmap_buffer&& rvalue) :
+        buffer(static_cast<buffer&&>(rvalue)),
+        file_path_(rvalue.file_path_) {
+      rvalue.buffer_ = 0;
+    }
+
   private:
-    mmap_buffer(const mmap_buffer& rvalue) :
-        buffer() {
+    mmap_buffer(const mmap_buffer& rvalue) {
     }
 
   public:
-    mmap_buffer(mmap_buffer&& rvalue) :
-        buffer(mmap_buffer),
-        file_path_(file_path_) {
-    }
-
     ~mmap_buffer() {
     }
 
