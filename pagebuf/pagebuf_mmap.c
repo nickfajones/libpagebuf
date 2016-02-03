@@ -287,7 +287,7 @@ static void pb_mmap_allocator_data_destroy(
  */
 static struct pb_page *pb_mmap_allocator_page_map_forward(
     struct pb_mmap_allocator * const mmap_allocator,
-    struct pb_buffer_iterator * const buffer_iterator) {
+    const struct pb_buffer_iterator *buffer_iterator) {
   struct pb_page *page = buffer_iterator->page;
   struct pb_mmap_data *mmap_data =
     (page) ?
@@ -371,7 +371,7 @@ static struct pb_page *pb_mmap_allocator_page_map_forward(
  */
 static struct pb_page *pb_mmap_allocator_page_map_backward(
     struct pb_mmap_allocator * const mmap_allocator,
-    struct pb_buffer_iterator * const buffer_iterator) {
+    const struct pb_buffer_iterator *buffer_iterator) {
   struct pb_page *page = buffer_iterator->page;
   struct pb_mmap_data *mmap_data =
     (page) ?
@@ -772,7 +772,7 @@ static void pb_mmap_buffer_get_iterator_end(
                             struct pb_buffer_iterator * const buffer_iterator);
 static bool pb_mmap_buffer_iterator_is_end(
                             struct pb_buffer * const buffer,
-                            struct pb_buffer_iterator * const buffer_iterator);
+                            const struct pb_buffer_iterator *buffer_iterator);
 static bool pb_mmap_buffer_iterator_cmp(struct pb_buffer * const buffer,
                             const struct pb_buffer_iterator *lvalue,
                             const struct pb_buffer_iterator *rvalue);
@@ -795,7 +795,7 @@ static struct pb_page *pb_mmap_buffer_page_create_ref(
 
 static uint64_t pb_mmap_buffer_insert(
                               struct pb_buffer * const buffer,
-                              struct pb_buffer_iterator * const buffer_iterator,
+                              const struct pb_buffer_iterator *buffer_iterator,
                               size_t offset,
                               struct pb_page * const page);
 static uint64_t pb_mmap_buffer_seek(struct pb_buffer * const buffer,
@@ -1012,7 +1012,7 @@ void pb_mmap_buffer_get_iterator_end(struct pb_buffer * const buffer,
 }
 
 bool pb_mmap_buffer_iterator_is_end(struct pb_buffer * const buffer,
-    struct pb_buffer_iterator * const buffer_iterator) {
+    const struct pb_buffer_iterator *buffer_iterator) {
   return pb_trivial_buffer_iterator_is_end(buffer, buffer_iterator);
 }
 
@@ -1093,7 +1093,7 @@ void pb_mmap_buffer_iterator_prev(struct pb_buffer * const buffer,
 /*******************************************************************************
  */
 uint64_t pb_mmap_buffer_insert(struct pb_buffer * const buffer,
-    struct pb_buffer_iterator * const buffer_iterator,
+    const struct pb_buffer_iterator *buffer_iterator,
     size_t offset,
     struct pb_page * const page) {
   assert(0);

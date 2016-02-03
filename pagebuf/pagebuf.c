@@ -367,7 +367,7 @@ void pb_buffer_get_iterator_end(struct pb_buffer * const buffer,
 }
 
 bool pb_buffer_iterator_is_end(struct pb_buffer * const buffer,
-    struct pb_buffer_iterator * const buffer_iterator) {
+    const struct pb_buffer_iterator *buffer_iterator) {
   return buffer->operations->iterator_is_end(buffer, buffer_iterator);
 }
 
@@ -423,7 +423,7 @@ void pb_buffer_byte_iterator_prev(struct pb_buffer * const buffer,
 /*******************************************************************************
  */
 uint64_t pb_buffer_insert(struct pb_buffer * const buffer,
-    struct pb_buffer_iterator * const buffer_iterator,
+    const struct pb_buffer_iterator *buffer_iterator,
     size_t offset,
     struct pb_page * const page) {
   return buffer->operations->insert(buffer, buffer_iterator, offset, page);
@@ -466,9 +466,9 @@ uint64_t pb_buffer_write_buffer(struct pb_buffer * const buffer,
 }
 
 uint64_t pb_buffer_insert_data(struct pb_buffer * const buffer,
-    struct pb_buffer_iterator * const buffer_iterator,
+    const struct pb_buffer_iterator *buffer_iterator,
     size_t offset,
-    const uint8_t *buf,
+    const void *buf,
     uint64_t len) {
   return
     buffer->operations->insert_data(buffer, buffer_iterator, offset, buf, len);
@@ -476,7 +476,7 @@ uint64_t pb_buffer_insert_data(struct pb_buffer * const buffer,
 
 uint64_t pb_buffer_insert_data_ref(
     struct pb_buffer * const buffer,
-    struct pb_buffer_iterator * const buffer_iterator,
+    const struct pb_buffer_iterator *buffer_iterator,
     size_t offset,
     const uint8_t *buf,
     uint64_t len) {
@@ -487,7 +487,7 @@ uint64_t pb_buffer_insert_data_ref(
 
 uint64_t pb_buffer_insert_buffer(
     struct pb_buffer * const buffer,
-    struct pb_buffer_iterator * const buffer_iterator,
+    const struct pb_buffer_iterator *buffer_iterator,
     size_t offset,
     struct pb_buffer * const src_buffer,
     uint64_t len) {
@@ -650,7 +650,7 @@ void pb_trivial_buffer_get_iterator_end(struct pb_buffer * const buffer,
 }
 
 bool pb_trivial_buffer_iterator_is_end(struct pb_buffer * const buffer,
-    struct pb_buffer_iterator * const buffer_iterator) {
+    const struct pb_buffer_iterator *buffer_iterator) {
   struct pb_trivial_buffer *trivial_buffer = (struct pb_trivial_buffer*)buffer;
 
   return (buffer_iterator->page == &trivial_buffer->page_end);
@@ -812,7 +812,7 @@ struct pb_page *pb_trivial_buffer_page_create_ref(
 /*******************************************************************************
  */
 uint64_t pb_trivial_buffer_insert(struct pb_buffer * const buffer,
-    struct pb_buffer_iterator * const buffer_iterator,
+    const struct pb_buffer_iterator *buffer_iterator,
     size_t offset,
     struct pb_page * const page) {
   if (!pb_buffer_iterator_is_end(buffer, buffer_iterator) &&
@@ -1115,7 +1115,7 @@ static
 inline
 #endif
 uint64_t pb_trivial_buffer_write_data_ref1(struct pb_buffer * const buffer,
-    struct pb_buffer_iterator * const buffer_iterator,
+    const struct pb_buffer_iterator *buffer_iterator,
     uint64_t offset,
     const uint8_t *buf,
     uint64_t len) {
@@ -1136,10 +1136,13 @@ static
 inline
 #endif
 uint64_t pb_trivial_buffer_write_data_ref2(struct pb_buffer * const buffer,
-    struct pb_buffer_iterator * const buffer_iterator,
+    const struct pb_buffer_iterator *buffer_iterator,
     uint64_t offset,
     const uint8_t *buf,
     uint64_t len) {
+  struct pb_buffer_iterator writable_iterator;
+  writable_iterator.page = buffer_iterator->page;
+
   uint64_t current_offset = offset;
   uint64_t written = 0;
 
@@ -1155,11 +1158,12 @@ uint64_t pb_trivial_buffer_write_data_ref2(struct pb_buffer * const buffer,
     if (!page)
       return 0;
 
-    write_len = pb_buffer_insert(buffer, buffer_iterator, current_offset, page);
+    write_len =
+      pb_buffer_insert(buffer, &writable_iterator, current_offset, page);
 
     if (current_offset > 0) {
-      pb_buffer_iterator_next(buffer, buffer_iterator); // new page
-      pb_buffer_iterator_next(buffer, buffer_iterator); // page after new page
+      pb_buffer_iterator_next(buffer, &writable_iterator); // new page
+      pb_buffer_iterator_next(buffer, &writable_iterator); // page after new page
     }
 
     current_offset = 0;
@@ -1439,9 +1443,9 @@ uint64_t pb_trivial_buffer_write_buffer(struct pb_buffer * const buffer,
 /*******************************************************************************
  */
 uint64_t pb_trivial_buffer_insert_data(struct pb_buffer * const buffer,
-    struct pb_buffer_iterator * const buffer_iterator,
+    const struct pb_buffer_iterator *buffer_iterator,
     size_t offset,
-    const uint8_t *buf,
+    const void *buf,
     uint64_t len) {
   if (!pb_buffer_iterator_is_end(buffer, buffer_iterator) &&
       buffer->strategy->rejects_insert)
@@ -1457,7 +1461,7 @@ uint64_t pb_trivial_buffer_insert_data(struct pb_buffer * const buffer,
 }
 
 uint64_t pb_trivial_buffer_insert_data_ref(struct pb_buffer * const buffer,
-    struct pb_buffer_iterator * const buffer_iterator,
+    const struct pb_buffer_iterator *buffer_iterator,
     size_t offset,
     const uint8_t *buf,
     uint64_t len) {
@@ -1473,7 +1477,7 @@ uint64_t pb_trivial_buffer_insert_data_ref(struct pb_buffer * const buffer,
 }
 
 uint64_t pb_trivial_buffer_insert_buffer(struct pb_buffer * const buffer,
-    struct pb_buffer_iterator * const buffer_iterator,
+    const struct pb_buffer_iterator *buffer_iterator,
     size_t offset,
     struct pb_buffer * const src_buffer,
     uint64_t len) {
@@ -1574,7 +1578,7 @@ static void pb_trivial_buffer_clear_impl(struct pb_buffer * const buffer,
     void (*get_iterator)(struct pb_buffer * const buffer,
                          struct pb_buffer_iterator * const buffer_iterator),
     bool (*iterator_is_end)(struct pb_buffer * const buffer,
-                            struct pb_buffer_iterator * const buffer_iterator),
+                            const struct pb_buffer_iterator *buffer_iterator),
     void (*iterator_next)(struct pb_buffer * const buffer,
                           struct pb_buffer_iterator * const buffer_iterator)) {
   pb_trivial_buffer_increment_data_revision(buffer);
