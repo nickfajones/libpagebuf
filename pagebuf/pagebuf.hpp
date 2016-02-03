@@ -222,11 +222,11 @@ class buffer {
     }
 
     buffer(
-        const struct pb_buffer_strategy *strategy,
-        const struct pb_allocator *allocator) :
-      buffer_(
-        pb_trivial_buffer_create_with_strategy_with_alloc(
-          strategy, allocator)) {
+          const struct pb_buffer_strategy *strategy,
+          const struct pb_allocator *allocator) :
+        buffer_(
+          pb_trivial_buffer_create_with_strategy_with_alloc(
+            strategy, allocator)) {
     }
 
     buffer(buffer&& rvalue) :
@@ -378,7 +378,13 @@ class line_reader {
       *this = rvalue;
     }
 
-    virtual ~line_reader() {
+    line_reader(const line_reader& rvalue) :
+        line_reader_(0),
+        has_line_(false) {
+      *this = rvalue;
+    }
+
+    ~line_reader() {
       destroy();
     }
 
@@ -402,7 +408,7 @@ class line_reader {
     }
 
   public:
-    virtual void reset() {
+    void reset() {
       if (line_reader_)
         pb_line_reader_reset(line_reader_);
 
@@ -412,7 +418,7 @@ class line_reader {
     }
 
   protected:
-    virtual void destroy() {
+    void destroy() {
       reset();
 
       if (line_reader_) {
