@@ -519,8 +519,11 @@ struct pb_buffer_iterator {
  *
  * These functions are public and may be called by end users.
  */
-uint8_t *pb_buffer_iterator_get_base(
+void *pb_buffer_iterator_get_base(
                              const struct pb_buffer_iterator *buffer_iterator);
+void *pb_buffer_iterator_get_base_at(
+                             const struct pb_buffer_iterator *buffer_iterator,
+                             size_t offset);
 size_t pb_buffer_iterator_get_len(
                              const struct pb_buffer_iterator *buffer_iterator);
 
@@ -884,7 +887,7 @@ struct pb_buffer_operations {
    * buffer.
    */
   uint64_t (*write_data)(struct pb_buffer * const buffer,
-                         const uint8_t *buf,
+                         const void *buf,
                          uint64_t len);
   /** Write data from memory region to the buffer, referencing only.
    *
@@ -897,7 +900,7 @@ struct pb_buffer_operations {
    * buffer.
    */
   uint64_t (*write_data_ref)(struct pb_buffer * const buffer,
-                             const uint8_t *buf,
+                             const void *buf,
                              uint64_t len);
   /** Write data from a source buffer to the buffer.
    *
@@ -957,7 +960,7 @@ struct pb_buffer_operations {
   uint64_t (*insert_data_ref)(struct pb_buffer * const buffer,
                               const struct pb_buffer_iterator *buffer_iterator,
                               size_t offset,
-                              const uint8_t *buf,
+                              const void *buf,
                               uint64_t len);
   /** Write data from a source buffer to the buffer.
    *
@@ -997,7 +1000,7 @@ struct pb_buffer_operations {
    * buffer.
    */
   uint64_t (*overwrite_data)(struct pb_buffer * const buffer,
-                             const uint8_t *buf,
+                             const void *buf,
                              uint64_t len);
 
 
@@ -1012,7 +1015,7 @@ struct pb_buffer_operations {
    * The return value is the amount of data successfully read from the buffer.
    */
   uint64_t (*read_data)(struct pb_buffer * const buffer,
-                        uint8_t * const buf,
+                        void * const buf,
                         uint64_t len);
 
 
@@ -1096,11 +1099,11 @@ uint64_t pb_buffer_trim(struct pb_buffer * const buffer, uint64_t len);
 
 
 uint64_t pb_buffer_write_data(struct pb_buffer * const buffer,
-                              const uint8_t *buf,
+                              const void *buf,
                               uint64_t len);
 uint64_t pb_buffer_write_data_ref(
                               struct pb_buffer * const buffer,
-                              const uint8_t *buf,
+                              const void *buf,
                               uint64_t len);
 uint64_t pb_buffer_write_buffer(
                               struct pb_buffer * const buffer,
@@ -1116,7 +1119,7 @@ uint64_t pb_buffer_insert_data_ref(
                                struct pb_buffer * const buffer,
                                const struct pb_buffer_iterator *buffer_iterator,
                                size_t offset,
-                               const uint8_t *buf,
+                               const void *buf,
                                uint64_t len);
 uint64_t pb_buffer_insert_buffer(
                                struct pb_buffer * const buffer,
@@ -1127,12 +1130,12 @@ uint64_t pb_buffer_insert_buffer(
 
 uint64_t pb_buffer_overwrite_data(
                               struct pb_buffer * const buffer,
-                              const uint8_t *buf,
+                              const void *buf,
                               uint64_t len);
 
 
 uint64_t pb_buffer_read_data(struct pb_buffer * const buffer,
-                             uint8_t * const buf,
+                             void * const buf,
                              uint64_t len);
 
 
@@ -1287,11 +1290,11 @@ uint64_t pb_trivial_buffer_trim(struct pb_buffer * const buffer,
 
 
 uint64_t pb_trivial_buffer_write_data(struct pb_buffer * const buffer,
-                                      const uint8_t *buf,
+                                      const void *buf,
                                       uint64_t len);
 uint64_t pb_trivial_buffer_write_data_ref(
                                       struct pb_buffer * const buffer,
-                                      const uint8_t *buf,
+                                      const void *buf,
                                       uint64_t len);
 uint64_t pb_trivial_buffer_write_buffer(
                                       struct pb_buffer * const buffer,
@@ -1309,7 +1312,7 @@ uint64_t pb_trivial_buffer_insert_data_ref(
                               struct pb_buffer * const buffer,
                               const struct pb_buffer_iterator *buffer_iterator,
                               size_t offset,
-                              const uint8_t *buf,
+                              const void *buf,
                               uint64_t len);
 uint64_t pb_trivial_buffer_insert_buffer(
                               struct pb_buffer * const buffer,
@@ -1320,12 +1323,12 @@ uint64_t pb_trivial_buffer_insert_buffer(
 
 
 uint64_t pb_trivial_buffer_overwrite_data(struct pb_buffer * const buffer,
-                                          const uint8_t *buf,
+                                          const void *buf,
                                           uint64_t len);
 
 
 uint64_t pb_trivial_buffer_read_data(struct pb_buffer * const buffer,
-                                     uint8_t * const buf,
+                                     void * const buf,
                                      uint64_t len);
 
 
@@ -1384,7 +1387,7 @@ struct pb_data_reader_operations {
    * The return value is the amount of data successfully read from the buffer.
    */
   uint64_t (*read)(struct pb_data_reader * const data_reader,
-                   uint8_t * const buf, uint64_t len);
+                   void * const buf, uint64_t len);
 
   /** Reset the data reader so that subsequent reads start at the beginning of
    *  the buffer. */
@@ -1405,7 +1408,7 @@ struct pb_data_reader_operations {
  * These functions are public and may be called by end users.
  */
 uint64_t pb_data_reader_read(struct pb_data_reader * const data_reader,
-                             uint8_t * const buf, uint64_t len);
+                             void * const buf, uint64_t len);
 
 void pb_data_reader_reset(struct pb_data_reader * const data_reader);
 void pb_data_reader_destroy(
@@ -1447,7 +1450,7 @@ struct pb_data_reader *pb_trivial_data_reader_create(
  * These are protected functions and should not be called externally.
  */
 uint64_t pb_trivial_data_reader_read(struct pb_data_reader * const data_reader,
-                                     uint8_t * const buf, uint64_t len);
+                                     void * const buf, uint64_t len);
 
 void pb_trivial_data_reader_reset(struct pb_data_reader * const data_reader);
 void pb_trivial_data_reader_destroy(
@@ -1528,7 +1531,7 @@ struct pb_line_reader_operations {
    * lower of the length of the line and the value of len.
    */
   size_t (*get_line_data)(struct pb_line_reader * const line_reader,
-                          uint8_t * const buf, uint64_t len);
+                          void * const buf, uint64_t len);
 
   /** Seek the buffer data to the position after the line.
    *
@@ -1590,7 +1593,7 @@ bool pb_line_reader_has_line(struct pb_line_reader * const line_reader);
 size_t pb_line_reader_get_line_len(struct pb_line_reader * const line_reader);
 size_t pb_line_reader_get_line_data(
                                    struct pb_line_reader * const line_reader,
-                                   uint8_t * const buf, uint64_t len);
+                                   void * const buf, uint64_t len);
 
 bool pb_line_reader_is_crlf(
                            struct pb_line_reader * const line_reader);
@@ -1651,7 +1654,7 @@ size_t pb_trivial_line_reader_get_line_len(
                                     struct pb_line_reader * const line_reader);
 size_t pb_trivial_line_reader_get_line_data(
                                     struct pb_line_reader * const line_reader,
-                                    uint8_t * const buf, uint64_t len);
+                                    void * const buf, uint64_t len);
 
 size_t pb_trivial_line_reader_seek_line(
                                     struct pb_line_reader * const line_reader);

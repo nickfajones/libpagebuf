@@ -108,7 +108,7 @@ class test_case_insert1 : public test_case<test_case_insert1> {
 
       pb_buffer_write_data(
         buffer,
-        reinterpret_cast<const u_int8_t*>(input1), strlen(input1));
+        input1, strlen(input1));
 
       pb_buffer_iterator buf_itr;
       pb_buffer_get_iterator(buffer, &buf_itr);
@@ -116,7 +116,7 @@ class test_case_insert1 : public test_case<test_case_insert1> {
       if (pb_buffer_insert_data(
             buffer,
             &buf_itr, 5,
-            reinterpret_cast<const uint8_t*>(input2), strlen(input2)) != 4)
+            input2, strlen(input2)) != 4)
         return 1;
 
       if (pb_buffer_get_data_size(buffer) != 26)
@@ -159,7 +159,7 @@ class test_case_insert2 : public test_case<test_case_insert2> {
 
       pb_buffer_write_data(
         buffer,
-        reinterpret_cast<const u_int8_t*>(input1), strlen(input1));
+        input1, strlen(input1));
 
       pb_buffer_iterator buf_itr;
       pb_buffer_get_iterator(buffer, &buf_itr);
@@ -167,7 +167,7 @@ class test_case_insert2 : public test_case<test_case_insert2> {
       if (pb_buffer_insert_data_ref(
             buffer,
             &buf_itr, 5,
-            reinterpret_cast<const uint8_t*>(input2), strlen(input2)) != 4)
+            input2, strlen(input2)) != 4)
         return 1;
 
       if (pb_buffer_get_data_size(buffer) != 26)
@@ -210,7 +210,7 @@ class test_case_insert3 : public test_case<test_case_insert3> {
 
       pb_buffer_write_data(
         buffer,
-        reinterpret_cast<const u_int8_t*>(input1), strlen(input1));
+        input1, strlen(input1));
 
       pb_buffer_iterator buf_itr;
       pb_buffer_get_iterator(buffer, &buf_itr);
@@ -218,7 +218,7 @@ class test_case_insert3 : public test_case<test_case_insert3> {
       struct pb_buffer *src_buffer = pb_trivial_buffer_create();
       pb_buffer_write_data(
         src_buffer,
-        reinterpret_cast<const u_int8_t*>(input2), strlen(input2));
+        input2, strlen(input2));
 
       if (pb_buffer_insert_buffer(
             buffer,
@@ -262,7 +262,7 @@ class test_case_trim1 : public test_case<test_case_trim1> {
 
       pb_buffer_write_data(
         buffer,
-        reinterpret_cast<const u_int8_t*>(input1), strlen(input1));
+        input1, strlen(input1));
 
       if (pb_buffer_trim(buffer, 10) != 10)
         return 1;
