@@ -775,9 +775,7 @@ struct pb_buffer_operations {
    */
   struct pb_page *(*page_create)(
                              struct pb_buffer * const buffer,
-                             struct pb_buffer_iterator * const buffer_iterator,
-                             size_t len,
-                             bool is_rewind);
+                             size_t len);
   /** Create a pb_page instance with an attached pb_data that references the
    *  provided memory region.
    *
@@ -788,9 +786,7 @@ struct pb_buffer_operations {
    */
   struct pb_page *(*page_create_ref)(
                              struct pb_buffer * const buffer,
-                             struct pb_buffer_iterator * const buffer_iterator,
-                             const uint8_t *buf, size_t len,
-                             bool is_rewind);
+                             const uint8_t *buf, size_t len);
 
 
   /** Insert a pb_page instance into the pb_buffer.
@@ -1267,14 +1263,10 @@ void pb_trivial_buffer_byte_iterator_prev(
 
 struct pb_page *pb_trivial_buffer_page_create(
                               struct pb_buffer * const buffer,
-                              struct pb_buffer_iterator * const buffer_iterator,
-                              size_t len,
-                              bool is_rewind);
+                              size_t len);
 struct pb_page *pb_trivial_buffer_page_create_ref(
                               struct pb_buffer * const buffer,
-                              struct pb_buffer_iterator * const buffer_iterator,
-                              const uint8_t *buf, size_t len,
-                              bool is_rewind);
+                              const uint8_t *buf, size_t len);
 
 
 uint64_t pb_trivial_buffer_insert(

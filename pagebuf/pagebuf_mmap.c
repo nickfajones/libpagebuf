@@ -786,15 +786,11 @@ static void pb_mmap_buffer_iterator_prev(
 
 static struct pb_page *pb_mmap_buffer_page_create(
                               struct pb_buffer * const buffer,
-                              struct pb_buffer_iterator * const buffer_iterator,
-                              size_t len,
-                              bool is_rewind);
+                              size_t len);
 
 static struct pb_page *pb_mmap_buffer_page_create_ref(
                               struct pb_buffer * const buffer,
-                              struct pb_buffer_iterator * const buffer_iterator,
-                              const uint8_t *buf, size_t len,
-                              bool is_rewind);
+                              const uint8_t *buf, size_t len);
 
 
 static uint64_t pb_mmap_buffer_insert(
@@ -968,9 +964,7 @@ static uint64_t pb_mmap_buffer_get_data_size(struct pb_buffer * const buffer) {
  */
 static struct pb_page *pb_mmap_buffer_page_create(
     struct pb_buffer * const buffer,
-    struct pb_buffer_iterator * const buffer_iterator,
-    size_t len,
-    bool is_rewind) {
+    size_t len) {
   assert(0);
 
   return NULL;
@@ -978,9 +972,7 @@ static struct pb_page *pb_mmap_buffer_page_create(
 
 static struct pb_page *pb_mmap_buffer_page_create_ref(
     struct pb_buffer * const buffer,
-    struct pb_buffer_iterator * const buffer_iterator,
-    const uint8_t *buf, size_t len,
-    bool is_rewind) {
+    const uint8_t *buf, size_t len) {
   assert(0);
 
   return NULL;
