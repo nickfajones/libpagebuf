@@ -681,6 +681,10 @@ void pb_trivial_buffer_iterator_prev(struct pb_buffer * const buffer,
 
 /*******************************************************************************
  */
+static char pb_trivial_buffer_byte_iterator_null_char = '\0';
+
+/*******************************************************************************
+ *  */
 void pb_trivial_buffer_get_byte_iterator(struct pb_buffer * const buffer,
     struct pb_buffer_byte_iterator * const byte_iterator) {
   pb_buffer_get_iterator(buffer, &byte_iterator->buffer_iterator);
@@ -688,15 +692,15 @@ void pb_trivial_buffer_get_byte_iterator(struct pb_buffer * const buffer,
   byte_iterator->page_offset = 0;
 
   if (pb_buffer_iterator_is_end(buffer, &byte_iterator->buffer_iterator)) {
-    byte_iterator->current_byte = NULL;
+    byte_iterator->current_byte = &pb_trivial_buffer_byte_iterator_null_char;
 
     return;
   }
 
   byte_iterator->current_byte =
-    &((const char*)(
-      pb_buffer_iterator_get_base(&byte_iterator->buffer_iterator)))[
-        byte_iterator->page_offset];
+    (const char*)
+      pb_buffer_iterator_get_base_at(
+        &byte_iterator->buffer_iterator, byte_iterator->page_offset);
 }
 
 void pb_trivial_buffer_get_byte_iterator_end(struct pb_buffer * const buffer,
@@ -705,7 +709,7 @@ void pb_trivial_buffer_get_byte_iterator_end(struct pb_buffer * const buffer,
 
   byte_iterator->page_offset = 0;
 
-  byte_iterator->current_byte = NULL;
+  byte_iterator->current_byte = &pb_trivial_buffer_byte_iterator_null_char;
 }
 
 bool pb_trivial_buffer_byte_iterator_is_end(struct pb_buffer * const buffer,
@@ -732,18 +736,18 @@ void pb_trivial_buffer_byte_iterator_next(struct pb_buffer * const buffer,
     pb_buffer_iterator_next(buffer, &byte_iterator->buffer_iterator);
 
     byte_iterator->page_offset = 0;
-  }
 
-  if (pb_buffer_iterator_is_end(buffer, &byte_iterator->buffer_iterator)) {
-    byte_iterator->current_byte = NULL;
+    if (pb_buffer_iterator_is_end(buffer, &byte_iterator->buffer_iterator)) {
+      byte_iterator->current_byte = &pb_trivial_buffer_byte_iterator_null_char;
 
-    return;
+      return;
+    }
   }
 
   byte_iterator->current_byte =
-    &((const char*)(
-      pb_buffer_iterator_get_base(&byte_iterator->buffer_iterator)))[
-        byte_iterator->page_offset];
+    (const char*)
+      pb_buffer_iterator_get_base_at(
+        &byte_iterator->buffer_iterator, byte_iterator->page_offset);
 }
 
 void pb_trivial_buffer_byte_iterator_prev(struct pb_buffer * const buffer,
@@ -753,20 +757,20 @@ void pb_trivial_buffer_byte_iterator_prev(struct pb_buffer * const buffer,
 
     byte_iterator->page_offset =
       pb_buffer_iterator_get_len(&byte_iterator->buffer_iterator);
+
+    if (pb_buffer_iterator_is_end(buffer, &byte_iterator->buffer_iterator)) {
+      byte_iterator->current_byte = &pb_trivial_buffer_byte_iterator_null_char;
+
+      return;
+    }
   }
 
   --byte_iterator->page_offset;
 
-  if (pb_buffer_iterator_is_end(buffer, &byte_iterator->buffer_iterator)) {
-    byte_iterator->current_byte = NULL;
-
-    return;
-  }
-
   byte_iterator->current_byte =
-    &((const char*)(
-      pb_buffer_iterator_get_base(&byte_iterator->buffer_iterator)))[
-        byte_iterator->page_offset];
+    (const char*)
+      pb_buffer_iterator_get_base_at(
+        &byte_iterator->buffer_iterator, byte_iterator->page_offset);
 }
 
 
