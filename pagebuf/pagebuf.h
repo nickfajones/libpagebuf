@@ -553,6 +553,8 @@ const char *pb_buffer_byte_iterator_get_current_byte(
 
 /** The default size of pb_buffer memory regions. */
 #define PB_BUFFER_DEFAULT_PAGE_SIZE                       4096
+/** The hard maximum size of automatically sized memory regions. */
+#define PB_BUFFER_MAX_PAGE_SIZE                           16777216L
 
 
 
@@ -577,7 +579,11 @@ struct pb_buffer_strategy {
    *
    * If this value is zero, there will be no limit on fragment size,
    * therefore write operations will cause allocations of memory regions equal
-   * in size to the length of the source data.
+   * in size to the length of the source data.  This logic will apply
+   * implicitly in the different scenarios explained below.
+   *
+   * However a hard limit to the page size is described in the variable
+   * PB_BUFFER_MAX_PAGE_SIZE introduced above.
    */
   size_t page_size;
 
@@ -585,7 +591,7 @@ struct pb_buffer_strategy {
    *  to be referenced or copied.
    *
    * Available behaviours:
-   * not_cloned (false):reference to the pb_data instance is incremented.
+   * not cloned (false):reference to the pb_data instance is incremented.
    *
    * cloned     (true): new pb_data instance created and memory regions copied.
    */
@@ -599,15 +605,12 @@ struct pb_buffer_strategy {
    *                    clone_on_write (false):
    *                    When clone_on_write is false, source pages are
    *                    moved to the target as is and pb_data references are
-   *                    incremented.  Source pages are only fragmented due to
-   *                    truncation to keep the final page within the write
-   *                    operation length value.
-   *                    
+   *                    incremented.
+   *
    *                    clone_on_write (true):
    *                    When clone_on_write is true, source pages are
    *                    fragmented according to the lower of the source
-   *                    page size and the target page_size, which may be
-   *                    zero, in which case the source fragment size is used.
+   *                    page size and the target page_size.
    *
    * as target  (true): target pb_buffer page_size takes precedence.
    *
@@ -618,7 +621,7 @@ struct pb_buffer_strategy {
    *
    *                    clone_on_write (true):
    *                    When clone_on_write is true, source pages will be
-   *                    coppied and packed into target fragments up to the
+   *                    copied and packed into target fragments up to the
    *                    target page_size in size.
    */
   bool fragment_as_target;
@@ -627,7 +630,7 @@ struct pb_buffer_strategy {
    *  That is: operations that write to places in the buffer other than the end.
    *
    * Available behaviours:
-   * no reject (false): insert operations can be performed wuth expected results.
+   * no reject (false): insert operations can be performed with expected results.
    *
    * reject     (true): insert operations will immediately return 0.
    */
@@ -1488,7 +1491,7 @@ struct pb_line_reader {
  *  this value. Any line discovery that reaches this position value during a
  *  search will set an artificial newline at this point.
  */
-#define PB_LINE_READER_DEFAULT_LINE_MAX                   16777216L
+#define PB_LINE_READER_MAX_LINE_SIZE                      16777216L
 
 
 

@@ -245,6 +245,7 @@ void pb_page_destroy(struct pb_page *page,
 
 
 
+
 /*******************************************************************************
  */
 void *pb_buffer_iterator_get_base(
@@ -826,7 +827,7 @@ uint64_t pb_trivial_buffer_insert(struct pb_buffer * const buffer,
     size_t offset,
     struct pb_page * const page) {
   if (!pb_buffer_iterator_is_end(buffer, buffer_iterator) &&
-      buffer->strategy->rejects_insert)
+       buffer->strategy->fragment_as_target)
     return 0;
 
   if (!pb_buffer_iterator_is_end(buffer, buffer_iterator) ||
@@ -882,7 +883,7 @@ uint64_t pb_trivial_buffer_extend(struct pb_buffer * const buffer,
     size_t extend_len =
       ((buffer->strategy->page_size != 0) &&
        (buffer->strategy->page_size < len)) ?
-      buffer->strategy->page_size : len;
+        buffer->strategy->page_size : len;
 
     struct pb_buffer_iterator buffer_iterator;
     pb_buffer_get_iterator_end(buffer, &buffer_iterator);
@@ -913,7 +914,7 @@ uint64_t pb_trivial_buffer_rewind(struct pb_buffer * const buffer,
     uint64_t extend_len =
       ((buffer->strategy->page_size != 0) &&
        (buffer->strategy->page_size < len)) ?
-      buffer->strategy->page_size : len;
+        buffer->strategy->page_size : len;
 
     struct pb_buffer_iterator buffer_iterator;
     pb_buffer_get_iterator(buffer, &buffer_iterator);
@@ -1022,86 +1023,36 @@ uint64_t pb_trivial_buffer_trim(struct pb_buffer * const buffer, uint64_t len) {
 
 
 /*******************************************************************************
- * fragment_as_target: false
  */
-static
-#ifdef NDEBUG
-inline
-#endif
-uint64_t pb_trivial_buffer_write_data1(struct pb_buffer * const buffer,
+static uint64_t pb_trivial_buffer_write_data1(
+    struct pb_buffer * const buffer,
     const uint8_t *buf,
     uint64_t len) {
   struct pb_buffer_iterator buffer_iterator;
   pb_buffer_get_iterator_end(buffer, &buffer_iterator);
-  pb_buffer_iterator_prev(buffer, &buffer_iterator);
 
   uint64_t written = 0;
 
   while (len > 0) {
     uint64_t write_len =
-      (buffer->strategy->page_size != 0) ?
-      (buffer->strategy->page_size < len) ?
-       buffer->strategy->page_size : len :
-       len;
+      ((buffer->strategy->page_size != 0) &&
+       (buffer->strategy->page_size < len)) ?
+        buffer->strategy->page_size : len;
 
-    write_len = pb_buffer_extend(buffer, write_len);
+    struct pb_page *page =
+      buffer->operations->page_create(buffer, write_len);
+    if (!page)
+      return 0;
 
-    if (!pb_buffer_iterator_is_end(buffer, &buffer_iterator))
-      pb_buffer_iterator_next(buffer, &buffer_iterator);
-    else
-      pb_buffer_iterator_prev(buffer, &buffer_iterator);
+    write_len = pb_buffer_insert(buffer, &buffer_iterator, 0, page);
 
     memcpy(
-      pb_buffer_iterator_get_base(&buffer_iterator),
+      page->data_vec.base,
       buf + written,
       write_len);
 
     len -= write_len;
     written += write_len;
-
-    pb_buffer_iterator_next(buffer, &buffer_iterator);
-  }
-
-  return written;
-}
-
-/*
- * fragment_as_target: true
- */
-static
-#ifdef NDEBUG
-inline
-#endif
-uint64_t pb_trivial_buffer_write_data2(struct pb_buffer * const buffer,
-    const uint8_t *buf,
-    uint64_t len) {
-  struct pb_buffer_iterator buffer_iterator;
-  pb_buffer_get_iterator_end(buffer, &buffer_iterator);
-  pb_buffer_iterator_prev(buffer, &buffer_iterator);
-
-  len = pb_buffer_extend(buffer, len);
-
-  if (!pb_buffer_iterator_is_end(buffer, &buffer_iterator))
-    pb_buffer_iterator_next(buffer, &buffer_iterator);
-  else
-    pb_buffer_get_iterator(buffer, &buffer_iterator);
-
-  uint64_t written = 0;
-
-  while (len > 0) {
-    uint64_t write_len =
-      (pb_buffer_iterator_get_len(&buffer_iterator) < len) ?
-       pb_buffer_iterator_get_len(&buffer_iterator) : len;
-
-    memcpy(
-      pb_buffer_iterator_get_base(&buffer_iterator),
-      buf + written,
-      write_len);
-
-    len -= write_len;
-    written += write_len;
-
-    pb_buffer_iterator_next(buffer, &buffer_iterator);
   }
 
   return written;
@@ -1110,73 +1061,33 @@ uint64_t pb_trivial_buffer_write_data2(struct pb_buffer * const buffer,
 uint64_t pb_trivial_buffer_write_data(struct pb_buffer * const buffer,
     const void *buf,
     uint64_t len) {
-  if (!buffer->strategy->fragment_as_target)
-    return pb_trivial_buffer_write_data1(buffer, buf, len);
-
-  return pb_trivial_buffer_write_data2(buffer, buf, len);
+  return pb_trivial_buffer_write_data1(buffer, buf, len);
 }
 
 /*******************************************************************************
- * clone_on_write: false
- * fragment_as_target: false
  */
-static
-#ifdef NDEBUG
-inline
-#endif
-uint64_t pb_trivial_buffer_write_data_ref1(struct pb_buffer * const buffer,
+static uint64_t pb_trivial_buffer_write_data_ref1(
+    struct pb_buffer * const buffer,
     const struct pb_buffer_iterator *buffer_iterator,
     uint64_t offset,
     const uint8_t *buf,
     uint64_t len) {
-  struct pb_page *page =
-    buffer->operations->page_create_ref(buffer, buf, len);
-  if (!page)
-    return 0;
-
-  return pb_buffer_insert(buffer, buffer_iterator, offset, page);
-}
-
-/*
- * clone_on_write: false
- * fragment_as_target: true
- */
-static
-#ifdef NDEBUG
-inline
-#endif
-uint64_t pb_trivial_buffer_write_data_ref2(struct pb_buffer * const buffer,
-    const struct pb_buffer_iterator *buffer_iterator,
-    uint64_t offset,
-    const uint8_t *buf,
-    uint64_t len) {
-  struct pb_buffer_iterator writable_iterator;
-  writable_iterator.page = buffer_iterator->page;
-
-  uint64_t current_offset = offset;
   uint64_t written = 0;
 
   while (len > 0) {
     uint64_t write_len =
-      (buffer->strategy->page_size != 0) ?
-      (buffer->strategy->page_size < len) ?
-       buffer->strategy->page_size : len :
-       len;
+      ((buffer->strategy->page_size != 0) &&
+       (buffer->strategy->page_size < len)) ?
+        buffer->strategy->page_size : len;
 
     struct pb_page *page =
       buffer->operations->page_create_ref(buffer, buf + written, write_len);
     if (!page)
       return 0;
 
-    write_len =
-      pb_buffer_insert(buffer, &writable_iterator, current_offset, page);
+    write_len = pb_buffer_insert(buffer, buffer_iterator, offset, page);
 
-    if (current_offset > 0) {
-      pb_buffer_iterator_next(buffer, &writable_iterator); // new page
-      pb_buffer_iterator_next(buffer, &writable_iterator); // page after new page
-    }
-
-    current_offset = 0;
+    offset = 0;
 
     len -= write_len;
     written += write_len;
@@ -1191,36 +1102,18 @@ uint64_t pb_trivial_buffer_write_data_ref(struct pb_buffer * const buffer,
   struct pb_buffer_iterator buffer_iterator;
   pb_buffer_get_iterator_end(buffer, &buffer_iterator);
 
-  if (!buffer->strategy->clone_on_write &&
-      !buffer->strategy->fragment_as_target) {
-    return
-      pb_trivial_buffer_write_data_ref1(buffer, &buffer_iterator, 0, buf, len);
-  } else if (!buffer->strategy->clone_on_write &&
-              buffer->strategy->fragment_as_target) {
-    return
-      pb_trivial_buffer_write_data_ref2(buffer, &buffer_iterator, 0, buf, len);
-  } else if ( buffer->strategy->clone_on_write &&
-             !buffer->strategy->fragment_as_target) {
-    return pb_trivial_buffer_write_data1(buffer, buf, len);
-  }
-  /*else if (buffer->strategy->clone_on_write &&
-             buffer->strategy->fragment_as_target) {*/
-  return pb_trivial_buffer_write_data2(buffer, buf, len);
+  return
+    pb_trivial_buffer_write_data_ref1(buffer, &buffer_iterator, 0, buf, len);
 }
 
 /*******************************************************************************
  * clone_on_write: false
  * fragment_as_target: false
  */
-static
-#ifdef NDEBUG
-inline
-#endif
-uint64_t pb_trivial_buffer_write_buffer1(struct pb_buffer * const buffer,
+static uint64_t pb_trivial_buffer_write_buffer1(
+    struct pb_buffer * const buffer,
     struct pb_buffer * const src_buffer,
     uint64_t len) {
-  const struct pb_allocator *allocator = buffer->allocator;
-
   struct pb_buffer_iterator buffer_iterator;
   pb_buffer_get_iterator_end(buffer, &buffer_iterator);
 
@@ -1236,7 +1129,8 @@ uint64_t pb_trivial_buffer_write_buffer1(struct pb_buffer * const buffer,
        pb_buffer_iterator_get_len(&src_buffer_iterator) : len;
 
     struct pb_page *page =
-      pb_page_transfer(src_buffer_iterator.page, write_len, 0, allocator);
+      pb_page_transfer(
+        src_buffer_iterator.page, write_len, 0, buffer->allocator);
     if (!page)
       return written;
 
@@ -1252,75 +1146,15 @@ uint64_t pb_trivial_buffer_write_buffer1(struct pb_buffer * const buffer,
 }
 
 /*
- * clone_on_write: false
- * fragment_as_target: true
- */
-static
-#ifdef NDEBUG
-inline
-#endif
-uint64_t pb_trivial_buffer_write_buffer2(struct pb_buffer * const buffer,
-    struct pb_buffer * const src_buffer,
-    uint64_t len) {
-  const struct pb_allocator *allocator = buffer->allocator;
-
-  struct pb_buffer_iterator buffer_iterator;
-  pb_buffer_get_iterator_end(buffer, &buffer_iterator);
-
-  struct pb_buffer_iterator src_buffer_iterator;
-  pb_buffer_get_iterator(src_buffer, &src_buffer_iterator);
-
-  uint64_t written = 0;
-  size_t src_offset = 0;
-
-  while ((len > 0) &&
-         (!pb_buffer_iterator_is_end(src_buffer, &src_buffer_iterator))) {
-    uint64_t write_len =
-      (buffer->strategy->page_size != 0) ?
-      (buffer->strategy->page_size < len) ?
-       buffer->strategy->page_size : len :
-       len;
-
-    write_len =
-      (pb_buffer_iterator_get_len(&src_buffer_iterator) - src_offset < write_len) ?
-       pb_buffer_iterator_get_len(&src_buffer_iterator) - src_offset : write_len;
-
-    struct pb_page *page =
-      pb_page_transfer(
-        src_buffer_iterator.page, write_len, src_offset, allocator);
-    if (!page)
-      return written;
-
-    write_len = pb_buffer_insert(buffer, &buffer_iterator, 0, page);
-
-    len -= write_len;
-    written += write_len;
-    src_offset += write_len;
-
-    if (src_offset == pb_buffer_iterator_get_len(&src_buffer_iterator)) {
-      pb_buffer_iterator_next(src_buffer, &src_buffer_iterator);
-
-      src_offset = 0;
-    }
-  }
-
-  return written;
-}
-
-/*
  * clone_on_write: true
  * fragment_as_target: false
  */
-static
-#ifdef NDEBUG
-inline
-#endif
-uint64_t pb_trivial_buffer_write_buffer3(struct pb_buffer * const buffer,
+static uint64_t pb_trivial_buffer_write_buffer2(
+    struct pb_buffer * const buffer,
     struct pb_buffer * const src_buffer,
     uint64_t len) {
   struct pb_buffer_iterator buffer_iterator;
   pb_buffer_get_iterator_end(buffer, &buffer_iterator);
-  pb_buffer_iterator_prev(buffer, &buffer_iterator);
 
   struct pb_buffer_iterator src_buffer_iterator;
   pb_buffer_get_iterator(src_buffer, &src_buffer_iterator);
@@ -1331,24 +1165,18 @@ uint64_t pb_trivial_buffer_write_buffer3(struct pb_buffer * const buffer,
   while ((len > 0) &&
          (!pb_buffer_iterator_is_end(src_buffer, &src_buffer_iterator))) {
     uint64_t write_len =
-      (buffer->strategy->page_size != 0) ?
-      (buffer->strategy->page_size < len) ?
-       buffer->strategy->page_size : len :
-       len;
+      (pb_buffer_iterator_get_len(&src_buffer_iterator) < len) ?
+       pb_buffer_iterator_get_len(&src_buffer_iterator) : len;
 
-    write_len =
-      (pb_buffer_iterator_get_len(&src_buffer_iterator) - src_offset < write_len) ?
-       pb_buffer_iterator_get_len(&src_buffer_iterator) - src_offset : write_len;
+    struct pb_page* page =
+      buffer->operations->page_create(buffer, write_len);
+    if (!page)
+      return 0;
 
-    write_len = pb_buffer_extend(buffer, write_len);
-
-    if (!pb_buffer_iterator_is_end(buffer, &buffer_iterator))
-      pb_buffer_iterator_next(buffer, &buffer_iterator);
-    else
-      pb_buffer_get_iterator(buffer, &buffer_iterator);
+    write_len = pb_buffer_insert(buffer, &buffer_iterator, 0, page);
 
     memcpy(
-      pb_buffer_iterator_get_base(&buffer_iterator),
+      page->data_vec.base,
       pb_buffer_iterator_get_base_at(&src_buffer_iterator, src_offset),
       write_len);
 
@@ -1367,47 +1195,104 @@ uint64_t pb_trivial_buffer_write_buffer3(struct pb_buffer * const buffer,
 }
 
 /*
- * clone_on_write: true
+ * clone_on_write: false
  * fragment_as_target: true
  */
-static
-#ifdef NDEBUG
-inline
-#endif
-uint64_t pb_trivial_buffer_write_buffer4(struct pb_buffer * const buffer,
+static uint64_t pb_trivial_buffer_write_buffer3(
+    struct pb_buffer * const buffer,
     struct pb_buffer * const src_buffer,
     uint64_t len) {
   struct pb_buffer_iterator buffer_iterator;
   pb_buffer_get_iterator_end(buffer, &buffer_iterator);
-  pb_buffer_iterator_prev(buffer, &buffer_iterator);
 
   struct pb_buffer_iterator src_buffer_iterator;
   pb_buffer_get_iterator(src_buffer, &src_buffer_iterator);
 
-  len = pb_buffer_extend(buffer, len);
-
-  if (!pb_buffer_iterator_is_end(buffer, &buffer_iterator))
-    pb_buffer_iterator_next(buffer, &buffer_iterator);
-  else
-    pb_buffer_get_iterator(buffer, &buffer_iterator);
+  struct pb_page *page = NULL;
 
   uint64_t written = 0;
   size_t offset = 0;
   size_t src_offset = 0;
 
   while ((len > 0) &&
-         (!pb_buffer_iterator_is_end(buffer, &buffer_iterator)) &&
          (!pb_buffer_iterator_is_end(src_buffer, &src_buffer_iterator))) {
     uint64_t write_len =
-      (pb_buffer_iterator_get_len(&buffer_iterator) - offset < len) ?
-       pb_buffer_iterator_get_len(&buffer_iterator) - offset: len;
+      (pb_buffer_iterator_get_len(&src_buffer_iterator) - src_offset < len) ?
+       pb_buffer_iterator_get_len(&src_buffer_iterator) - src_offset : len;
 
     write_len =
-      (pb_buffer_iterator_get_len(&src_buffer_iterator) - src_offset < write_len) ?
-       pb_buffer_iterator_get_len(&src_buffer_iterator) - src_offset : write_len;
+      ((buffer->strategy->page_size != 0) &&
+       (buffer->strategy->page_size < write_len)) ?
+        buffer->strategy->page_size : write_len;
+
+    if (!page) {
+      page =
+        pb_page_transfer(
+          src_buffer_iterator.page, write_len, src_offset, buffer->allocator);
+      if (!page)
+        return written;
+
+      write_len = pb_buffer_insert(buffer, &buffer_iterator, 0, page);
+    }
+
+    len -= write_len;
+    written += write_len;
+    offset += write_len;
+    src_offset += write_len;
+
+    if (offset == page->data_vec.len) {
+      page = NULL;
+
+      offset = 0;
+    }
+
+    if (src_offset == pb_buffer_iterator_get_len(&src_buffer_iterator)) {
+      pb_buffer_iterator_next(src_buffer, &src_buffer_iterator);
+
+      src_offset = 0;
+    }
+  }
+
+  return written;
+}
+
+/*
+ * clone_on_write: true
+ * fragment_as_target: true
+ */
+static uint64_t pb_trivial_buffer_write_buffer4(
+    struct pb_buffer * const buffer,
+    struct pb_buffer * const src_buffer,
+    uint64_t len) {
+  struct pb_buffer_iterator buffer_iterator;
+  pb_buffer_get_iterator_end(buffer, &buffer_iterator);
+
+  struct pb_buffer_iterator src_buffer_iterator;
+  pb_buffer_get_iterator(src_buffer, &src_buffer_iterator);
+
+  struct pb_page *page = NULL;
+
+  uint64_t written = 0;
+  size_t offset = 0;
+  size_t src_offset = 0;
+
+  while ((len > 0) &&
+         (!pb_buffer_iterator_is_end(src_buffer, &src_buffer_iterator))) {
+    uint64_t write_len =
+      (pb_buffer_iterator_get_len(&src_buffer_iterator) - src_offset < len) ?
+       pb_buffer_iterator_get_len(&src_buffer_iterator) - src_offset : len;
+
+    if (!page) {
+      page =
+        buffer->operations->page_create(buffer, write_len);
+      if (!page)
+        return 0;
+
+      write_len = pb_buffer_insert(buffer, &buffer_iterator, 0, page);
+    }
 
     memcpy(
-      pb_buffer_iterator_get_base_at(&buffer_iterator, offset),
+      (uint8_t*)page->data_vec.base + offset,
       pb_buffer_iterator_get_base_at(&src_buffer_iterator, src_offset),
       write_len);
 
@@ -1416,8 +1301,8 @@ uint64_t pb_trivial_buffer_write_buffer4(struct pb_buffer * const buffer,
     offset += write_len;
     src_offset += write_len;
 
-    if (offset == pb_buffer_iterator_get_len(&buffer_iterator)) {
-      pb_buffer_iterator_next(buffer, &buffer_iterator);
+    if (offset == page->data_vec.len) {
+      page = NULL;
 
       offset = 0;
     }
@@ -1438,15 +1323,15 @@ uint64_t pb_trivial_buffer_write_buffer(struct pb_buffer * const buffer,
   if (!buffer->strategy->clone_on_write &&
       !buffer->strategy->fragment_as_target) {
     return pb_trivial_buffer_write_buffer1(buffer, src_buffer, len);
-  } else if (!buffer->strategy->clone_on_write &&
-              buffer->strategy->fragment_as_target) {
-    return pb_trivial_buffer_write_buffer2(buffer, src_buffer, len);
   } else if ( buffer->strategy->clone_on_write &&
              !buffer->strategy->fragment_as_target) {
+    return pb_trivial_buffer_write_buffer2(buffer, src_buffer, len);
+  } else if (!buffer->strategy->clone_on_write &&
+              buffer->strategy->fragment_as_target) {
     return pb_trivial_buffer_write_buffer3(buffer, src_buffer, len);
   }
   /*else if (buffer->strategy->clone_on_write &&
-             buffer->strategy->fragment_as_target) {*/
+             buffer->strategy->fragment_as_target) { */
   return pb_trivial_buffer_write_buffer4(buffer, src_buffer, len);
 }
 
@@ -1458,7 +1343,7 @@ uint64_t pb_trivial_buffer_insert_data(struct pb_buffer * const buffer,
     const void *buf,
     uint64_t len) {
   if (!pb_buffer_iterator_is_end(buffer, buffer_iterator) &&
-      buffer->strategy->rejects_insert)
+       buffer->strategy->rejects_insert)
     return 0;
 
   struct pb_page *page = buffer->operations->page_create(buffer, len);
@@ -1476,7 +1361,7 @@ uint64_t pb_trivial_buffer_insert_data_ref(struct pb_buffer * const buffer,
     const void *buf,
     uint64_t len) {
   if (!pb_buffer_iterator_is_end(buffer, buffer_iterator) &&
-      buffer->strategy->rejects_insert)
+       buffer->strategy->rejects_insert)
     return 0;
   
   struct pb_page *page = buffer->operations->page_create_ref(buffer, buf, len);
@@ -1492,7 +1377,7 @@ uint64_t pb_trivial_buffer_insert_buffer(struct pb_buffer * const buffer,
     struct pb_buffer * const src_buffer,
     uint64_t len) {
   if (!pb_buffer_iterator_is_end(buffer, buffer_iterator) &&
-      buffer->strategy->rejects_insert)
+       buffer->strategy->rejects_insert)
     return 0;
 
   const struct pb_allocator *allocator = buffer->allocator;
@@ -1965,7 +1850,7 @@ bool pb_trivial_line_reader_has_line(
     else
       trivial_line_reader->has_cr = false;
 
-    if (trivial_line_reader->buffer_offset == PB_LINE_READER_DEFAULT_LINE_MAX) {
+    if (trivial_line_reader->buffer_offset == PB_LINE_READER_MAX_LINE_SIZE) {
       trivial_line_reader->has_cr = false;
 
       return (trivial_line_reader->has_line = true);
