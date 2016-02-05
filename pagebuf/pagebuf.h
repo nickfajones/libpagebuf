@@ -348,6 +348,18 @@ void pb_data_put(struct pb_data * const data);
 
 
 
+/** Functional interfaces for accessing a memory region through the
+ *  pb_page class.
+ *
+ * These functions are public and may be called by end users.
+ */
+void *pb_data_get_base(const struct pb_data *data);
+void *pb_data_get_base_at(
+                       const struct pb_data *data, size_t offset);
+size_t pb_data_get_len(const struct pb_data *data);
+
+
+
 /** Get a built in, trivial set of pb_data operations.
  *
  * This is a protected function and should not be called externally.
@@ -455,6 +467,18 @@ struct pb_page *pb_page_transfer(const struct pb_page *src_page,
  */
 void pb_page_destroy(struct pb_page *page,
                      const struct pb_allocator *allocator);
+
+
+
+/** Functional interfaces for accessing a memory region through the
+ *  pb_page class.
+ *
+ * These functions are public and may be called by end users.
+ */
+void *pb_page_get_base(const struct pb_page *page);
+void *pb_page_get_base_at(
+                       const struct pb_page *page, size_t offset);
+size_t pb_page_get_len(const struct pb_page *page);
 
 
 

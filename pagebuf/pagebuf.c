@@ -176,10 +176,27 @@ void pb_trivial_data_put(struct pb_data *data) {
 
   if (data->responsibility == pb_data_owned)
     pb_allocator_free(
-      allocator, pb_alloc_type_struct, data->data_vec.base, data->data_vec.len);
+      allocator, pb_alloc_type_struct,
+      pb_data_get_base(data), pb_data_get_len(data));
 
   pb_allocator_free(
     allocator, pb_alloc_type_struct, data, sizeof(struct pb_data));
+}
+
+
+
+/*******************************************************************************
+ */
+void *pb_data_get_base(const struct pb_data *data) {
+  return data->data_vec.base;
+}
+
+void *pb_data_get_base_at(const struct pb_data *data, size_t offset) {
+  return (uint8_t*)data->data_vec.base + offset;
+}
+
+size_t pb_data_get_len(const struct pb_data *data) {
+  return data->data_vec.len;
 }
 
 
@@ -196,8 +213,8 @@ struct pb_page *pb_page_create(struct pb_data *data,
   if (!page)
     return NULL;
 
-  page->data_vec.base = data->data_vec.base;
-  page->data_vec.len = data->data_vec.len;
+  page->data_vec.base = pb_data_get_base(data);
+  page->data_vec.len = pb_data_get_len(data);
   page->data = data;
   page->prev = NULL;
   page->next = NULL;
@@ -215,7 +232,7 @@ struct pb_page *pb_page_transfer(const struct pb_page *src_page,
   if (!page)
     return NULL;
 
-  page->data_vec.base = src_page->data_vec.base + src_off;
+  page->data_vec.base = pb_page_get_base_at(src_page, src_off);
   page->data_vec.len = len;
   page->data = src_page->data;
   page->prev = NULL;
@@ -240,6 +257,21 @@ void pb_page_destroy(struct pb_page *page,
     allocator, pb_alloc_type_struct, page, sizeof(struct pb_page));
 }
 
+
+
+/*******************************************************************************
+ */
+void *pb_page_get_base(const struct pb_page *page) {
+  return page->data_vec.base;
+}
+
+void *pb_page_get_base_at(const struct pb_page *page, size_t offset) {
+  return (uint8_t*)page->data_vec.base + offset;
+}
+
+size_t pb_page_get_len(const struct pb_page *page) {
+  return page->data_vec.len;
+}
 
 
 
@@ -844,7 +876,7 @@ uint64_t pb_trivial_buffer_insert(struct pb_buffer * const buffer,
     page2 = buffer_iterator->page;
     page1 =
       pb_page_transfer(
-        page2, page2->data_vec.len, 0,
+        page2, pb_page_get_len(page2), 0,
         buffer->allocator);
     if (!page1)
       return 0;
@@ -868,9 +900,9 @@ uint64_t pb_trivial_buffer_insert(struct pb_buffer * const buffer,
   page1->next = page;
   page2->prev = page;
 
-  pb_trivial_buffer_increment_data_size(buffer, page->data_vec.len);
+  pb_trivial_buffer_increment_data_size(buffer, pb_page_get_len(page));
 
-  return page->data_vec.len;
+  return pb_page_get_len(page);
 }
 
 /*******************************************************************************
@@ -1047,7 +1079,7 @@ static uint64_t pb_trivial_buffer_write_data1(
     write_len = pb_buffer_insert(buffer, &buffer_iterator, 0, page);
 
     memcpy(
-      page->data_vec.base,
+      pb_page_get_base(page),
       buf + written,
       write_len);
 
@@ -1176,7 +1208,7 @@ static uint64_t pb_trivial_buffer_write_buffer2(
     write_len = pb_buffer_insert(buffer, &buffer_iterator, 0, page);
 
     memcpy(
-      page->data_vec.base,
+      pb_page_get_base(page),
       pb_buffer_iterator_get_base_at(&src_buffer_iterator, src_offset),
       write_len);
 
@@ -1240,7 +1272,7 @@ static uint64_t pb_trivial_buffer_write_buffer3(
     offset += write_len;
     src_offset += write_len;
 
-    if (offset == page->data_vec.len) {
+    if (offset == pb_page_get_len(page)) {
       page = NULL;
 
       offset = 0;
@@ -1292,7 +1324,7 @@ static uint64_t pb_trivial_buffer_write_buffer4(
     }
 
     memcpy(
-      (uint8_t*)page->data_vec.base + offset,
+      pb_page_get_base_at(page, offset),
       pb_buffer_iterator_get_base_at(&src_buffer_iterator, src_offset),
       write_len);
 
@@ -1301,7 +1333,7 @@ static uint64_t pb_trivial_buffer_write_buffer4(
     offset += write_len;
     src_offset += write_len;
 
-    if (offset == page->data_vec.len) {
+    if (offset == pb_page_get_len(page)) {
       page = NULL;
 
       offset = 0;
@@ -1350,7 +1382,7 @@ uint64_t pb_trivial_buffer_insert_data(struct pb_buffer * const buffer,
   if (!page)
     return 0;
 
-  memcpy(page->data_vec.base, buf, page->data_vec.len);
+  memcpy(pb_page_get_base(page), buf, pb_page_get_len(page));
 
   return pb_buffer_insert(buffer, buffer_iterator, offset, page);
 }
