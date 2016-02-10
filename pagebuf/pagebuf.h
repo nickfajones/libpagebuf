@@ -903,6 +903,75 @@ struct pb_buffer_operations {
                    uint64_t len);
 
 
+  /** Insert data from a memory region to the buffer.
+   *
+   * buffer_iterator: the position in the buffer, before which or into which
+   *                  the data will be inserted.
+   * offset: the position within the iterator page, before which the data will
+   *         be inserted.
+   * buf: the start of the source memory region.
+   * len: the amount of data to insert in bytes.
+   *
+   * If the offset is zero, the data will be inserted in front of the iterator
+   * page.  If the offset is non-zero, the iterator page will be split into
+   * two sub-pages at the point of the offset, and the data will be inserted
+   * between them.
+   *
+   * The return value is the amount of data successfully inserted to the
+   * buffer.
+   */
+  uint64_t (*insert_data)(struct pb_buffer * const buffer,
+                          const struct pb_buffer_iterator * buffer_iterator,
+                          size_t offset,
+                          const void *buf,
+                          uint64_t len);
+  /** Insert data from a memory region to the buffer, referencing only.
+   *
+   * buffer_iterator: the position in the buffer, before which or into which
+   *                  the data will be inserted.
+   * offset: the position within the iterator page, before which the data will
+   *         be inserted.
+   * buf: the start of the source memory region.
+   * len: the amount of data to write in bytes.
+   *
+   * If the offset is zero, the data will be inserted in front of the iterator
+   * page.  If the offset is non-zero, the iterator page will be split into
+   * two sub-pages at the point of the offset, and the data will be inserted
+   * between them.
+   *
+   * The return value is the amount of data successfully inserted to the
+   * buffer.
+   */
+  uint64_t (*insert_data_ref)(struct pb_buffer * const buffer,
+                              const struct pb_buffer_iterator *buffer_iterator,
+                              size_t offset,
+                              const void *buf,
+                              uint64_t len);
+  /** Insert data from a source buffer to the buffer.
+   *
+   * buffer_iterator: the position in the buffer, before which or into which
+   *                  the data will be inserted.
+   * offset: the position within the iterator page, before which the data will
+   *         be inserted.
+   * src_buffer: the buffer to write from.  This pb_buffer instance will not
+   *             have its data modified.
+   * len: the amount of data to write in bytes.
+   *
+   * If the offset is zero, the data will be inserted in front of the iterator
+   * page.  If the offset is non-zero, the iterator page will be split into
+   * two sub-pages at the point of the offset, and the data will be inserted
+   * between them.
+   *
+   * The return value is the amount of data successfully inserted to the
+   * buffer.
+   */
+  uint64_t (*insert_buffer)(struct pb_buffer * const buffer,
+                            const struct pb_buffer_iterator *buffer_iterator,
+                            size_t offset,
+                            struct pb_buffer * const src_buffer,
+                            uint64_t len);
+
+
   /** Write data from a memory region to the buffer.
    *
    * buf: the start of the source memory region.
@@ -943,75 +1012,6 @@ struct pb_buffer_operations {
   uint64_t (*write_buffer)(struct pb_buffer * const buffer,
                            struct pb_buffer * const src_buffer,
                            uint64_t len);
-
-
-  /** Write data from a memory region to the buffer.
-   *
-   * buffer_iterator: the position in the buffer, before which or into which
-   *                  the data will be inserted.
-   * offset: the position within the iterator page, before which the data will
-   *         be inserted.
-   * buf: the start of the source memory region.
-   * len: the amount of data to insert in bytes.
-   *
-   * If the offset is zero, the data will be inserted in front of the iterator
-   * page.  If the offset is non-zero, the iterator page will be split into
-   * two sub-pages at the point of the offset, and the data will be inserted
-   * between them.
-   *
-   * The return value is the amount of data successfully inserted to the
-   * buffer.
-   */
-  uint64_t (*insert_data)(struct pb_buffer * const buffer,
-                          const struct pb_buffer_iterator * buffer_iterator,
-                          size_t offset,
-                          const void *buf,
-                          uint64_t len);
-  /** Write data from memory region to the buffer, referencing only.
-   *
-   * buffer_iterator: the position in the buffer, before which or into which
-   *                  the data will be inserted.
-   * offset: the position within the iterator page, before which the data will
-   *         be inserted.
-   * buf: the start of the source memory region.
-   * len: the amount of data to write in bytes.
-   *
-   * If the offset is zero, the data will be inserted in front of the iterator
-   * page.  If the offset is non-zero, the iterator page will be split into
-   * two sub-pages at the point of the offset, and the data will be inserted
-   * between them.
-   *
-   * The return value is the amount of data successfully inserted to the
-   * buffer.
-   */
-  uint64_t (*insert_data_ref)(struct pb_buffer * const buffer,
-                              const struct pb_buffer_iterator *buffer_iterator,
-                              size_t offset,
-                              const void *buf,
-                              uint64_t len);
-  /** Write data from a source buffer to the buffer.
-   *
-   * buffer_iterator: the position in the buffer, before which or into which
-   *                  the data will be inserted.
-   * offset: the position within the iterator page, before which the data will
-   *         be inserted.
-   * src_buffer: the buffer to write from.  This pb_buffer instance will not
-   *             have its data modified.
-   * len: the amount of data to write in bytes.
-   *
-   * If the offset is zero, the data will be inserted in front of the iterator
-   * page.  If the offset is non-zero, the iterator page will be split into
-   * two sub-pages at the point of the offset, and the data will be inserted
-   * between them.
-   *
-   * The return value is the amount of data successfully inserted to the
-   * buffer.
-   */
-  uint64_t (*insert_buffer)(struct pb_buffer * const buffer,
-                            const struct pb_buffer_iterator *buffer_iterator,
-                            size_t offset,
-                            struct pb_buffer * const src_buffer,
-                            uint64_t len);
 
 
   /** Overwrite the head of a buffer with data from a memory region.
@@ -1125,18 +1125,6 @@ uint64_t pb_buffer_seek(struct pb_buffer * const buffer, uint64_t len);
 uint64_t pb_buffer_trim(struct pb_buffer * const buffer, uint64_t len);
 
 
-uint64_t pb_buffer_write_data(struct pb_buffer * const buffer,
-                              const void *buf,
-                              uint64_t len);
-uint64_t pb_buffer_write_data_ref(
-                              struct pb_buffer * const buffer,
-                              const void *buf,
-                              uint64_t len);
-uint64_t pb_buffer_write_buffer(
-                              struct pb_buffer * const buffer,
-                              struct pb_buffer * const src_buffer,
-                              uint64_t len);
-
 uint64_t pb_buffer_insert_data(struct pb_buffer * const buffer,
                                const struct pb_buffer_iterator *buffer_iterator,
                                size_t offset,
@@ -1154,6 +1142,20 @@ uint64_t pb_buffer_insert_buffer(
                                size_t offset,
                                struct pb_buffer * const src_buffer,
                                uint64_t len);
+
+
+uint64_t pb_buffer_write_data(struct pb_buffer * const buffer,
+                              const void *buf,
+                              uint64_t len);
+uint64_t pb_buffer_write_data_ref(
+                              struct pb_buffer * const buffer,
+                              const void *buf,
+                              uint64_t len);
+uint64_t pb_buffer_write_buffer(
+                              struct pb_buffer * const buffer,
+                              struct pb_buffer * const src_buffer,
+                              uint64_t len);
+
 
 uint64_t pb_buffer_overwrite_data(
                               struct pb_buffer * const buffer,
@@ -1316,19 +1318,6 @@ uint64_t pb_trivial_buffer_trim(struct pb_buffer * const buffer,
                               uint64_t len);
 
 
-uint64_t pb_trivial_buffer_write_data(struct pb_buffer * const buffer,
-                                      const void *buf,
-                                      uint64_t len);
-uint64_t pb_trivial_buffer_write_data_ref(
-                                      struct pb_buffer * const buffer,
-                                      const void *buf,
-                                      uint64_t len);
-uint64_t pb_trivial_buffer_write_buffer(
-                                      struct pb_buffer * const buffer,
-                                      struct pb_buffer * const src_buffer,
-                                      uint64_t len);
-
-
 uint64_t pb_trivial_buffer_insert_data(
                               struct pb_buffer * const buffer,
                               const struct pb_buffer_iterator *buffer_iterator,
@@ -1347,6 +1336,19 @@ uint64_t pb_trivial_buffer_insert_buffer(
                               size_t offset,
                               struct pb_buffer * const src_buffer,
                               uint64_t len);
+
+
+uint64_t pb_trivial_buffer_write_data(struct pb_buffer * const buffer,
+                                      const void *buf,
+                                      uint64_t len);
+uint64_t pb_trivial_buffer_write_data_ref(
+                                      struct pb_buffer * const buffer,
+                                      const void *buf,
+                                      uint64_t len);
+uint64_t pb_trivial_buffer_write_buffer(
+                                      struct pb_buffer * const buffer,
+                                      struct pb_buffer * const src_buffer,
+                                      uint64_t len);
 
 
 uint64_t pb_trivial_buffer_overwrite_data(struct pb_buffer * const buffer,

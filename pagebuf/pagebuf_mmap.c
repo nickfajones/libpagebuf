@@ -868,13 +868,13 @@ static struct pb_buffer_operations pb_mmap_buffer_operations = {
   .seek = &pb_mmap_buffer_seek,
   .trim = &pb_mmap_buffer_trim,
 
-  .write_data = &pb_mmap_buffer_write_data,
-  .write_data_ref = &pb_mmap_buffer_write_data_ref,
-  .write_buffer = &pb_mmap_buffer_write_buffer,
-
   .insert_data = &pb_trivial_buffer_insert_data,
   .insert_data_ref = &pb_trivial_buffer_insert_data_ref,
   .insert_buffer = &pb_trivial_buffer_insert_buffer,
+
+  .write_data = &pb_mmap_buffer_write_data,
+  .write_data_ref = &pb_mmap_buffer_write_data_ref,
+  .write_buffer = &pb_mmap_buffer_write_buffer,
 
   .overwrite_data = &pb_trivial_buffer_overwrite_data,
 

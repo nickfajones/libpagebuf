@@ -1,5 +1,3 @@
-- Implement write operations as calls to insert operations
-- insert functions don't respect strategy.  Make them!
 - Remove functional interfaces that shouldn't be called externally
 - Remove pb_get_trivial_data_reader_operations
 - Add overwrite_buffer
