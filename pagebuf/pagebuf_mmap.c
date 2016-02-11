@@ -674,7 +674,7 @@ static void pb_mmap_allocator_clear(
  */
 static void pb_mmap_allocator_get(
     struct pb_mmap_allocator * const mmap_allocator) {
-  __sync_add_and_fetch(&mmap_allocator->use_count, 1);
+  ++mmap_allocator->use_count;
 }
 
 static void pb_mmap_allocator_put(
@@ -682,7 +682,7 @@ static void pb_mmap_allocator_put(
   const struct pb_allocator *struct_allocator =
     mmap_allocator->struct_allocator;
 
-  if (__sync_sub_and_fetch(&mmap_allocator->use_count, 1) != 0)
+  if (--mmap_allocator->use_count != 0)
     return;
 
   PB_HASH_CLEAR(mmap_allocator->data_tree);
@@ -719,14 +719,14 @@ static void pb_mmap_allocator_put(
 /*******************************************************************************
  */
 static void pb_mmap_data_get(struct pb_data * const data) {
-  __sync_add_and_fetch(&data->use_count, 1);
+  ++data->use_count;
 }
 
 static void pb_mmap_data_put(struct pb_data * const data) {
   struct pb_mmap_data *mmap_data = (struct pb_mmap_data*)data;
   struct pb_mmap_allocator *mmap_allocator = mmap_data->mmap_allocator;
 
-  if (__sync_sub_and_fetch(&data->use_count, 1) != 0)
+  if (--data->use_count != 0)
     return;
 
   pb_mmap_allocator_data_destroy(mmap_allocator, mmap_data);

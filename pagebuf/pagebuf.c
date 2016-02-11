@@ -165,13 +165,13 @@ struct pb_data *pb_trivial_data_create_ref(const uint8_t *buf, size_t len,
 }
 
 void pb_trivial_data_get(struct pb_data *data) {
-  __sync_add_and_fetch(&data->use_count, 1);
+  ++data->use_count;
 }
 
 void pb_trivial_data_put(struct pb_data *data) {
   const struct pb_allocator *allocator = data->allocator;
 
-  if (__sync_sub_and_fetch(&data->use_count, 1) != 0)
+  if (--data->use_count != 0)
     return;
 
   if (data->responsibility == pb_data_owned)

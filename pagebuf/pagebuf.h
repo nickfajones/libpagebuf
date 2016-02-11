@@ -133,6 +133,20 @@ extern "C" {
  * a sparse list, backed by memory regions mapping to a file on disk.
  */
 
+/** Thread safety
+ *
+ * The pb_buffer, its supporting classes and API is explicitly NOT thread safe.
+ *
+ * There is no notion of locking in any of the pb_buffer operations, and even
+ * pb_data and other object reference counts are not modified in a globally
+ * atomic fashion.
+ *
+ * It is the responsibility of users to ensure that buffers are not accessed
+ * concurrently from across thread boundaries, and even if this is done in a
+ * serialised way, cleanup operations, in particular pb_allocator frees are
+ * internally thread safe.
+ */
+
 
 
 
