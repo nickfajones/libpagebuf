@@ -893,15 +893,7 @@ static const struct pb_buffer_operations *pb_get_mmap_buffer_operations(void) {
 
 /*******************************************************************************
  */
-struct pb_mmap_buffer {
-  struct pb_trivial_buffer trivial_buffer;
-};
-
-
-
-/*******************************************************************************
- */
-struct pb_buffer *pb_mmap_buffer_create(const char *file_path,
+struct pb_mmap_buffer *pb_mmap_buffer_create(const char *file_path,
     enum pb_mmap_open_action open_action,
     enum pb_mmap_close_action close_action) {
   return
@@ -910,7 +902,7 @@ struct pb_buffer *pb_mmap_buffer_create(const char *file_path,
       pb_get_trivial_allocator());
 }
 
-struct pb_buffer *pb_mmap_buffer_create_with_alloc(const char *file_path,
+struct pb_mmap_buffer *pb_mmap_buffer_create_with_alloc(const char *file_path,
     enum pb_mmap_open_action open_action,
     enum pb_mmap_close_action close_action,
     const struct pb_allocator *allocator) {
@@ -951,7 +943,7 @@ struct pb_buffer *pb_mmap_buffer_create_with_alloc(const char *file_path,
   mmap_buffer->trivial_buffer.data_revision = 0;
   mmap_buffer->trivial_buffer.data_size = 0;
 
-  return &mmap_buffer->trivial_buffer.buffer;
+  return mmap_buffer;
 }
 
 
@@ -1225,4 +1217,41 @@ static void pb_mmap_buffer_destroy(struct pb_buffer * const buffer) {
     mmap_buffer, sizeof(struct pb_mmap_buffer));
 
   pb_mmap_allocator_put(mmap_allocator);
+}
+
+
+/*******************************************************************************
+ */
+struct pb_buffer *pb_mmap_buffer_to_buffer(
+    struct pb_mmap_buffer * const mmap_buffer) {
+  return &mmap_buffer->trivial_buffer.buffer;
+}
+
+/*******************************************************************************
+ */
+const char *pb_mmap_buffer_get_file_path(
+    struct pb_mmap_buffer * const mmap_buffer) {
+  struct pb_mmap_allocator *mmap_allocator =
+    (struct pb_mmap_allocator*)mmap_buffer->trivial_buffer.buffer.allocator;
+
+  return mmap_allocator->file_path;
+}
+
+/*******************************************************************************
+ */
+enum pb_mmap_close_action pb_mmap_buffer_get_close_action(
+    struct pb_mmap_buffer * const mmap_buffer) {
+  struct pb_mmap_allocator *mmap_allocator =
+    (struct pb_mmap_allocator*)mmap_buffer->trivial_buffer.buffer.allocator;
+
+  return mmap_allocator->close_action;
+}
+
+void pb_mmap_buffer_set_close_action(
+    struct pb_mmap_buffer * const mmap_buffer,
+    enum pb_mmap_close_action close_action) {
+  struct pb_mmap_allocator *mmap_allocator =
+    (struct pb_mmap_allocator*)mmap_buffer->trivial_buffer.buffer.allocator;
+
+  mmap_allocator->close_action = close_action;
 }

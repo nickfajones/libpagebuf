@@ -340,9 +340,10 @@ int main(int argc, char **argv) {
   test_subjects.push_back(
     new test_subject(
       "mmap file backed pb_buffer                                            ",
-      pb_mmap_buffer_create(
-        buffer_name,
-        pb_mmap_open_action_overwrite, pb_mmap_close_action_remove)));
+      pb_mmap_buffer_to_buffer(
+        pb_mmap_buffer_create(
+          buffer_name,
+          pb_mmap_open_action_overwrite, pb_mmap_close_action_remove))));
 
   test_case<test_case_insert1>::run_test(test_subjects);
   test_case<test_case_insert2>::run_test(test_subjects);

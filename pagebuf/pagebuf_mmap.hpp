@@ -43,27 +43,29 @@ class mmap_buffer : public buffer {
 
   public:
     mmap_buffer(const std::string& file_path,
-                enum open_action open_action,
-                enum close_action close_action) :
-        buffer(
+                enum open_action open__action,
+                enum close_action close__action) :
+        mmap_buffer_(
           pb_mmap_buffer_create(
             file_path.c_str(),
-            pb_mmap_open_action(open_action),
-            pb_mmap_close_action(close_action))),
+            pb_mmap_open_action(open__action),
+            pb_mmap_close_action(close__action))),
         file_path_(file_path) {
+      buffer_ = pb_mmap_buffer_to_buffer(mmap_buffer_);
     }
 
     mmap_buffer(const std::string& file_path,
-                enum open_action open_action,
-                enum close_action close_action,
+                enum open_action open__action,
+                enum close_action close__action,
                 const struct pb_allocator *allocator) :
-        buffer(
+        mmap_buffer_(
           pb_mmap_buffer_create_with_alloc(
             file_path.c_str(),
-            pb_mmap_open_action(open_action),
-            pb_mmap_close_action(close_action),
+            pb_mmap_open_action(open__action),
+            pb_mmap_close_action(close__action),
             allocator)),
         file_path_(file_path) {
+      buffer_ = pb_mmap_buffer_to_buffer(mmap_buffer_);
     }
 
     mmap_buffer(mmap_buffer&& rvalue) :
@@ -73,7 +75,9 @@ class mmap_buffer : public buffer {
     }
 
   private:
-    mmap_buffer(const mmap_buffer& rvalue) {
+    mmap_buffer(const mmap_buffer& rvalue) :
+        buffer(),
+        file_path_(rvalue.file_path_) {
     }
 
   public:
@@ -90,7 +94,20 @@ class mmap_buffer : public buffer {
       return file_path_;
     }
 
+  public:
+    enum close_action get_close_action() const {
+      return
+        close_action(pb_mmap_buffer_get_close_action(mmap_buffer_));
+    }
+
+    void set_close_action(enum close_action close__action) {
+      pb_mmap_buffer_set_close_action(
+        mmap_buffer_, pb_mmap_close_action(close__action));
+    }
+
   protected:
+    struct pb_mmap_buffer *mmap_buffer_;
+
     std::string file_path_;
 };
 

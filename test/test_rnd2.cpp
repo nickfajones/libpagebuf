@@ -430,12 +430,14 @@ int main(int argc, char **argv) {
   test_cases.push_back(
     new TestCase(
       "mmap file backed pb_buffer                                                        ",
-      pb_mmap_buffer_create(
-        buffer1_name,
-        pb_mmap_open_action_overwrite, pb_mmap_close_action_remove),
-      pb_mmap_buffer_create(
-        buffer2_name,
-        pb_mmap_open_action_overwrite, pb_mmap_close_action_remove),
+      pb_mmap_buffer_to_buffer(
+        pb_mmap_buffer_create(
+          buffer1_name,
+          pb_mmap_open_action_overwrite, pb_mmap_close_action_remove)),
+      pb_mmap_buffer_to_buffer(
+        pb_mmap_buffer_create(
+          buffer2_name,
+          pb_mmap_open_action_overwrite, pb_mmap_close_action_remove)),
       false));
 
   EVP_MD_CTX control_mdctx;

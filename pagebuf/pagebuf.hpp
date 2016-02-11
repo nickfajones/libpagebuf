@@ -234,11 +234,6 @@ class buffer {
         rvalue.buffer_ = 0;
     }
 
-  protected:
-    explicit buffer(struct pb_buffer *buf) :
-        buffer_(buf) {
-    }
-
   private:
     buffer(const buffer& rvalue) :
         buffer_(0) {

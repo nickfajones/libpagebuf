@@ -40,16 +40,30 @@ enum pb_mmap_close_action {
 
 
 
-/** Factory functions for the mmap buffer implementation of pb_buffer.
+/** The mmap buffer.
  *
- * The mmap buffer has a specific strategy and customised operations that allow
- * it to use mmap'd memory regions backed by a file on a block storage device
- * as its data storage backend.
+ * The mmap buffer has a specific strategy and customised operations that
+ * allow it to use mmap'd memory regions backed by a file on a block storage
+ * device as its data storage backend.
  *
  * The mmap buffer will make use of a supplied allocator for the purpose of
  * allocating structs, however data regions will be allocated using an
  * internal allocator.  If no allocator is supplied, the trivial heap based
  * allocator will be used for struct allocations.
+ *
+ * The mmap buffer uses a trivial buffer internally as a structure to store
+ * mapped pages, but the trivial buffer will only represent the current
+ * runtime state of the mmap buffer and will not necessarily represent the
+ * state of the backing file, thus it should not be accessed directly by
+ * a user.
+ */
+struct pb_mmap_buffer {
+  struct pb_trivial_buffer trivial_buffer;
+};
+
+
+
+/** Factory functions for the mmap buffer implementation of pb_buffer.
  *
  * The mmap buffer requires some parameters for initialisation:
  * file_path: the full path and file name of the file that the mmap buffer is
@@ -64,19 +78,39 @@ enum pb_mmap_close_action {
  *               retain: leaves the file and its data as is
  *               remove: clears all data and deletes the file
  *
- * Parameter validation errors during mmap buffer create will cause errno to be
- * set to EINVAL.
+ * Parameter validation errors during mmap buffer create will cause errno to
+ * be set to EINVAL.
  * System errors during mmap buffer create will cause errno to be set to the
  * appropriate non zero value by the system call.
  */
-struct pb_buffer *pb_mmap_buffer_create(const char *file_path,
-  enum pb_mmap_open_action open_action,
-  enum pb_mmap_close_action close_action);
-struct pb_buffer *pb_mmap_buffer_create_with_alloc(const char *file_path,
-  enum pb_mmap_open_action open_action,
-  enum pb_mmap_close_action close_action,
-  const struct pb_allocator *allocator);
+struct pb_mmap_buffer *pb_mmap_buffer_create(const char *file_path,
+    enum pb_mmap_open_action open_action,
+    enum pb_mmap_close_action close_action);
+struct pb_mmap_buffer *pb_mmap_buffer_create_with_alloc(const char *file_path,
+    enum pb_mmap_open_action open_action,
+    enum pb_mmap_close_action close_action,
+    const struct pb_allocator *allocator);
 
+
+
+/** mmap buffer conversion function. */
+struct pb_buffer *pb_mmap_buffer_to_buffer(
+                                   struct pb_mmap_buffer * const mmap_buffer);
+
+/** Query the mmap buffers' backing file path and name. */
+const char *pb_mmap_buffer_get_file_path(
+                                   struct pb_mmap_buffer * const mmap_buffer);
+
+/** Query or set the mmap buffers' closing action.
+ *
+ * The set operator allows the close action policy to be updated after a
+ * buffer is created.
+ */
+enum pb_mmap_close_action pb_mmap_buffer_get_close_action(
+                                   struct pb_mmap_buffer * const mmap_buffer);
+void pb_mmap_buffer_set_close_action(
+                                   struct pb_mmap_buffer * const mmap_buffer,
+                                   enum pb_mmap_close_action close_action);
 
 #ifdef __cplusplus
 } /* extern "C" */
