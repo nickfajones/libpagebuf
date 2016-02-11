@@ -1,6 +1,5 @@
 - Remove functional interfaces that shouldn't be called externally
 - Remove pb_get_trivial_data_reader_operations
-- Add overwrite_buffer
 - Factory functions return pointers to subclasses?
 - fragment_as_target(false) should not even fragment to page_size, original
   fragment sizes should remain unchanged.

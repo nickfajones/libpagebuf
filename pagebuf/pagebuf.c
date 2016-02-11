@@ -368,6 +368,7 @@ static struct pb_buffer_operations pb_trivial_buffer_operations = {
   .write_buffer = &pb_trivial_buffer_write_buffer,
 
   .overwrite_data = &pb_trivial_buffer_overwrite_data,
+  .overwrite_buffer = &pb_trivial_buffer_overwrite_buffer,
 
   .read_data = &pb_trivial_buffer_read_data,
 
@@ -541,6 +542,12 @@ uint64_t pb_buffer_overwrite_data(struct pb_buffer * const buffer,
     const void *buf,
     uint64_t len) {
   return buffer->operations->overwrite_data(buffer, buf, len);
+}
+
+uint64_t pb_buffer_overwrite_buffer(struct pb_buffer * const buffer,
+    struct pb_buffer * const src_buffer,
+    uint64_t len) {
+  return buffer->operations->overwrite_buffer(buffer, src_buffer, len);
 }
 
 
@@ -1461,6 +1468,59 @@ uint64_t pb_trivial_buffer_overwrite_data(struct pb_buffer * const buffer,
 
   return written;
 }
+
+uint64_t pb_trivial_buffer_overwrite_buffer(struct pb_buffer * const buffer,
+    struct pb_buffer * const src_buffer,
+    uint64_t len) {
+  pb_trivial_buffer_increment_data_revision(buffer);
+
+  struct pb_buffer_iterator buffer_iterator;
+  pb_buffer_get_iterator(buffer, &buffer_iterator);
+
+  struct pb_buffer_iterator src_buffer_iterator;
+  pb_buffer_get_iterator(src_buffer, &src_buffer_iterator);
+
+  uint64_t written = 0;
+  size_t offset = 0;
+  size_t src_offset = 0;
+
+  while ((len > 0) &&
+         (!pb_buffer_iterator_is_end(buffer, &buffer_iterator)) &&
+         (!pb_buffer_iterator_is_end(src_buffer, &src_buffer_iterator))) {
+    uint64_t write_len =
+      (pb_buffer_iterator_get_len(&buffer_iterator) < len) ?
+       pb_buffer_iterator_get_len(&buffer_iterator) : len;
+
+    write_len =
+      (pb_buffer_iterator_get_len(&src_buffer_iterator) < write_len) ?
+       pb_buffer_iterator_get_len(&src_buffer_iterator) : write_len;
+
+    memcpy(
+      pb_buffer_iterator_get_base_at(&buffer_iterator, offset),
+      pb_buffer_iterator_get_base_at(&src_buffer_iterator, src_offset),
+      write_len);
+
+    len -= write_len;
+    written += write_len;
+    offset += write_len;
+    src_offset += write_len;
+
+    if (offset == pb_buffer_iterator_get_len(&buffer_iterator)) {
+      pb_buffer_iterator_next(buffer, &buffer_iterator);
+
+      offset = 0;
+    }
+
+    if (src_offset == pb_buffer_iterator_get_len(&src_buffer_iterator)) {
+      pb_buffer_iterator_next(src_buffer, &src_buffer_iterator);
+
+      src_offset = 0;
+    }
+  }
+
+  return written;
+}
+
 
 /*******************************************************************************
  */

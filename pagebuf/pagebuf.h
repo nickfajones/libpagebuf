@@ -1029,6 +1029,22 @@ struct pb_buffer_operations {
   uint64_t (*overwrite_data)(struct pb_buffer * const buffer,
                              const void *buf,
                              uint64_t len);
+  /** Overwrite the head of a buffer with data from another buffer.
+   *
+   * src_buffer: the buffer to write from.  This pb_buffer instance will not
+   *             have its data modified.
+   * len: the amount of data to write in bytes.
+   *
+   * Data is written to the head of the buffer, overwriting existing data.
+   * No new storage will be allocated if len is greater than the size of the
+   * buffer.
+   *
+   * The return value is the amount of data successfully written to the
+   * buffer.
+   */
+  uint64_t (*overwrite_buffer)(struct pb_buffer * const buffer,
+                               struct pb_buffer * const src_buffer,
+                               uint64_t len);
 
 
   /** Read data from the head of a buffer to a memory region.
@@ -1160,6 +1176,10 @@ uint64_t pb_buffer_write_buffer(
 uint64_t pb_buffer_overwrite_data(
                               struct pb_buffer * const buffer,
                               const void *buf,
+                              uint64_t len);
+uint64_t pb_buffer_overwrite_buffer(
+                              struct pb_buffer * const buffer,
+                              struct pb_buffer * const src_buffer,
                               uint64_t len);
 
 
@@ -1353,6 +1373,10 @@ uint64_t pb_trivial_buffer_write_buffer(
 
 uint64_t pb_trivial_buffer_overwrite_data(struct pb_buffer * const buffer,
                                           const void *buf,
+                                          uint64_t len);
+uint64_t pb_trivial_buffer_overwrite_buffer(
+                                          struct pb_buffer * const buffer,
+                                          struct pb_buffer * const src_buffer,
                                           uint64_t len);
 
 

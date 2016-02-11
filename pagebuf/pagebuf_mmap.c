@@ -877,6 +877,7 @@ static struct pb_buffer_operations pb_mmap_buffer_operations = {
   .write_buffer = &pb_mmap_buffer_write_buffer,
 
   .overwrite_data = &pb_trivial_buffer_overwrite_data,
+  .overwrite_buffer = &pb_trivial_buffer_overwrite_buffer,
 
   .read_data = &pb_trivial_buffer_read_data,
 
