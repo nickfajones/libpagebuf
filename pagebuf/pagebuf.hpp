@@ -234,6 +234,11 @@ class buffer {
         rvalue.buffer_ = 0;
     }
 
+  protected:
+    buffer(struct pb_buffer *buf) :
+        buffer_(buf) {
+    }
+
   private:
     buffer(const buffer& rvalue) :
         buffer_(0) {
@@ -245,6 +250,11 @@ class buffer {
         pb_buffer_destroy(buffer_);
         buffer_ = 0;
       }
+    }
+
+  public:
+    buffer& operator=(const buffer&& rvalue) {
+      return *this;
     }
 
   private:

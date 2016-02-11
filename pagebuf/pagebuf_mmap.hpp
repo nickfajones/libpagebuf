@@ -45,6 +45,7 @@ class mmap_buffer : public buffer {
     mmap_buffer(const std::string& file_path,
                 enum open_action open__action,
                 enum close_action close__action) :
+        buffer(static_cast<struct pb_buffer*>(0)),
         mmap_buffer_(
           pb_mmap_buffer_create(
             file_path.c_str(),
@@ -58,6 +59,7 @@ class mmap_buffer : public buffer {
                 enum open_action open__action,
                 enum close_action close__action,
                 const struct pb_allocator *allocator) :
+        buffer(static_cast<struct pb_buffer*>(0)),
         mmap_buffer_(
           pb_mmap_buffer_create_with_alloc(
             file_path.c_str(),
@@ -70,22 +72,30 @@ class mmap_buffer : public buffer {
 
     mmap_buffer(mmap_buffer&& rvalue) :
         buffer(static_cast<buffer&&>(rvalue)),
+        mmap_buffer_(rvalue.mmap_buffer_),
         file_path_(rvalue.file_path_) {
-      rvalue.buffer_ = 0;
+      rvalue.mmap_buffer_ = 0;
     }
 
   private:
     mmap_buffer(const mmap_buffer& rvalue) :
-        buffer(),
-        file_path_(rvalue.file_path_) {
+        buffer(static_cast<struct pb_buffer*>(0)),
+        mmap_buffer_(0),
+      file_path_(rvalue.file_path_) {
     }
 
   public:
     ~mmap_buffer() {
+      mmap_buffer_ = 0;
+    }
+
+  public:
+    mmap_buffer& operator=(const mmap_buffer&& rvalue) {
+      return *this;
     }
 
   private:
-    mmap_buffer& operator=(const mmap_buffer&& rvalue) {
+    buffer& operator=(const buffer& rvalue) {
       return *this;
     }
 
