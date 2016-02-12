@@ -286,24 +286,18 @@ class test_case_overwrite1 : public test_case<test_case_overwrite1> {
         return 1;
       }
 
-      if (pb_buffer_seek(buffer, seek_size) != seek_size) {
-        delete [] input_buf;
+      delete [] input_buf;
 
+      if (pb_buffer_seek(buffer, seek_size) != seek_size)
         return 1;
-      }
 
       if (pb_buffer_overwrite_data(
             buffer,
-            input2, strlen(input2)) != strlen(input2)) {
-        delete [] input_buf;
-
+            input2, strlen(input2)) != strlen(input2))
         return 1;
-      }
-
-      delete [] input_buf;
 
       if (pb_buffer_get_data_size(buffer) != strlen(input1))
-        return 0;
+        return 1;
 
       pb_buffer_byte_iterator byte_itr;
       pb_buffer_get_byte_iterator(buffer, &byte_itr);
@@ -322,6 +316,78 @@ class test_case_overwrite1 : public test_case<test_case_overwrite1> {
 const char *test_case_overwrite1::input1 = "----efghijklmnopqrstuvwxyz";
 const char *test_case_overwrite1::input2 = "abcd";
 const char *test_case_overwrite1::output = "abcdefghijklmnopqrstuvwxyz";
+
+
+
+/*******************************************************************************
+ */
+class test_case_overwrite2 : public test_case<test_case_overwrite2> {
+  public:
+    static const char *input1;
+    static const char *input2;
+    static const char *output;
+
+  public:
+    virtual int run_test(struct pb_buffer *buffer) {
+      pb_buffer_clear(buffer);
+
+      size_t input_size = buffer->strategy->page_size + 10;
+      size_t seek_size = input_size - 26;
+      char *input_buf = new char[input_size];
+      memset(input_buf, 0, input_size);
+      memcpy(input_buf + seek_size, input1, strlen(input1));
+
+      if (pb_buffer_write_data(buffer, input_buf, input_size) != input_size) {
+        delete [] input_buf;
+
+        return 1;
+      }
+
+      delete [] input_buf;
+
+      if (pb_buffer_seek(buffer, seek_size) != seek_size)
+        return 1;
+
+      struct pb_buffer *src_buffer = pb_trivial_buffer_create();
+      if (pb_buffer_write_data(
+            src_buffer,
+            input2, strlen(input2)) != strlen(input2)) {
+        pb_buffer_destroy(src_buffer);
+
+        return 1;
+      }
+
+      if (pb_buffer_overwrite_buffer(
+            buffer,
+            src_buffer, pb_buffer_get_data_size(src_buffer)) !=
+          pb_buffer_get_data_size(src_buffer)) {
+        pb_buffer_destroy(src_buffer);
+
+        return 1;
+      }
+
+      pb_buffer_destroy(src_buffer);
+
+      if (pb_buffer_get_data_size(buffer) != strlen(input1))
+        return 1;
+
+      pb_buffer_byte_iterator byte_itr;
+      pb_buffer_get_byte_iterator(buffer, &byte_itr);
+
+      for (unsigned int i = 0; i < strlen(output); ++i) {
+        if (*byte_itr.current_byte != output[i])
+          return 1;
+
+        pb_buffer_byte_iterator_next(buffer, &byte_itr);
+      }
+
+      return 0;
+    }
+};
+
+const char *test_case_overwrite2::input1 = "----efghijklmnopqrstuvwxyz";
+const char *test_case_overwrite2::input2 = "abcd";
+const char *test_case_overwrite2::output = "abcdefghijklmnopqrstuvwxyz";
 
 
 
@@ -425,6 +491,7 @@ int main(int argc, char **argv) {
   test_case<test_case_insert2>::run_test(test_subjects);
   test_case<test_case_insert3>::run_test(test_subjects);
   test_case<test_case_overwrite1>::run_test(test_subjects);
+  test_case<test_case_overwrite2>::run_test(test_subjects);
   test_case<test_case_trim1>::run_test(test_subjects);
 
   while (!test_subjects.empty()) {
