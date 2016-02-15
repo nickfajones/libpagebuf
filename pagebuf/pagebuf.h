@@ -142,9 +142,9 @@ extern "C" {
  * atomic fashion.
  *
  * It is the responsibility of users to ensure that buffers are not accessed
- * concurrently from across thread boundaries, and even if this is done in a
- * serialised way, cleanup operations, in particular pb_allocator frees are
- * internally thread safe.
+ * concurrently from across thread boundaries, and even if such a thing is
+ * done in a serialised way, users must ensure that cleanup operations, in
+ * particular pb_allocator frees are internally thread safe.
  */
 
 
