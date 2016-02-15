@@ -904,7 +904,7 @@ uint64_t pb_trivial_buffer_rewind(struct pb_buffer * const buffer,
   uint64_t rewinded = 0;
 
   while (len > 0) {
-    uint64_t extend_len =
+    uint64_t rewind_len =
       ((buffer->strategy->page_size != 0) &&
        (buffer->strategy->page_size < len)) ?
         buffer->strategy->page_size : len;
@@ -913,16 +913,16 @@ uint64_t pb_trivial_buffer_rewind(struct pb_buffer * const buffer,
     pb_buffer_get_iterator(buffer, &buffer_iterator);
 
     struct pb_page *page =
-      pb_trivial_buffer_page_create(buffer, extend_len);
+      pb_trivial_buffer_page_create(buffer, rewind_len);
     if (!page)
       return rewinded;
 
-    extend_len = pb_buffer_insert(buffer, &buffer_iterator, 0, page);
-    if (extend_len == 0)
+    rewind_len = pb_buffer_insert(buffer, &buffer_iterator, 0, page);
+    if (rewind_len == 0)
       break;
 
-    len -= extend_len;
-    rewinded += extend_len;
+    len -= rewind_len;
+    rewinded += rewind_len;
   }
 
   return rewinded;
