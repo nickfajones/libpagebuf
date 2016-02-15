@@ -788,15 +788,6 @@ static void pb_mmap_buffer_iterator_prev(
                             struct pb_buffer_iterator * const buffer_iterator);
 
 
-static struct pb_page *pb_mmap_buffer_page_create(
-                              struct pb_buffer * const buffer,
-                              size_t len);
-
-static struct pb_page *pb_mmap_buffer_page_create_ref(
-                              struct pb_buffer * const buffer,
-                              const uint8_t *buf, size_t len);
-
-
 static uint64_t pb_mmap_buffer_insert(
                               struct pb_buffer * const buffer,
                               const struct pb_buffer_iterator *buffer_iterator,
@@ -813,6 +804,7 @@ static uint64_t pb_mmap_buffer_rewind(
 static uint64_t pb_mmap_buffer_trim(
                               struct pb_buffer * const buffer,
                               uint64_t len);
+
 
 uint64_t pb_mmap_buffer_write_data(struct pb_buffer * const buffer,
                                    const void *buf,
@@ -858,9 +850,6 @@ static struct pb_buffer_operations pb_mmap_buffer_operations = {
   .byte_iterator_cmp = &pb_trivial_buffer_byte_iterator_cmp,
   .byte_iterator_next = &pb_trivial_buffer_byte_iterator_next,
   .byte_iterator_prev = &pb_trivial_buffer_byte_iterator_prev,
-
-  .page_create = &pb_mmap_buffer_page_create,
-  .page_create_ref = &pb_mmap_buffer_page_create_ref,
 
   .insert = &pb_mmap_buffer_insert,
   .extend = &pb_mmap_buffer_extend,
@@ -957,23 +946,6 @@ static uint64_t pb_mmap_buffer_get_data_size(struct pb_buffer * const buffer) {
   return pb_mmap_allocator_get_data_size(mmap_allocator);
 }
 
-/*******************************************************************************
- */
-static struct pb_page *pb_mmap_buffer_page_create(
-    struct pb_buffer * const buffer,
-    size_t len) {
-  assert(0);
-
-  return NULL;
-}
-
-static struct pb_page *pb_mmap_buffer_page_create_ref(
-    struct pb_buffer * const buffer,
-    const uint8_t *buf, size_t len) {
-  assert(0);
-
-  return NULL;
-}
 
 /*******************************************************************************
  */

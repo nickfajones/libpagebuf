@@ -1273,18 +1273,7 @@ struct pb_buffer *pb_trivial_buffer_create_with_strategy_with_alloc(
  */
 uint64_t pb_trivial_buffer_get_data_revision(
                                          struct pb_buffer * const buffer);
-void pb_trivial_buffer_increment_data_revision(
-                                         struct pb_buffer * const buffer);
-
-
 uint64_t pb_trivial_buffer_get_data_size(struct pb_buffer * const buffer);
-
-void pb_trivial_buffer_increment_data_size(
-                                         struct pb_buffer * const buffer,
-                                         uint64_t size);
-void pb_trivial_buffer_decrement_data_size(
-                                         struct pb_buffer * const buffer,
-                                         uint64_t size);
 
 
 void pb_trivial_buffer_get_iterator(
@@ -1325,14 +1314,6 @@ void pb_trivial_buffer_byte_iterator_next(
 void pb_trivial_buffer_byte_iterator_prev(
                          struct pb_buffer * const buffer,
                          struct pb_buffer_byte_iterator * const byte_iterator);
-
-
-struct pb_page *pb_trivial_buffer_page_create(
-                              struct pb_buffer * const buffer,
-                              size_t len);
-struct pb_page *pb_trivial_buffer_page_create_ref(
-                              struct pb_buffer * const buffer,
-                              const uint8_t *buf, size_t len);
 
 
 uint64_t pb_trivial_buffer_insert(
@@ -1405,6 +1386,28 @@ void pb_trivial_pure_buffer_clear(
 
 void pb_trivial_buffer_destroy(
                              struct pb_buffer * const buffer);
+
+
+/** Utility functions for the trivial buffer implementation.
+ *
+ * These are protected functions and should not be called externally.
+ */
+void pb_trivial_buffer_increment_data_revision(
+                                         struct pb_buffer * const buffer);
+
+void pb_trivial_buffer_increment_data_size(
+                                         struct pb_buffer * const buffer,
+                                         uint64_t size);
+void pb_trivial_buffer_decrement_data_size(
+                                         struct pb_buffer * const buffer,
+                                         uint64_t size);
+
+struct pb_page *pb_trivial_buffer_page_create(
+                              struct pb_buffer * const buffer,
+                              size_t len);
+struct pb_page *pb_trivial_buffer_page_create_ref(
+                              struct pb_buffer * const buffer,
+                              const uint8_t *buf, size_t len);
 
 
 
