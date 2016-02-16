@@ -32,6 +32,25 @@
 #include "pagebuf/pagebuf.h"
 #include "pagebuf/pagebuf_mmap.h"
 
+#include <stdio.h>
+
+
+/*******************************************************************************
+ */
+#define TEST_OPS_MERGE(prefix,counter) prefix##counter
+#define TEST_OPS_UNIQUE_VAR(counter) TEST_OPS_MERGE(cnd_,counter)
+#define TEST_OPS_EVAL(condition) \
+  bool TEST_OPS_UNIQUE_VAR(__LINE__) = (condition); \
+  if (TEST_OPS_UNIQUE_VAR(__LINE__)) \
+    fprintf( \
+      stderr, \
+      "Error Condition Found: Test: '%s', Line: '%d': Subject: '%s': '%s'\n", \
+        __PRETTY_FUNCTION__, __LINE__, \
+        subject->description.c_str(), \
+        #condition); \
+  if (TEST_OPS_UNIQUE_VAR(__LINE__))
+
+
 
 /*******************************************************************************
  */
@@ -74,7 +93,7 @@ int test_base::final_result = 0;
 template <typename T>
 class test_case : public test_base {
   public:
-    virtual int run_test(struct pb_buffer *buffer) = 0;
+    virtual int run_test(struct test_subject *subject) = 0;
 
   public:
     static void run_test(const std::list<test_subject*>& test_subjects) {
@@ -83,7 +102,7 @@ class test_case : public test_base {
       for (std::list<test_subject*>::const_iterator itr = test_subjects.begin();
            itr != test_subjects.end();
            ++itr) {
-        int result = test_case.run_test((*itr)->buffer);
+        int result = test_case.run_test(*itr);
         final_result = ((final_result == 0) && (result == 0)) ? 0 : 1;
       }
     }
@@ -100,37 +119,39 @@ class test_case_insert1 : public test_case<test_case_insert1> {
     static const char *output;
 
   public:
-    virtual int run_test(struct pb_buffer *buffer) {
-      pb_buffer_clear(buffer);
+    virtual int run_test(struct test_subject *subject) {
+      pb_buffer_clear(subject->buffer);
 
-      if (buffer->strategy->rejects_insert)
+      if (subject->buffer->strategy->rejects_insert)
         return 0;
 
-      if (pb_buffer_write_data(
-            buffer,
+      TEST_OPS_EVAL(pb_buffer_write_data(
+            subject->buffer,
             input1, strlen(input1)) != strlen(input1))
         return 1;
 
       pb_buffer_iterator buf_itr;
-      pb_buffer_get_iterator(buffer, &buf_itr);
+      pb_buffer_get_iterator(subject->buffer, &buf_itr);
 
-      if (pb_buffer_insert_data(
-            buffer,
+      TEST_OPS_EVAL(pb_buffer_insert_data(
+            subject->buffer,
             &buf_itr, 5,
             input2, strlen(input2)) != strlen(input2))
         return 1;
 
-      if (pb_buffer_get_data_size(buffer) != (strlen(input1) + strlen(input2)))
+      TEST_OPS_EVAL(pb_buffer_get_data_size(
+            subject->buffer) !=
+          (strlen(input1) + strlen(input2)))
         return 1;
 
       pb_buffer_byte_iterator byte_itr;
-      pb_buffer_get_byte_iterator(buffer, &byte_itr);
+      pb_buffer_get_byte_iterator(subject->buffer, &byte_itr);
 
       for (unsigned int i = 0; i < strlen(output); ++i) {
-        if (*byte_itr.current_byte != output[i])
+        TEST_OPS_EVAL(*byte_itr.current_byte != output[i])
           return 1;
 
-        pb_buffer_byte_iterator_next(buffer, &byte_itr);
+        pb_buffer_byte_iterator_next(subject->buffer, &byte_itr);
       }
 
       return 0;
@@ -152,37 +173,39 @@ class test_case_insert2 : public test_case<test_case_insert2> {
     static const char *output;
 
   public:
-    virtual int run_test(struct pb_buffer *buffer) {
-      pb_buffer_clear(buffer);
+    virtual int run_test(struct test_subject *subject) {
+      pb_buffer_clear(subject->buffer);
 
-      if (buffer->strategy->rejects_insert)
+      if (subject->buffer->strategy->rejects_insert)
         return 0;
 
-      if (pb_buffer_write_data(
-            buffer,
+      TEST_OPS_EVAL(pb_buffer_write_data(
+            subject->buffer,
             input1, strlen(input1)) != strlen(input1))
         return 1;
 
       pb_buffer_iterator buf_itr;
-      pb_buffer_get_iterator(buffer, &buf_itr);
+      pb_buffer_get_iterator(subject->buffer, &buf_itr);
 
-      if (pb_buffer_insert_data_ref(
-            buffer,
+      TEST_OPS_EVAL(pb_buffer_insert_data_ref(
+            subject->buffer,
             &buf_itr, 5,
             input2, strlen(input2)) != strlen(input2))
         return 1;
 
-      if (pb_buffer_get_data_size(buffer) != (strlen(input1) + strlen(input2)))
+      TEST_OPS_EVAL(pb_buffer_get_data_size(
+            subject->buffer) !=
+          (strlen(input1) + strlen(input2)))
         return 1;
 
       pb_buffer_byte_iterator byte_itr;
-      pb_buffer_get_byte_iterator(buffer, &byte_itr);
+      pb_buffer_get_byte_iterator(subject->buffer, &byte_itr);
 
       for (unsigned int i = 0; i < strlen(output); ++i) {
-        if (*byte_itr.current_byte != output[i])
+        TEST_OPS_EVAL(*byte_itr.current_byte != output[i])
           return 1;
 
-        pb_buffer_byte_iterator_next(buffer, &byte_itr);
+        pb_buffer_byte_iterator_next(subject->buffer, &byte_itr);
       }
 
       return 0;
@@ -204,22 +227,22 @@ class test_case_insert3 : public test_case<test_case_insert3> {
     static const char *output;
 
   public:
-    virtual int run_test(struct pb_buffer *buffer) {
-      pb_buffer_clear(buffer);
+    virtual int run_test(struct test_subject *subject) {
+      pb_buffer_clear(subject->buffer);
 
-      if (buffer->strategy->rejects_insert)
+      if (subject->buffer->strategy->rejects_insert)
         return 0;
 
-      if (pb_buffer_write_data(
-            buffer,
+      TEST_OPS_EVAL(pb_buffer_write_data(
+            subject->buffer,
             input1, strlen(input1)) != strlen(input1))
         return 1;
 
       pb_buffer_iterator buf_itr;
-      pb_buffer_get_iterator(buffer, &buf_itr);
+      pb_buffer_get_iterator(subject->buffer, &buf_itr);
 
       struct pb_buffer *src_buffer = pb_trivial_buffer_create();
-      if (pb_buffer_write_data(
+      TEST_OPS_EVAL(pb_buffer_write_data(
             src_buffer,
             input2, strlen(input2)) != strlen(input2)) {
         pb_buffer_destroy(src_buffer);
@@ -227,11 +250,11 @@ class test_case_insert3 : public test_case<test_case_insert3> {
         return 1;
       }
 
-      if (pb_buffer_insert_buffer(
-            buffer,
+      TEST_OPS_EVAL(pb_buffer_insert_buffer(
+            subject->buffer,
             &buf_itr, 5,
             src_buffer, pb_buffer_get_data_size(src_buffer)) !=
-         pb_buffer_get_data_size(src_buffer)) {
+          pb_buffer_get_data_size(src_buffer)) {
         pb_buffer_destroy(src_buffer);
 
         return 1;
@@ -239,17 +262,19 @@ class test_case_insert3 : public test_case<test_case_insert3> {
 
       pb_buffer_destroy(src_buffer);
 
-      if (pb_buffer_get_data_size(buffer) != (strlen(input1) + strlen(input2)))
+      TEST_OPS_EVAL(pb_buffer_get_data_size(
+            subject->buffer) !=
+          (strlen(input1) + strlen(input2)))
         return 1;
 
       pb_buffer_byte_iterator byte_itr;
-      pb_buffer_get_byte_iterator(buffer, &byte_itr);
+      pb_buffer_get_byte_iterator(subject->buffer, &byte_itr);
 
       for (unsigned int i = 0; i < strlen(output); ++i) {
-        if (*byte_itr.current_byte != output[i])
+        TEST_OPS_EVAL(*byte_itr.current_byte != output[i])
           return 1;
 
-        pb_buffer_byte_iterator_next(buffer, &byte_itr);
+        pb_buffer_byte_iterator_next(subject->buffer, &byte_itr);
       }
 
       return 0;
@@ -271,16 +296,17 @@ class test_case_overwrite1 : public test_case<test_case_overwrite1> {
     static const char *output;
 
   public:
-    virtual int run_test(struct pb_buffer *buffer) {
-      pb_buffer_clear(buffer);
+    virtual int run_test(struct test_subject *subject) {
+      pb_buffer_clear(subject->buffer);
 
-      size_t input_size = buffer->strategy->page_size + 10;
+      size_t input_size = subject->buffer->strategy->page_size + 10;
       size_t seek_size = input_size - 26;
       char *input_buf = new char[input_size];
       memset(input_buf, 0, input_size);
       memcpy(input_buf + seek_size, input1, strlen(input1));
 
-      if (pb_buffer_write_data(buffer, input_buf, input_size) != input_size) {
+      TEST_OPS_EVAL(pb_buffer_write_data(
+            subject->buffer, input_buf, input_size) != input_size) {
         delete [] input_buf;
 
         return 1;
@@ -288,25 +314,26 @@ class test_case_overwrite1 : public test_case<test_case_overwrite1> {
 
       delete [] input_buf;
 
-      if (pb_buffer_seek(buffer, seek_size) != seek_size)
+      TEST_OPS_EVAL(pb_buffer_seek(subject->buffer, seek_size) != seek_size)
         return 1;
 
-      if (pb_buffer_overwrite_data(
-            buffer,
+      TEST_OPS_EVAL(pb_buffer_overwrite_data(
+            subject->buffer,
             input2, strlen(input2)) != strlen(input2))
         return 1;
 
-      if (pb_buffer_get_data_size(buffer) != strlen(input1))
+      TEST_OPS_EVAL(pb_buffer_get_data_size(
+            subject->buffer) != strlen(input1))
         return 1;
 
       pb_buffer_byte_iterator byte_itr;
-      pb_buffer_get_byte_iterator(buffer, &byte_itr);
+      pb_buffer_get_byte_iterator(subject->buffer, &byte_itr);
 
       for (unsigned int i = 0; i < strlen(output); ++i) {
-        if (*byte_itr.current_byte != output[i])
+        TEST_OPS_EVAL(*byte_itr.current_byte != output[i])
           return 1;
 
-        pb_buffer_byte_iterator_next(buffer, &byte_itr);
+        pb_buffer_byte_iterator_next(subject->buffer, &byte_itr);
       }
 
       return 0;
@@ -328,16 +355,17 @@ class test_case_overwrite2 : public test_case<test_case_overwrite2> {
     static const char *output;
 
   public:
-    virtual int run_test(struct pb_buffer *buffer) {
-      pb_buffer_clear(buffer);
+    virtual int run_test(struct test_subject *subject) {
+      pb_buffer_clear(subject->buffer);
 
-      size_t input_size = buffer->strategy->page_size + 10;
+      size_t input_size = subject->buffer->strategy->page_size + 10;
       size_t seek_size = input_size - 26;
       char *input_buf = new char[input_size];
       memset(input_buf, 0, input_size);
       memcpy(input_buf + seek_size, input1, strlen(input1));
 
-      if (pb_buffer_write_data(buffer, input_buf, input_size) != input_size) {
+      TEST_OPS_EVAL(pb_buffer_write_data(
+            subject->buffer, input_buf, input_size) != input_size) {
         delete [] input_buf;
 
         return 1;
@@ -345,11 +373,11 @@ class test_case_overwrite2 : public test_case<test_case_overwrite2> {
 
       delete [] input_buf;
 
-      if (pb_buffer_seek(buffer, seek_size) != seek_size)
+      TEST_OPS_EVAL(pb_buffer_seek(subject->buffer, seek_size) != seek_size)
         return 1;
 
       struct pb_buffer *src_buffer = pb_trivial_buffer_create();
-      if (pb_buffer_write_data(
+      TEST_OPS_EVAL(pb_buffer_write_data(
             src_buffer,
             input2, strlen(input2)) != strlen(input2)) {
         pb_buffer_destroy(src_buffer);
@@ -357,8 +385,8 @@ class test_case_overwrite2 : public test_case<test_case_overwrite2> {
         return 1;
       }
 
-      if (pb_buffer_overwrite_buffer(
-            buffer,
+      TEST_OPS_EVAL(pb_buffer_overwrite_buffer(
+            subject->buffer,
             src_buffer, pb_buffer_get_data_size(src_buffer)) !=
           pb_buffer_get_data_size(src_buffer)) {
         pb_buffer_destroy(src_buffer);
@@ -368,17 +396,18 @@ class test_case_overwrite2 : public test_case<test_case_overwrite2> {
 
       pb_buffer_destroy(src_buffer);
 
-      if (pb_buffer_get_data_size(buffer) != strlen(input1))
+      TEST_OPS_EVAL(pb_buffer_get_data_size(
+            subject->buffer) != strlen(input1))
         return 1;
 
       pb_buffer_byte_iterator byte_itr;
-      pb_buffer_get_byte_iterator(buffer, &byte_itr);
+      pb_buffer_get_byte_iterator(subject->buffer, &byte_itr);
 
       for (unsigned int i = 0; i < strlen(output); ++i) {
-        if (*byte_itr.current_byte != output[i])
+        TEST_OPS_EVAL(*byte_itr.current_byte != output[i])
           return 1;
 
-        pb_buffer_byte_iterator_next(buffer, &byte_itr);
+        pb_buffer_byte_iterator_next(subject->buffer, &byte_itr);
       }
 
       return 0;
@@ -399,27 +428,28 @@ class test_case_trim1 : public test_case<test_case_trim1> {
     static const char *output;
 
   public:
-    virtual int run_test(struct pb_buffer *buffer) {
-      pb_buffer_clear(buffer);
+    virtual int run_test(struct test_subject *subject) {
+      pb_buffer_clear(subject->buffer);
 
-      pb_buffer_write_data(
-        buffer,
-        input1, strlen(input1));
-
-      if (pb_buffer_trim(buffer, 10) != 10)
+      TEST_OPS_EVAL(pb_buffer_write_data(
+            subject->buffer,
+            input1, strlen(input1)) != strlen(input1))
         return 1;
 
-      if (pb_buffer_get_data_size(buffer) != 16)
+      TEST_OPS_EVAL(pb_buffer_trim(subject->buffer, 10) != 10)
+        return 1;
+
+      TEST_OPS_EVAL(pb_buffer_get_data_size(subject->buffer) != 16)
         return 1;
 
       pb_buffer_byte_iterator byte_itr;
-      pb_buffer_get_byte_iterator(buffer, &byte_itr);
+      pb_buffer_get_byte_iterator(subject->buffer, &byte_itr);
 
       for (unsigned int i = 0; i < strlen(output); ++i) {
-        if (*byte_itr.current_byte != output[i])
+        TEST_OPS_EVAL(*byte_itr.current_byte != output[i])
           return 1;
 
-        pb_buffer_byte_iterator_next(buffer, &byte_itr);
+        pb_buffer_byte_iterator_next(subject->buffer, &byte_itr);
       }
 
       return 0;
