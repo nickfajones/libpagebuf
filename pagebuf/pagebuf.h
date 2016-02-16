@@ -664,15 +664,96 @@ struct pb_buffer_strategy {
    */
   bool fragment_as_target;
 
-  /** Indicates whether a pb_buffer rejects (fails to support) insert operations.
-   *  That is: operations that write to places in the buffer other than the end.
+  /** Alteration flags: control access to functions that alter the state of
+   *  the buffer.
+   */
+ 
+  /** Indicates whether a pb_buffer rejects (fails to support) any alteration
+   *
+   * Setting the rejects_alteration flag to true will implicitly override all
+   * other alteration flags an reject all alterations.
+   *
+   * The clear (and destroy) operations are not affected by this flag
+   */
+  bool rejects_alteration;
+ 
+  /** Indicates whether a pb_buffer rejects (fails to support) insert
+   *  operations.  That is: operations that write to places in the buffer
+   *  other than the end.
    *
    * Available behaviours:
-   * no reject (false): insert operations can be performed with expected results.
+   * no reject (false): insert operations can be performed with expected
+   *                    results.
    *
    * reject     (true): insert operations will immediately return 0.
    */
   bool rejects_insert;
+
+  /** Indicates whether a pb_buffer rejects (fails to support) the extend
+   *  operation.
+   *
+   * Available behaviours:
+   * no reject (false): extend operations can be performed with expected
+   *                    results.
+   *
+   * reject     (true): extend operations will immediately return 0.
+   */
+  bool rejects_extend;
+
+  /** Indicates whether a pb_buffer rejects (fails to support) the rewind
+   *  operation.
+   *
+   * Available behaviours:
+   * no reject (false): rewind operations can be performed with expected
+   *                    results.
+   *
+   * reject     (true): rewind operations will immediately return 0.
+   */
+  bool rejects_rewind;
+
+  /** Indicates whether a pb_buffer rejects (fails to support) the seek
+   *  operation.
+   *
+   * Available behaviours:
+   * no reject (false): seek operations can be performed with expected
+   *                    results.
+   *
+   * reject     (true): seek operations will immediately return 0.
+   */
+  bool rejects_seek;
+
+  /** Indicates whether a pb_buffer rejects (fails to support) the trim
+   *  operation.
+   *
+   * Available behaviours:
+   * no reject (false): trim operations can be performed with expected
+   *                    results.
+   *
+   * reject     (true): trim operations will immediately return 0.
+   */
+  bool rejects_trim;
+
+  /** Indicates whether a pb_buffer rejects (fails to support) write
+   *  operations
+   *
+   * Available behaviours:
+   * no reject (false): write operations can be performed with expected
+   *                    results.
+   *
+   * reject     (true): write operations will immediately return 0.
+   */
+  bool rejects_write;
+
+  /** Indicates whether a pb_buffer rejects (fails to support) the overwrite
+   *  operation.
+   *
+   * Available behaviours:
+   * no reject (false): overwrite operations can be performed with expected
+   *                    results.
+   *
+   * reject     (true): overwrite operations will immediately return 0.
+   */
+  bool rejects_overwrite;
 };
 
 

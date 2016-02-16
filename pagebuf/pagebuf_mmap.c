@@ -755,7 +755,14 @@ static struct pb_buffer_strategy pb_mmap_buffer_strategy = {
   .page_size = 4096,
   .clone_on_write = true,
   .fragment_as_target = true,
+  .rejects_alteration = false,
   .rejects_insert = true,
+  .rejects_extend = false,
+  .rejects_rewind = false,
+  .rejects_seek = false,
+  .rejects_trim = false,
+  .rejects_write = false,
+  .rejects_overwrite = false,
 };
 
 static const struct pb_buffer_strategy *pb_get_mmap_buffer_strategy(void) {
