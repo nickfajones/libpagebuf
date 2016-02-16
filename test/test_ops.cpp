@@ -122,6 +122,9 @@ class test_case_insert1 : public test_case<test_case_insert1> {
     virtual int run_test(struct test_subject *subject) {
       pb_buffer_clear(subject->buffer);
 
+      TEST_OPS_EVAL(pb_buffer_get_data_size(subject->buffer) != 0)
+        return 1;
+
       if (subject->buffer->strategy->rejects_insert)
         return 0;
 
@@ -176,6 +179,9 @@ class test_case_insert2 : public test_case<test_case_insert2> {
     virtual int run_test(struct test_subject *subject) {
       pb_buffer_clear(subject->buffer);
 
+      TEST_OPS_EVAL(pb_buffer_get_data_size(subject->buffer) != 0)
+        return 1;
+
       if (subject->buffer->strategy->rejects_insert)
         return 0;
 
@@ -229,6 +235,9 @@ class test_case_insert3 : public test_case<test_case_insert3> {
   public:
     virtual int run_test(struct test_subject *subject) {
       pb_buffer_clear(subject->buffer);
+
+      TEST_OPS_EVAL(pb_buffer_get_data_size(subject->buffer) != 0)
+        return 1;
 
       if (subject->buffer->strategy->rejects_insert)
         return 0;
@@ -299,6 +308,9 @@ class test_case_overwrite1 : public test_case<test_case_overwrite1> {
     virtual int run_test(struct test_subject *subject) {
       pb_buffer_clear(subject->buffer);
 
+      TEST_OPS_EVAL(pb_buffer_get_data_size(subject->buffer) != 0)
+        return 1;
+
       size_t input_size = subject->buffer->strategy->page_size + 10;
       size_t seek_size = input_size - 26;
       char *input_buf = new char[input_size];
@@ -357,6 +369,9 @@ class test_case_overwrite2 : public test_case<test_case_overwrite2> {
   public:
     virtual int run_test(struct test_subject *subject) {
       pb_buffer_clear(subject->buffer);
+
+      TEST_OPS_EVAL(pb_buffer_get_data_size(subject->buffer) != 0)
+        return 1;
 
       size_t input_size = subject->buffer->strategy->page_size + 10;
       size_t seek_size = input_size - 26;
@@ -422,6 +437,59 @@ const char *test_case_overwrite2::output = "abcdefghijklmnopqrstuvwxyz";
 
 /*******************************************************************************
  */
+class test_case_rewind1 : public test_case<test_case_rewind1> {
+  public:
+    static const char *input1;
+    static const char *input2;
+    static const char *output;
+
+  public:
+    virtual int run_test(struct test_subject *subject) {
+      pb_buffer_clear(subject->buffer);
+
+      TEST_OPS_EVAL(pb_buffer_get_data_size(subject->buffer) != 0)
+        return 1;
+
+      TEST_OPS_EVAL(pb_buffer_write_data(
+            subject->buffer,
+            input1, strlen(input1)) != strlen(input1))
+        return 1;
+
+      TEST_OPS_EVAL(pb_buffer_seek(subject->buffer,
+            strlen(input2)) != strlen(input2))
+        return 1;
+
+      TEST_OPS_EVAL(pb_buffer_rewind(subject->buffer,
+            strlen(input2)) != strlen(input2))
+        return 1;
+
+      TEST_OPS_EVAL(pb_buffer_overwrite_data(
+            subject->buffer,
+            input2, strlen(input2)) != strlen(input2))
+        return 1;
+
+      pb_buffer_byte_iterator byte_itr;
+      pb_buffer_get_byte_iterator(subject->buffer, &byte_itr);
+
+      for (unsigned int i = 0; i < strlen(output); ++i) {
+        TEST_OPS_EVAL(*byte_itr.current_byte != output[i])
+          return 1;
+
+        pb_buffer_byte_iterator_next(subject->buffer, &byte_itr);
+      }
+
+      return 0;
+    }
+};
+
+const char *test_case_rewind1::input1 = "----efghijklmnopqrstuvwxyz";
+const char *test_case_rewind1::input2 = "abcd";
+const char *test_case_rewind1::output = "abcdefghijklmnopqrstuvwxyz";
+
+
+
+/*******************************************************************************
+ */
 class test_case_trim1 : public test_case<test_case_trim1> {
   public:
     static const char *input1;
@@ -430,6 +498,9 @@ class test_case_trim1 : public test_case<test_case_trim1> {
   public:
     virtual int run_test(struct test_subject *subject) {
       pb_buffer_clear(subject->buffer);
+
+      TEST_OPS_EVAL(pb_buffer_get_data_size(subject->buffer) != 0)
+        return 1;
 
       TEST_OPS_EVAL(pb_buffer_write_data(
             subject->buffer,
@@ -522,6 +593,7 @@ int main(int argc, char **argv) {
   test_case<test_case_insert3>::run_test(test_subjects);
   test_case<test_case_overwrite1>::run_test(test_subjects);
   test_case<test_case_overwrite2>::run_test(test_subjects);
+  test_case<test_case_rewind1>::run_test(test_subjects);
   test_case<test_case_trim1>::run_test(test_subjects);
 
   while (!test_subjects.empty()) {
