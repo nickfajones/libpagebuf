@@ -252,7 +252,7 @@ static struct pb_mmap_data *pb_mmap_allocator_data_create(
   mmap_data->data.data_vec.base = mmap_base;
   mmap_data->data.data_vec.len = mmap_len;
 
-  mmap_data->data.responsibility = pb_data_referenced;
+  mmap_data->data.responsibility = pb_data_owned;
 
   mmap_data->data.use_count = 1;
 
