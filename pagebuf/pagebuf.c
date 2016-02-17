@@ -508,7 +508,8 @@ uint64_t pb_buffer_insert_data(struct pb_buffer * const buffer,
     const void *buf,
     uint64_t len) {
   return
-    buffer->operations->insert_data(buffer, buffer_iterator, offset, buf, len);
+    buffer->operations->insert_data(
+      buffer, buffer_iterator, offset, buf, len);
 }
 
 uint64_t pb_buffer_insert_data_ref(
@@ -972,6 +973,7 @@ uint64_t pb_trivial_buffer_extend(struct pb_buffer * const buffer,
       return extended;
 
     extend_len = pb_buffer_insert(buffer, &buffer_iterator, 0, page);
+
     if (extend_len == 0)
       break;
 
@@ -1006,6 +1008,7 @@ uint64_t pb_trivial_buffer_rewind(struct pb_buffer * const buffer,
       return rewinded;
 
     rewind_len = pb_buffer_insert(buffer, &buffer_iterator, 0, page);
+
     if (rewind_len == 0)
       break;
 
@@ -1021,8 +1024,6 @@ uint64_t pb_trivial_buffer_rewind(struct pb_buffer * const buffer,
 uint64_t pb_trivial_buffer_seek(struct pb_buffer * const buffer, uint64_t len) {
   if (buffer->strategy->rejects_seek)
     return 0;
-
-  pb_trivial_buffer_increment_data_revision(buffer);
 
   uint64_t seeked = 0;
 
@@ -1052,11 +1053,17 @@ uint64_t pb_trivial_buffer_seek(struct pb_buffer * const buffer, uint64_t len) {
       pb_page_destroy(page, buffer->allocator);
     }
 
+    if (seek_len == 0)
+      break;
+
     len -= seek_len;
     seeked += seek_len;
 
     pb_trivial_buffer_decrement_data_size(buffer, seek_len);
   }
+
+  if (seeked > 0)
+    pb_trivial_buffer_increment_data_revision(buffer);
 
   return seeked;
 }
@@ -1066,8 +1073,6 @@ uint64_t pb_trivial_buffer_seek(struct pb_buffer * const buffer, uint64_t len) {
 uint64_t pb_trivial_buffer_trim(struct pb_buffer * const buffer, uint64_t len) {
   if (buffer->strategy->rejects_trim)
     return 0;
-
-  pb_trivial_buffer_increment_data_revision(buffer);
 
   uint64_t trimmed = 0;
 
@@ -1097,6 +1102,9 @@ uint64_t pb_trivial_buffer_trim(struct pb_buffer * const buffer, uint64_t len) {
       pb_page_destroy(page, buffer->allocator);
     }
 
+    if (trim_len == 0)
+      break;
+
     len -= trim_len;
     trimmed += trim_len;
 
@@ -1104,6 +1112,9 @@ uint64_t pb_trivial_buffer_trim(struct pb_buffer * const buffer, uint64_t len) {
 
     pb_buffer_iterator_prev(buffer, &buffer_iterator);
   }
+
+  if (trimmed > 0)
+    pb_trivial_buffer_increment_data_revision(buffer);
 
   return trimmed;
 }
@@ -1136,6 +1147,9 @@ static uint64_t pb_trivial_buffer_insert_data1(
       pb_page_get_len(page));
 
     insert_len = pb_buffer_insert(buffer, buffer_iterator, offset, page);
+
+    if (insert_len == 0)
+      break;
 
     offset = 0;
 
@@ -1181,6 +1195,9 @@ static uint64_t pb_trivial_buffer_insert_data_ref1(
       return inserted;
 
     insert_len = pb_buffer_insert(buffer, buffer_iterator, offset, page);
+
+    if (insert_len == 0)
+      break;
 
     offset = 0;
 
@@ -1234,6 +1251,9 @@ static uint64_t pb_trivial_buffer_insert_buffer1(
 
     insert_len = pb_buffer_insert(buffer, buffer_iterator, offset, page);
 
+    if (insert_len == 0)
+      break;
+
     offset = 0;
 
     len -= insert_len;
@@ -1278,6 +1298,9 @@ static uint64_t pb_trivial_buffer_insert_buffer2(
       pb_page_get_len(page));
 
     insert_len = pb_buffer_insert(buffer, buffer_iterator, offset, page);
+
+    if (insert_len == 0)
+      break;
 
     offset = 0;
 
@@ -1329,6 +1352,9 @@ static uint64_t pb_trivial_buffer_insert_buffer3(
       return inserted;
 
     insert_len = pb_buffer_insert(buffer, buffer_iterator, offset, page);
+
+    if (insert_len == 0)
+      break;
 
     offset = 0;
 
@@ -1384,6 +1410,9 @@ static uint64_t pb_trivial_buffer_insert_buffer4(
       pb_page_get_len(page));
     
     insert_len = pb_buffer_insert(buffer, buffer_iterator, offset, page);
+
+    if (insert_len == 0)
+      break;
 
     offset = 0;
 
@@ -1500,8 +1529,6 @@ uint64_t pb_trivial_buffer_overwrite_data(struct pb_buffer * const buffer,
   if (buffer->strategy->rejects_overwrite)
     return 0;
 
-  pb_trivial_buffer_increment_data_revision(buffer);
-
   struct pb_buffer_iterator buffer_iterator;
   pb_buffer_get_iterator(buffer, &buffer_iterator);
 
@@ -1519,6 +1546,9 @@ uint64_t pb_trivial_buffer_overwrite_data(struct pb_buffer * const buffer,
       (pb_buffer_iterator_get_len(&buffer_iterator) < len) ?
        pb_buffer_iterator_get_len(&buffer_iterator) : len;
 
+    if (write_len == 0)
+      break;
+
     memcpy(
       pb_buffer_iterator_get_base(&buffer_iterator),
       (uint8_t*)buf + written,
@@ -1530,6 +1560,9 @@ uint64_t pb_trivial_buffer_overwrite_data(struct pb_buffer * const buffer,
     pb_buffer_iterator_next(buffer, &buffer_iterator);
   }
 
+  if (written > 0)
+    pb_trivial_buffer_increment_data_revision(buffer);
+
   return written;
 }
 
@@ -1538,8 +1571,6 @@ uint64_t pb_trivial_buffer_overwrite_buffer(struct pb_buffer * const buffer,
     uint64_t len) {
   if (buffer->strategy->rejects_overwrite)
     return 0;
-
-  pb_trivial_buffer_increment_data_revision(buffer);
 
   struct pb_buffer_iterator buffer_iterator;
   pb_buffer_get_iterator(buffer, &buffer_iterator);
@@ -1568,6 +1599,9 @@ uint64_t pb_trivial_buffer_overwrite_buffer(struct pb_buffer * const buffer,
       (pb_buffer_iterator_get_len(&src_buffer_iterator) < write_len) ?
        pb_buffer_iterator_get_len(&src_buffer_iterator) : write_len;
 
+    if (write_len == 0)
+      break;
+
     memcpy(
       pb_buffer_iterator_get_base_at(&buffer_iterator, offset),
       pb_buffer_iterator_get_base_at(&src_buffer_iterator, src_offset),
@@ -1590,6 +1624,9 @@ uint64_t pb_trivial_buffer_overwrite_buffer(struct pb_buffer * const buffer,
       src_offset = 0;
     }
   }
+
+  if (written > 0)
+    pb_trivial_buffer_increment_data_revision(buffer);
 
   return written;
 }
@@ -1705,7 +1742,8 @@ struct pb_data_reader_operations pb_trivial_data_reader_operations = {
   .destroy = pb_trivial_data_reader_destroy,
 };
 
-const struct pb_data_reader_operations *pb_get_trivial_data_reader_operations(void) {
+const struct pb_data_reader_operations *pb_get_trivial_data_reader_operations(
+    void) {
   return &pb_trivial_data_reader_operations;
 }
 
