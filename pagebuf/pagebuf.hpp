@@ -326,7 +326,7 @@ class buffer {
 
     uint64_t insert_ref(
         const iterator& buffer_iterator, size_t offset,
-        const uint8_t *buf, uint64_t len) {
+        const void *buf, uint64_t len) {
       return
         pb_buffer_insert_data_ref(
           buffer_, &buffer_iterator.buffer_iterator_, offset, buf, len);
@@ -342,11 +342,11 @@ class buffer {
     }
 
   public:
-    uint64_t write(const uint8_t *buf, uint64_t len) {
+    uint64_t write(const void *buf, uint64_t len) {
       return pb_buffer_write_data(buffer_, buf, len);
     }
 
-    uint64_t write_ref(const uint8_t *buf, uint64_t len) {
+    uint64_t write_ref(const void *buf, uint64_t len) {
       return pb_buffer_write_data_ref(buffer_, buf, len);
     }
 
@@ -355,7 +355,7 @@ class buffer {
     }
 
   public:
-    uint64_t overwrite(const uint8_t *buf, uint64_t len) {
+    uint64_t overwrite(const void *buf, uint64_t len) {
       return pb_buffer_overwrite_data(buffer_, buf, len);
     }
 
@@ -364,7 +364,7 @@ class buffer {
     }
 
   public:
-    uint64_t read(uint8_t * const buf, uint64_t len) {
+    uint64_t read(void * const buf, uint64_t len) {
       return pb_buffer_read_data(buffer_, buf, len);
     }
 
@@ -464,7 +464,7 @@ class line_reader {
       line_.resize(line_len);
       pb_line_reader_get_line_data(
         line_reader_,
-        reinterpret_cast<uint8_t*>(const_cast<char*>(line_.data())),
+        const_cast<char*>(line_.data()),
         line_len);
 
       return true;
