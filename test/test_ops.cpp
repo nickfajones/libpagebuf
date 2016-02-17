@@ -311,6 +311,9 @@ class test_case_overwrite1 : public test_case<test_case_overwrite1> {
       TEST_OPS_EVAL(pb_buffer_get_data_size(subject->buffer) != 0)
         return 1;
 
+      if (subject->buffer->strategy->rejects_overwrite)
+        return 0;
+
       size_t input_size = subject->buffer->strategy->page_size + 10;
       size_t seek_size = input_size - 26;
       char *input_buf = new char[input_size];
@@ -372,6 +375,9 @@ class test_case_overwrite2 : public test_case<test_case_overwrite2> {
 
       TEST_OPS_EVAL(pb_buffer_get_data_size(subject->buffer) != 0)
         return 1;
+
+      if (subject->buffer->strategy->rejects_overwrite)
+        return 0;
 
       size_t input_size = subject->buffer->strategy->page_size + 10;
       size_t seek_size = input_size - 26;
@@ -450,6 +456,9 @@ class test_case_rewind1 : public test_case<test_case_rewind1> {
       TEST_OPS_EVAL(pb_buffer_get_data_size(subject->buffer) != 0)
         return 1;
 
+      if (subject->buffer->strategy->rejects_rewind)
+        return 0;
+
       TEST_OPS_EVAL(pb_buffer_write_data(
             subject->buffer,
             input1, strlen(input1)) != strlen(input1))
@@ -501,6 +510,9 @@ class test_case_trim1 : public test_case<test_case_trim1> {
 
       TEST_OPS_EVAL(pb_buffer_get_data_size(subject->buffer) != 0)
         return 1;
+
+      if (subject->buffer->strategy->rejects_trim)
+        return 0;
 
       TEST_OPS_EVAL(pb_buffer_write_data(
             subject->buffer,
