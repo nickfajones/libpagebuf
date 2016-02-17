@@ -213,13 +213,7 @@ struct pb_page *pb_page_create(struct pb_data *data,
   if (!page)
     return NULL;
 
-  page->data_vec.base = pb_data_get_base(data);
-  page->data_vec.len = pb_data_get_len(data);
-  page->data = data;
-  page->prev = NULL;
-  page->next = NULL;
-
-  pb_data_get(data);
+  pb_page_set_data(page, data);
 
   return page;
 }
@@ -232,13 +226,11 @@ struct pb_page *pb_page_transfer(const struct pb_page *src_page,
   if (!page)
     return NULL;
 
+  pb_page_set_data(page, src_page->data);
+
   page->data_vec.base = pb_page_get_base_at(src_page, src_off);
   page->data_vec.len = len;
-  page->data = src_page->data;
-  page->prev = NULL;
-  page->next = NULL;
-
-  pb_data_get(src_page->data);
+  page->is_transfer = true;
 
   return page;
 }
@@ -252,9 +244,29 @@ void pb_page_destroy(struct pb_page *page,
   page->data = NULL;
   page->prev = NULL;
   page->next = NULL;
+  page->is_transfer = false;
 
   pb_allocator_free(
     allocator, pb_alloc_type_struct, page, sizeof(struct pb_page));
+}
+
+
+
+/*******************************************************************************
+ */
+void pb_page_set_data(struct pb_page * const page,
+    struct pb_data * const data) {
+  if (page->data != NULL)
+    pb_data_put(page->data);
+
+  page->data_vec.base = pb_data_get_base(data);
+  page->data_vec.len = pb_data_get_len(data);
+  page->data = data;
+  page->prev = NULL;
+  page->next = NULL;
+  page->is_transfer = false;
+
+  pb_data_get(data);
 }
 
 
@@ -864,6 +876,29 @@ struct pb_page *pb_trivial_buffer_page_create_ref(
   return page;
 }
 
+
+/*******************************************************************************
+ */
+bool pb_trivial_buffer_copy_page_data(struct pb_buffer * const buffer,
+    struct pb_page * const page) {
+  const struct pb_allocator *allocator = buffer->allocator;
+
+  struct pb_data *data =
+    pb_trivial_data_create(pb_page_get_len(page), allocator);
+  if (!data)
+    return false;
+
+  memcpy(
+    pb_page_get_base(page),
+    pb_data_get_base(data),
+    pb_data_get_len(data));
+
+  pb_page_set_data(page, data);
+
+  pb_data_put(data);
+
+  return true;
+}
 
 /*******************************************************************************
  */
@@ -1486,6 +1521,12 @@ uint64_t pb_trivial_buffer_overwrite_data(struct pb_buffer * const buffer,
 
   while ((len > 0) &&
          (!pb_buffer_iterator_is_end(buffer, &buffer_iterator))) {
+    if ( buffer_iterator.page->is_transfer ||
+        (buffer_iterator.page->data->responsibility == pb_data_referenced)) {
+      if (!pb_trivial_buffer_copy_page_data(buffer, buffer_iterator.page))
+        return written;
+    }
+
     uint64_t write_len =
       (pb_buffer_iterator_get_len(&buffer_iterator) < len) ?
        pb_buffer_iterator_get_len(&buffer_iterator) : len;
@@ -1526,6 +1567,12 @@ uint64_t pb_trivial_buffer_overwrite_buffer(struct pb_buffer * const buffer,
   while ((len > 0) &&
          (!pb_buffer_iterator_is_end(buffer, &buffer_iterator)) &&
          (!pb_buffer_iterator_is_end(src_buffer, &src_buffer_iterator))) {
+    if ( buffer_iterator.page->is_transfer ||
+        (buffer_iterator.page->data->responsibility == pb_data_referenced)) {
+      if (!pb_trivial_buffer_copy_page_data(buffer, buffer_iterator.page))
+        return written;
+    }
+
     uint64_t write_len =
       (pb_buffer_iterator_get_len(&buffer_iterator) < len) ?
        pb_buffer_iterator_get_len(&buffer_iterator) : len;

@@ -449,6 +449,13 @@ struct pb_page {
   struct pb_page *prev;
   /** Next page in a buffer structure */
   struct pb_page *next;
+
+  /** Indicates whether the data that the page refers to is a transfer,
+   *  or not exclusive nor created with the page.
+   *
+   * This flag is used for Copy On Write decision making.
+   */
+  bool is_transfer;
 };
 
 
@@ -481,6 +488,12 @@ struct pb_page *pb_page_transfer(const struct pb_page *src_page,
  */
 void pb_page_destroy(struct pb_page *page,
                      const struct pb_allocator *allocator);
+
+
+
+/** Utility function to set the data object of a page. */
+void pb_page_set_data(struct pb_page * const page,
+                      struct pb_data * const data);
 
 
 
@@ -1489,6 +1502,20 @@ struct pb_page *pb_trivial_buffer_page_create(
 struct pb_page *pb_trivial_buffer_page_create_ref(
                               struct pb_buffer * const buffer,
                               const uint8_t *buf, size_t len);
+
+/** Copy the data of a page.
+ *
+ * The existing data in a page has its data memory region duplicated into a
+ * new pb_data object, and has it data replaced with the new data.
+ *
+ * This is primarily done when the pb_data has been transferred to the
+ * current page, or the original memory region was a reference, and now
+ * that data needs to be modified.
+ *
+ * In these cases the data will be Copied On Write.
+ */
+bool pb_trivial_buffer_copy_page_data(struct pb_buffer * const buffer,
+                                      struct pb_page * const page);
 
 
 
