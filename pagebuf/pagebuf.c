@@ -821,6 +821,51 @@ void pb_trivial_buffer_byte_iterator_prev(struct pb_buffer * const buffer,
 
 
 /*******************************************************************************
+ *  */
+struct pb_page *pb_trivial_buffer_page_create(
+    struct pb_buffer * const buffer,
+    size_t len) {
+  const struct pb_allocator *allocator = buffer->allocator;
+
+  struct pb_data *data = pb_trivial_data_create(len, allocator);
+  if (!data)
+    return NULL;
+
+  struct pb_page *page = pb_page_create(data, allocator);
+  if (!page) {
+    pb_data_put(data);
+
+    return NULL;
+  }
+
+  pb_data_put(data);
+
+  return page;
+}
+
+struct pb_page *pb_trivial_buffer_page_create_ref(
+    struct pb_buffer * const buffer,
+    const uint8_t *buf, size_t len) {
+  const struct pb_allocator *allocator = buffer->allocator;
+
+  struct pb_data *data = pb_trivial_data_create_ref(buf, len, allocator);
+  if (!data)
+    return NULL;
+
+  struct pb_page *page = pb_page_create(data, allocator);
+  if (!page) {
+    pb_data_put(data);
+
+    return NULL;
+  }
+
+  pb_data_put(data);
+
+  return page;
+}
+
+
+/*******************************************************************************
  */
 uint64_t pb_trivial_buffer_insert(struct pb_buffer * const buffer,
     const struct pb_buffer_iterator *buffer_iterator,
@@ -1036,51 +1081,6 @@ uint64_t pb_trivial_buffer_trim(struct pb_buffer * const buffer, uint64_t len) {
   }
 
   return trimmed;
-}
-
-
-/*******************************************************************************
- */
-struct pb_page *pb_trivial_buffer_page_create(
-    struct pb_buffer * const buffer,
-    size_t len) {
-  const struct pb_allocator *allocator = buffer->allocator;
-
-  struct pb_data *data = pb_trivial_data_create(len, allocator);
-  if (!data)
-    return NULL;
-
-  struct pb_page *page = pb_page_create(data, allocator);
-  if (!page) {
-    pb_data_put(data);
-
-    return NULL;
-  }
-
-  pb_data_put(data);
-
-  return page;
-}
-
-struct pb_page *pb_trivial_buffer_page_create_ref(
-    struct pb_buffer * const buffer,
-    const uint8_t *buf, size_t len) {
-  const struct pb_allocator *allocator = buffer->allocator;
-
-  struct pb_data *data = pb_trivial_data_create_ref(buf, len, allocator);
-  if (!data)
-    return NULL;
-
-  struct pb_page *page = pb_page_create(data, allocator);
-  if (!page) {
-    pb_data_put(data);
-
-    return NULL;
-  }
-
-  pb_data_put(data);
-
-  return page;
 }
 
 
@@ -1656,11 +1656,11 @@ void pb_trivial_buffer_destroy(struct pb_buffer * const buffer) {
 
   pb_allocator_free(
     allocator,
-    pb_alloc_type_struct, trivial_buffer, sizeof(struct pb_trivial_buffer));
+    pb_alloc_type_struct, buffer_strategy, sizeof(struct pb_buffer_strategy));
 
   pb_allocator_free(
     allocator,
-    pb_alloc_type_struct, buffer_strategy, sizeof(struct pb_buffer_strategy));
+    pb_alloc_type_struct, trivial_buffer, sizeof(struct pb_trivial_buffer));
 }
 
 
