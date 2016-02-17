@@ -871,11 +871,6 @@ uint64_t pb_trivial_buffer_insert(struct pb_buffer * const buffer,
     const struct pb_buffer_iterator *buffer_iterator,
     size_t offset,
     struct pb_page * const page) {
-  if (  buffer->strategy->rejects_alteration ||
-      (!pb_buffer_iterator_is_end(buffer, buffer_iterator) &&
-        buffer->strategy->rejects_insert))
-    return 0;
-
   if (!pb_buffer_iterator_is_end(buffer, buffer_iterator) ||
       (pb_buffer_get_data_size(buffer) == 0))
     pb_trivial_buffer_increment_data_revision(buffer);
