@@ -1,1 +1,4 @@
+- Function ordering tweaks
+- insert function no longer check alteration flags
+- COW
 - Add a thread exclusivity debugging API
