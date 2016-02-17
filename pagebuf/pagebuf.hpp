@@ -307,18 +307,15 @@ class buffer {
     }
 
   public:
-    uint64_t write(const uint8_t *buf, uint64_t len) {
-      return pb_buffer_write_data(buffer_, buf, len);
+    byte_iterator byte_begin() {
+      return byte_iterator(buffer_, false);
     }
 
-    uint64_t write_ref(const uint8_t *buf, uint64_t len) {
-      return pb_buffer_write_data_ref(buffer_, buf, len);
+    byte_iterator byte_end() {
+      return byte_iterator(buffer_, true);
     }
 
-    uint64_t write(const buffer& src_buf, uint64_t len) {
-      return pb_buffer_write_buffer(buffer_, src_buf.buffer_, len);
-    }
-
+  public:
     uint64_t insert(
         const iterator& buffer_iterator, size_t offset,
         const void *buf, uint64_t len) {
@@ -344,8 +341,26 @@ class buffer {
           src_buf.buffer_, len);
     }
 
+  public:
+    uint64_t write(const uint8_t *buf, uint64_t len) {
+      return pb_buffer_write_data(buffer_, buf, len);
+    }
+
+    uint64_t write_ref(const uint8_t *buf, uint64_t len) {
+      return pb_buffer_write_data_ref(buffer_, buf, len);
+    }
+
+    uint64_t write(const buffer& src_buf, uint64_t len) {
+      return pb_buffer_write_buffer(buffer_, src_buf.buffer_, len);
+    }
+
+  public:
     uint64_t overwrite(const uint8_t *buf, uint64_t len) {
       return pb_buffer_overwrite_data(buffer_, buf, len);
+    }
+
+    uint64_t overwrite(const buffer& src_buf, uint64_t len) {
+      return pb_buffer_overwrite_buffer(buffer_, src_buf.buffer_, len);
     }
 
   public:
