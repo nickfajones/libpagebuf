@@ -681,15 +681,6 @@ struct pb_buffer_strategy {
    *  the buffer.
    */
  
-  /** Indicates whether a pb_buffer rejects (fails to support) any alteration
-   *
-   * Setting the rejects_alteration flag to true will implicitly override all
-   * other alteration flags an reject all alterations.
-   *
-   * The clear (and destroy) operations are not affected by this flag
-   */
-  bool rejects_alteration;
- 
   /** Indicates whether a pb_buffer rejects (fails to support) insert
    *  operations.  That is: operations that write to places in the buffer
    *  other than the end.
