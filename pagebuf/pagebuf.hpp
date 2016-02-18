@@ -319,16 +319,20 @@ class buffer {
     }
 
   public:
-    uint64_t seek(uint64_t len) {
-      return pb_buffer_seek(buffer_, len);
-    }
-
     uint64_t extend(uint64_t len) {
       return pb_buffer_extend(buffer_, len);
     }
 
     uint64_t rewind(uint64_t len) {
       return pb_buffer_rewind(buffer_, len);
+    }
+
+    uint64_t seek(uint64_t len) {
+      return pb_buffer_seek(buffer_, len);
+    }
+
+    uint64_t trim(uint64_t len) {
+      return pb_buffer_trim(buffer_, len);
     }
 
   public:
