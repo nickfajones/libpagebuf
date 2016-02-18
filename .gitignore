@@ -21,6 +21,7 @@
 /missing
 /pagebuf.pc
 /stamp-h1
+/m4/*
 /pagebuf/*~
 /pagebuf/*.a
 /pagebuf/*.la
