@@ -315,9 +315,9 @@ size_t pb_buffer_iterator_get_len(
 
 /*******************************************************************************
  */
-const char *pb_buffer_byte_iterator_get_current_byte(
+char pb_buffer_byte_iterator_get_current_byte(
     const struct pb_buffer_byte_iterator *buffer_byte_iterator) {
-  return buffer_byte_iterator->current_byte;
+  return *buffer_byte_iterator->current_byte;
 }
 
 

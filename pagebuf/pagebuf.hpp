@@ -230,7 +230,7 @@ class buffer {
         }
 
       public:
-        const char* operator*() {
+        char operator*() {
           return pb_buffer_byte_iterator_get_current_byte(&byte_iterator_);
         }
 

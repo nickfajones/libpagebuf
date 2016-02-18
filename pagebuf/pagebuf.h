@@ -597,7 +597,7 @@ struct pb_buffer_byte_iterator {
  *
  * This function is public and may be called by end users.
  */
-const char *pb_buffer_byte_iterator_get_current_byte(
+char pb_buffer_byte_iterator_get_current_byte(
                    const struct pb_buffer_byte_iterator *buffer_byte_iterator);
 
 
