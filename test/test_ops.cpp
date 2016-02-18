@@ -14,9 +14,6 @@
  *  limitations under the License.
  ******************************************************************************/
 
-#ifdef NDEBUG
-#undef NDEBU
-#endif
 
 #include <sys/types.h>
 #ifndef __STDC_FORMAT_MACROS

@@ -14,9 +14,6 @@
  *  limitations under the License.
  ******************************************************************************/
 
-#ifdef NDEBUG
-#undef NDEBUG
-#endif
 
 #include <sys/types.h>
 #include <sys/stat.h>
