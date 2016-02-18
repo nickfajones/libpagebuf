@@ -58,6 +58,12 @@ class buffer {
         }
 
       public:
+        iterator(iterator&& rvalue) :
+            buffer_iterator_({}),
+            buffer_(0) {
+          *this = rvalue;
+        }
+
         iterator(const iterator& rvalue) :
             buffer_iterator_({}),
             buffer_(0) {
@@ -70,6 +76,16 @@ class buffer {
         }
 
       public:
+        iterator& operator=(iterator&& rvalue) {
+          buffer_iterator_ = rvalue.buffer_iterator_;
+          buffer_ = rvalue.buffer_;
+
+          rvalue.buffer_iterator_ = {};
+          rvalue.buffer_ = 0;
+
+          return *this;
+        }
+
         iterator& operator=(const iterator& rvalue) {
           buffer_iterator_ = rvalue.buffer_iterator_;
           buffer_ = rvalue.buffer_;
@@ -144,6 +160,12 @@ class buffer {
         }
 
       public:
+        byte_iterator(byte_iterator&& rvalue) :
+            byte_iterator_({}),
+            buffer_(0) {
+          *this = rvalue;
+        }
+
         byte_iterator(const byte_iterator& rvalue) :
             byte_iterator_({}),
             buffer_(0) {
@@ -156,6 +178,16 @@ class buffer {
         }
 
       public:
+        byte_iterator& operator=(byte_iterator&& rvalue) {
+          byte_iterator_ = rvalue.byte_iterator_;
+          buffer_ = rvalue.buffer_;
+
+          rvalue.byte_iterator_ = {};
+          rvalue.buffer_ = 0;
+
+          return *this;
+        }
+
         byte_iterator& operator=(const byte_iterator& rvalue) {
           byte_iterator_ = rvalue.byte_iterator_;
           buffer_ = rvalue.buffer_;
@@ -199,7 +231,7 @@ class buffer {
 
       public:
         const char* operator*() {
-          return byte_iterator_.current_byte;
+          return pb_buffer_byte_iterator_get_current_byte(&byte_iterator_);
         }
 
       private:
@@ -221,22 +253,16 @@ class buffer {
         buffer_(pb_trivial_buffer_create_with_alloc(allocator)) {
     }
 
-    buffer(
-          const struct pb_buffer_strategy *strategy,
-          const struct pb_allocator *allocator) :
+    buffer(const struct pb_buffer_strategy *strategy,
+           const struct pb_allocator *allocator) :
         buffer_(
           pb_trivial_buffer_create_with_strategy_with_alloc(
             strategy, allocator)) {
     }
 
     buffer(buffer&& rvalue) :
-        buffer_(rvalue.buffer_) {
-        rvalue.buffer_ = 0;
-    }
-
-  protected:
-    buffer(struct pb_buffer *buf) :
-        buffer_(buf) {
+        buffer_(0) {
+      *this = rvalue;
     }
 
   private:
@@ -244,16 +270,24 @@ class buffer {
         buffer_(0) {
     }
 
-  public:
-    ~buffer() {
-      if (buffer_) {
-        pb_buffer_destroy(buffer_);
-        buffer_ = 0;
-      }
+  protected:
+    buffer(struct pb_buffer *buf) :
+        buffer_(buf) {
     }
 
   public:
-    buffer& operator=(const buffer&& rvalue) {
+    ~buffer() {
+      destroy();
+    }
+
+  public:
+    buffer& operator=(buffer&& rvalue) {
+      destroy();
+
+      buffer_ = rvalue.buffer_;
+
+      rvalue.buffer_ = 0;
+
       return *this;
     }
 
@@ -374,6 +408,14 @@ class buffer {
     }
 
   protected:
+    void destroy() {
+      if (buffer_) {
+        pb_buffer_destroy(buffer_);
+        buffer_ = 0;
+      }
+    }
+
+  protected:
     struct pb_buffer *buffer_;
 };
 
@@ -409,20 +451,20 @@ class line_reader {
     }
 
   public:
-    line_reader& operator=(const line_reader& rvalue) {
+    line_reader& operator=(line_reader&& rvalue) {
       destroy();
 
       line_reader_ = pb_line_reader_clone(rvalue.line_reader_);
 
+      rvalue.line_reader_ = 0;
+
       return *this;
     }
 
-  public:
-    line_reader& operator=(line_reader&& rvalue) {
+    line_reader& operator=(const line_reader& rvalue) {
       destroy();
 
-      line_reader_ = rvalue.line_reader_;
-      rvalue.line_reader_ = 0;
+      line_reader_ = pb_line_reader_clone(rvalue.line_reader_);
 
       return *this;
     }
@@ -472,10 +514,10 @@ class line_reader {
 
   public:
     size_t get_line_len() {
-      if (!has_line_)
+      if (!has_line())
         return 0;
 
-      return pb_line_reader_get_line_len(line_reader_);
+      return line_.size();
     }
 
     const std::string& get_line() {
@@ -484,12 +526,10 @@ class line_reader {
 
   public:
     size_t seek_line() {
-      if (!has_line_)
+      if (!has_line())
         return 0;
 
-      size_t seeked;
-
-      seeked = pb_line_reader_seek_line(line_reader_);
+      size_t seeked = pb_line_reader_seek_line(line_reader_);
 
       reset();
 
@@ -510,6 +550,9 @@ class line_reader {
 
   public:
     bool is_line_crlf() {
+      if (!has_line())
+        return false;
+
       return pb_line_reader_is_crlf(line_reader_);
     }
 
