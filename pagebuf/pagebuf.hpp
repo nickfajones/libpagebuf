@@ -276,7 +276,7 @@ class buffer {
     }
 
   public:
-    ~buffer() {
+    virtual ~buffer() {
       destroy();
     }
 

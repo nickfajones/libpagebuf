@@ -85,7 +85,7 @@ class mmap_buffer : public buffer {
     }
 
   public:
-    ~mmap_buffer() {
+    virtual ~mmap_buffer() {
       mmap_buffer_ = 0;
     }
 
