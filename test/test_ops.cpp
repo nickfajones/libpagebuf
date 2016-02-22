@@ -65,6 +65,14 @@ class test_subject {
     }
 
   public:
+    void init(
+        const std::string &_description,
+        pb::buffer *_buffer) {
+      description = _description;
+      buffer = _buffer;
+    }
+
+  public:
     std::string description;
 
     pb::buffer *buffer;
@@ -514,52 +522,47 @@ int main(int argc, char **argv) {
   strategy.fragment_as_target = false;
 
   test_subjects.push_back(test_subject());
-  test_subjects.back().description =
-    "Standard heap sourced pb_buffer                                       ";
-  test_subjects.back().buffer =
-    new pb::buffer(&strategy);
+  test_subjects.back().init(
+    "Standard heap sourced pb_buffer                                       ",
+    new pb::buffer(&strategy));
 
   strategy.page_size = PB_BUFFER_DEFAULT_PAGE_SIZE;
   strategy.clone_on_write = false;
   strategy.fragment_as_target = true;
 
   test_subjects.push_back(test_subject());
-  test_subjects.back().description =
-    "Standard heap sourced pb_buffer, fragment_as_target                   ";
-  test_subjects.back().buffer =
-    new pb::buffer(&strategy);
+  test_subjects.back().init(
+    "Standard heap sourced pb_buffer, fragment_as_target                   ",
+    new pb::buffer(&strategy));
 
   strategy.page_size = PB_BUFFER_DEFAULT_PAGE_SIZE;
   strategy.clone_on_write = true;
   strategy.fragment_as_target = false;
 
   test_subjects.push_back(test_subject());
-  test_subjects.back().description =
-    "Standard heap sourced pb_buffer, clone_on_Write                       ";
-  test_subjects.back().buffer =
-    new pb::buffer(&strategy);
+  test_subjects.back().init(
+    "Standard heap sourced pb_buffer, clone_on_Write                       ",
+    new pb::buffer(&strategy));
 
   strategy.page_size = PB_BUFFER_DEFAULT_PAGE_SIZE;
   strategy.clone_on_write = true;
   strategy.fragment_as_target = true;
 
   test_subjects.push_back(test_subject());
-  test_subjects.back().description =
-    "Standard heap sourced pb_buffer, clone_on_Write and fragment_on_target";
-  test_subjects.back().buffer =
-    new pb::buffer(&strategy);
+  test_subjects.back().init(
+    "Standard heap sourced pb_buffer, clone_on_Write and fragment_on_target",
+    new pb::buffer(&strategy));
 
   char buffer_file_path[34];
   sprintf(buffer_file_path, "/tmp/pb_test_ops_buffer-%05d", getpid());
 
   test_subjects.push_back(test_subject());
-  test_subjects.back().description =
-    "mmap file backed pb_buffer                                            ";
-  test_subjects.back().buffer =
+  test_subjects.back().init(
+    "mmap file backed pb_buffer                                            ",
     new pb::mmap_buffer(
       buffer_file_path,
       pb::mmap_buffer::open_action_overwrite,
-      pb::mmap_buffer::close_action_remove);
+      pb::mmap_buffer::close_action_remove));
 
   test_case<test_case_insert1>::run_test(test_subjects);
   test_case<test_case_insert2>::run_test(test_subjects);
