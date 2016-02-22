@@ -896,28 +896,6 @@ struct pb_buffer_operations {
                                buffer_byte_iterator);
 
 
-  /** Create a pb_page instance with an attached pb_data.
-   *
-   * This is a protected function and should not be called externally.
-   *
-   * len: the size of the memory region to allocate.
-   */
-  struct pb_page *(*page_create)(
-                             struct pb_buffer * const buffer,
-                             size_t len);
-  /** Create a pb_page instance with an attached pb_data that references the
-   *  provided memory region.
-   *
-   * This is a protected function and should not be called externally.
-   *
-   * buf: the memory region to reference.
-   * len: the size of the memory region to referenced.
-   */
-  struct pb_page *(*page_create_ref)(
-                             struct pb_buffer * const buffer,
-                             const uint8_t *buf, size_t len);
-
-
   /** Insert a pb_page instance into the pb_buffer.
    *
    * This is a protected function and should not be called externally.
