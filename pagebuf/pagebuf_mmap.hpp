@@ -71,17 +71,17 @@ class mmap_buffer : public buffer {
     }
 
     mmap_buffer(mmap_buffer&& rvalue) :
-        buffer(static_cast<buffer&&>(rvalue)),
+        buffer(std::move(rvalue)),
         mmap_buffer_(rvalue.mmap_buffer_),
         file_path_(rvalue.file_path_) {
       rvalue.mmap_buffer_ = 0;
+      rvalue.file_path_.clear();
     }
 
   private:
     mmap_buffer(const mmap_buffer& rvalue) :
         buffer(static_cast<struct pb_buffer*>(0)),
-        mmap_buffer_(0),
-      file_path_(rvalue.file_path_) {
+        mmap_buffer_(0) {
     }
 
   public:
@@ -90,12 +90,20 @@ class mmap_buffer : public buffer {
     }
 
   public:
-    mmap_buffer& operator=(const mmap_buffer&& rvalue) {
+    mmap_buffer& operator=(mmap_buffer&& rvalue) {
+      buffer::operator=(std::move(rvalue));
+
+      mmap_buffer_ = rvalue.mmap_buffer_;
+      file_path_ = rvalue.file_path_;
+
+      rvalue.mmap_buffer_ = 0;
+      rvalue.file_path_.clear();
+
       return *this;
     }
 
   private:
-    buffer& operator=(const buffer& rvalue) {
+    mmap_buffer& operator=(const buffer& rvalue) {
       return *this;
     }
 

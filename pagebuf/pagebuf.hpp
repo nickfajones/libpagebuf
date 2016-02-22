@@ -161,19 +161,18 @@ class buffer {
 
       public:
         byte_iterator(byte_iterator&& rvalue) :
-            byte_iterator_({}),
-            buffer_(0) {
-          *this = rvalue;
+            byte_iterator_(rvalue.byte_iterator_),
+            buffer_(rvalue.buffer_) {
+          rvalue.byte_iterator_ = {};
+          rvalue.buffer_ = 0;
         }
 
         byte_iterator(const byte_iterator& rvalue) :
-            byte_iterator_({}),
-            buffer_(0) {
-          *this = rvalue;
+            byte_iterator_(rvalue.byte_iterator_),
+            buffer_(rvalue.buffer_) {
         }
 
         ~byte_iterator() {
-          byte_iterator_ = {};
           buffer_ = 0;
         }
 
@@ -261,8 +260,8 @@ class buffer {
     }
 
     buffer(buffer&& rvalue) :
-        buffer_(0) {
-      *this = rvalue;
+        buffer_(rvalue.buffer_) {
+      rvalue.buffer_ = 0;
     }
 
   private:
@@ -439,9 +438,11 @@ class line_reader {
     }
 
     line_reader(line_reader&& rvalue) :
-        line_reader_(0),
+        line_reader_(rvalue.line_reader_),
         has_line_(false) {
-      *this = rvalue;
+      rvalue.line_reader_ = 0;
+      rvalue.line_.clear();
+      rvalue.has_line_ = false;
     }
 
     line_reader(const line_reader& rvalue) :
@@ -461,6 +462,8 @@ class line_reader {
       line_reader_ = pb_line_reader_clone(rvalue.line_reader_);
 
       rvalue.line_reader_ = 0;
+      rvalue.line_.clear();
+      rvalue.has_line_ = false;
 
       return *this;
     }
