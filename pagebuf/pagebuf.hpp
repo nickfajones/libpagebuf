@@ -459,7 +459,7 @@ class line_reader {
     line_reader& operator=(line_reader&& rvalue) {
       destroy();
 
-      line_reader_ = pb_line_reader_clone(rvalue.line_reader_);
+      line_reader_ = rvalue.line_reader_;
 
       rvalue.line_reader_ = 0;
       rvalue.line_.clear();
@@ -471,7 +471,8 @@ class line_reader {
     line_reader& operator=(const line_reader& rvalue) {
       destroy();
 
-      line_reader_ = pb_line_reader_clone(rvalue.line_reader_);
+      if (rvalue.line_reader_)
+        line_reader_ = pb_line_reader_clone(rvalue.line_reader_);
 
       return *this;
     }
@@ -563,7 +564,7 @@ class line_reader {
       return pb_line_reader_is_crlf(line_reader_);
     }
 
-    bool is_end() {
+    bool is_line_end() {
       return pb_line_reader_is_end(line_reader_);
     }
 
