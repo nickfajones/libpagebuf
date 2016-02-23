@@ -505,8 +505,6 @@ class line_reader {
       if (!pb_line_reader_has_line(line_reader_))
         return false;
 
-      reset();
-
       has_line_ = true;
 
       size_t line_len = pb_line_reader_get_line_len(line_reader_);
