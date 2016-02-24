@@ -15,6 +15,11 @@
  ******************************************************************************/
 
 
+#ifdef NDEBUG
+#undef NDEBUG
+#endif
+
+
 #include <sys/types.h>
 #ifndef __STDC_FORMAT_MACROS
 #define __STDC_FORMAT_MACROS
