@@ -542,8 +542,9 @@ int main(int argc, char **argv) {
 
     total_transfer_size += transfer_size;
 
-    while ((total_transfer_size - total_read_size) >=
-              data_profiles.front().full_len) {
+    while ((total_transfer_size > total_read_size) &&
+           ((total_transfer_size - total_read_size) >=
+             data_profiles.front().full_len)) {
       uint64_t read_size = data_profiles.front().full_len;
 
       for (subject_itr = test_subjects.begin();
