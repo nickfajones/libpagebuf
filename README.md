@@ -1,4 +1,5 @@
 [![Build Status](https://travis-ci.org/nickfajones/libpagebuf.svg?branch=master)](https://travis-ci.org/nickfajones/libpagebuf)
+[![Coverage Status](https://coveralls.io/repos/github/nickfajones/libpagebuf/badge.svg?branch=master)](https://coveralls.io/github/nickfajones/libpagebuf?branch=master)
 
 libpagebuf
 ==========

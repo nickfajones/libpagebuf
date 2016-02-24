@@ -137,7 +137,7 @@ fi
 dnl -----------------------------------------------
 dnl Construct final compiler flag set
 dnl -----------------------------------------------
-AC_ARG_ENABLE(debug,   [  --enable-debug    Enable debug mode], [ enable_debug=yes ])
+AC_ARG_ENABLE(debug,   [  --enable-debug          Enable debug mode], [ enable_debug=yes ])
 if test "$enable_debug" = "yes"; then
     OPTFLAGS="-O0 -g3"
     COMMON_CFLAGS="-Wall -Werror -Wfatal-errors"
@@ -153,6 +153,14 @@ else
     CFLAGS="${COMMON_CFLAGS} ${OPTFLAGS} -std=gnu99 ${CONFIG_CFLAGS}"
     CXXFLAGS="${COMMON_CFLAGS} ${OPTFLAGS} -std=gnu++0x ${CONFIG_CFLAGS} ${CXXFLAGS}"
     CPPFLAGS="-D_GNU_SOURCE -DNDEBUG ${CPPFLAGS}"
+fi
+
+AC_ARG_ENABLE(coverage,[  --enable-coverage       Enable code coverage measurement], [ enable_coverage=yes ])
+if test "$enable_coverage" = "yes"; then
+    CFLAGS="${CFLAGS} -fprofile-arcs -ftest-coverage"
+    CXXFLAGS="${CXXFLAGS} -fprofile-arcs -ftest-coverage"
+    LDFLAGS="${LDFLAGS} -fprofile-arcs"
+    LIBS="${LIBS} -lgcov"
 fi
 
 dnl -----------------------------------------------
