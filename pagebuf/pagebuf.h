@@ -1536,6 +1536,32 @@ struct pb_data_reader_operations {
   uint64_t (*read)(struct pb_data_reader * const data_reader,
                    void * const buf, uint64_t len);
 
+  /** Consume data from the pb_buffer instance, into a memory region.
+   *
+   * buf: the start of the target memory region.
+   * len: the amount of data to consume in bytes.
+   *
+   * Data is consumed from the head of the buffer.  The amount of data
+   * consumed is the lower of the size of the buffer and the value of len.
+   *
+   * Following a data read, the underlying buffer will be seeked to the
+   * position of the end of the read, thus, consuming the data in the buffer.
+   * A subsequent call to read or consume will continue from where the last
+   * consume finished.
+   *
+   * However, if the buffer undergoes an operation that alters its data
+   * revision, a subsequent call to read on the data reader will read from the
+   * beginning of the buffer.
+   *
+   * The return value is the amount of data successfully read from the buffer.
+   */
+  uint64_t (*consume)(
+                  struct pb_data_reader * const data_reader,
+                  void * const buf, uint64_t len);
+
+  /** Clone the state of the data reader into a new instance. */
+  struct pb_data_reader *(*clone)(struct pb_data_reader * const data_reader);
+
   /** Reset the data reader so that subsequent reads start at the beginning of
    *  the buffer. */
   void (*reset)(struct pb_data_reader * const data_reader);
@@ -1556,6 +1582,12 @@ struct pb_data_reader_operations {
  */
 uint64_t pb_data_reader_read(struct pb_data_reader * const data_reader,
                              void * const buf, uint64_t len);
+uint64_t pb_data_reader_consume(
+                             struct pb_data_reader * const data_reader,
+                             void * const buf, uint64_t len);
+
+struct pb_data_reader *pb_data_reader_clone(
+                             struct pb_data_reader * const data_reader);
 
 void pb_data_reader_reset(struct pb_data_reader * const data_reader);
 void pb_data_reader_destroy(
@@ -1588,7 +1620,7 @@ const struct pb_data_reader_operations
  * buffer: the buffer to attach the data reader to.
  */
 struct pb_data_reader *pb_trivial_data_reader_create(
-                                              struct pb_buffer * const buffer);
+                                             struct pb_buffer * const buffer);
 
 
 
@@ -1598,6 +1630,12 @@ struct pb_data_reader *pb_trivial_data_reader_create(
  */
 uint64_t pb_trivial_data_reader_read(struct pb_data_reader * const data_reader,
                                      void * const buf, uint64_t len);
+uint64_t pb_trivial_data_reader_consume(
+                                     struct pb_data_reader * const data_reader,
+                                     void * const buf, uint64_t len);
+
+struct pb_data_reader *pb_trivial_data_reader_clone(
+                             struct pb_data_reader * const data_reader);
 
 void pb_trivial_data_reader_reset(struct pb_data_reader * const data_reader);
 void pb_trivial_data_reader_destroy(

@@ -437,8 +437,8 @@ int main(int argc, char **argv) {
   char buffer1_name[34];
   char buffer2_name[34];
 
-  sprintf(buffer1_name, "/tmp/pb_test_rnd1_buffer1-%05d-1", getpid());
-  sprintf(buffer2_name, "/tmp/pb_test_rnd1_buffer1-%05d-2", getpid());
+  sprintf(buffer1_name, "/tmp/pb_test_rnd2_buffer1-%05d-1", getpid());
+  sprintf(buffer2_name, "/tmp/pb_test_rnd2_buffer1-%05d-2", getpid());
 
   test_subjects.push_back(test_subject());
   test_subjects.back().init(

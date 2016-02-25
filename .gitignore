@@ -44,6 +44,7 @@
 /test/.libs
 /test/Makefile.in
 /test/Makefile
+/test/test_ops
 /test/test_rnd1
 /test/test_rnd2
-/test/test_ops
+/test/test_rnd3

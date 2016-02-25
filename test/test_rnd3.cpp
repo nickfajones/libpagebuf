@@ -104,6 +104,7 @@ class test_subject {
     test_subject() :
       buffer1(0),
       buffer2(0),
+      data_reader(0),
       md5ctx(0),
       digest(0),
       write_ref(false) {
@@ -122,6 +123,11 @@ class test_subject {
 
         delete md5ctx;
         md5ctx = 0;
+      }
+
+      if (data_reader) {
+        delete data_reader;
+        data_reader = 0;
       }
 
       if (buffer2) {
@@ -144,6 +150,9 @@ class test_subject {
       description = _description;
       buffer1 = _buffer1;
       buffer2 = _buffer2;
+
+      data_reader = new pb::data_reader(*buffer2);
+
       write_ref = _write_ref;
 
       md5ctx = new EVP_MD_CTX;
@@ -161,6 +170,7 @@ class test_subject {
 
     pb::buffer *buffer1;
     pb::buffer *buffer2;
+    pb::data_reader *data_reader;
 
     EVP_MD_CTX *md5ctx;
 
@@ -225,40 +235,37 @@ void write_data(
 void transfer_data(
     test_subject& subject,
     uint64_t transfer_size,
-    uint64_t total_transfer_size, uint64_t total_read_size) {
+    uint64_t total_transfer_size, uint64_t total_consume_size) {
   uint64_t current_size = subject.buffer2->get_data_size();
-  assert(current_size == (total_transfer_size - total_read_size));
+  assert(current_size == (total_transfer_size - total_consume_size));
 
   uint64_t transferred =
     subject.buffer2->write(*subject.buffer1, transfer_size);
   assert(transferred == transfer_size);
 
   current_size = subject.buffer2->get_data_size();
-  assert(current_size == (total_transfer_size + transfer_size - total_read_size));
+  assert(current_size == (total_transfer_size + transfer_size - total_consume_size));
 
   uint64_t seeked = subject.buffer1->seek(transfer_size);
   assert(seeked == transfer_size);
 }
 
-uint64_t read_data(
+uint64_t consume_data(
     test_subject& subject,
-    uint8_t *read_buf, uint64_t read_size,
-    uint64_t total_transfer_size, uint64_t total_read_size) {
+    uint8_t *consume_buf, uint64_t consume_size,
+    uint64_t total_transfer_size, uint64_t total_consume_size) {
   uint64_t current_size = subject.buffer2->get_data_size();
-  assert(current_size >= read_size);
+  assert(current_size >= consume_size);
 
-  uint64_t readed = subject.buffer2->read(read_buf, read_size);
-  assert(readed == read_size);
+  uint64_t consumed = subject.data_reader->consume(consume_buf, consume_size);
+  assert(consumed == consume_size);
 
-  EVP_DigestUpdate(subject.md5ctx, read_buf, read_size);
-
-  uint64_t seeked = subject.buffer2->seek(read_size);
-  assert(seeked == read_size);
+  EVP_DigestUpdate(subject.md5ctx, consume_buf, consume_size);
 
   current_size = subject.buffer2->get_data_size();
-  assert(current_size == (total_transfer_size - total_read_size - seeked));
+  assert(current_size == (total_transfer_size - total_consume_size - consumed));
 
-  return seeked;
+  return consumed;
 }
 
 
@@ -323,7 +330,7 @@ int main(int argc, char **argv) {
 
   uint64_t total_write_size = 0;
   uint64_t total_transfer_size = 0;
-  uint64_t total_read_size = 0;
+  uint64_t total_consume_size = 0;
 
   std::list<test_subject> test_subjects;
   std::list<test_subject>::iterator test_itr;
@@ -410,8 +417,8 @@ int main(int argc, char **argv) {
   char buffer1_name[34];
   char buffer2_name[34];
 
-  sprintf(buffer1_name, "/tmp/pb_test_rnd1_buffer1-%05d-1", getpid());
-  sprintf(buffer2_name, "/tmp/pb_test_rnd1_buffer1-%05d-2", getpid());
+  sprintf(buffer1_name, "/tmp/pb_test_rnd3_buffer1-%05d-1", getpid());
+  sprintf(buffer2_name, "/tmp/pb_test_rnd3_buffer1-%05d-2", getpid());
 
   test_subjects.push_back(test_subject());
   test_subjects.back().init(
@@ -470,40 +477,40 @@ int main(int argc, char **argv) {
       transfer_data(
         *test_itr,
         transfer_size,
-        total_transfer_size, total_read_size);
+        total_transfer_size, total_consume_size);
     }
 
     total_transfer_size += transfer_size;
 
-    uint64_t read_size = random() & (total_transfer_size  - total_read_size);
-    uint8_t *read_buf = new uint8_t[read_size];
+    uint64_t consume_size = random() & (total_transfer_size  - total_consume_size);
+    uint8_t *consume_buf = new uint8_t[consume_size];
 
     for (test_itr = test_subjects.begin();
          test_itr != test_subjects.end();
          ++test_itr) {
-      uint64_t seek_size = read_data(
+      uint64_t consumed = consume_data(
         *test_itr,
-        read_buf, read_size,
-        total_transfer_size, total_read_size);
+        consume_buf, consume_size,
+        total_transfer_size, total_consume_size);
 
-      assert(seek_size == read_size);
+      assert(consumed == consume_size);
     }
 
-    total_read_size += read_size;
+    total_consume_size += consume_size;
 
-    while (read_size > 0) {
-      if (read_size >= data_profiles.front().len) {
-        read_size -= data_profiles.front().len;
+    while (consume_size > 0) {
+      if (consume_size >= data_profiles.front().len) {
+        consume_size -= data_profiles.front().len;
 
         data_profiles.pop_front();
       } else {
-        data_profiles.front().len -= read_size;
+        data_profiles.front().len -= consume_size;
 
-        read_size = 0;
+        consume_size = 0;
       }
     }
 
-    delete [] read_buf;
+    delete [] consume_buf;
 
     ++iterations;
   }
@@ -512,13 +519,13 @@ int main(int argc, char **argv) {
     uint64_t transfer_size =
       random() % (total_write_size - total_transfer_size);
 
-    uint64_t read_size =
-      random() & (total_transfer_size + transfer_size- total_read_size);
+    uint64_t consume_size =
+      random() & (total_transfer_size + transfer_size- total_consume_size);
 
     if (transfer_size < 1024) {
       transfer_size = (total_write_size - total_transfer_size);
 
-      read_size = (total_transfer_size + transfer_size - total_read_size);
+      consume_size = (total_transfer_size + transfer_size - total_consume_size);
     }
 
     for (test_itr = test_subjects.begin();
@@ -527,43 +534,43 @@ int main(int argc, char **argv) {
       transfer_data(
         *test_itr,
         transfer_size,
-        total_transfer_size, total_read_size);
+        total_transfer_size, total_consume_size);
     }
 
     total_transfer_size += transfer_size;
 
-    uint8_t *read_buf = new uint8_t[read_size];
+    uint8_t *consume_buf = new uint8_t[consume_size];
 
     for (test_itr = test_subjects.begin();
          test_itr != test_subjects.end();
          ++test_itr) {
-      uint64_t seek_size = read_data(
+      uint64_t consumed = consume_data(
         *test_itr,
-        read_buf, read_size,
-        total_transfer_size, total_read_size);
+        consume_buf, consume_size,
+        total_transfer_size, total_consume_size);
 
-      assert(seek_size == read_size);
+      assert(consumed == consume_size);
     }
 
-    total_read_size += read_size;
+    total_consume_size += consume_size;
 
-    while (read_size > 0) {
-      if (read_size >= data_profiles.front().len) {
-        read_size -= data_profiles.front().len;
+    while (consume_size > 0) {
+      if (consume_size >= data_profiles.front().len) {
+        consume_size -= data_profiles.front().len;
 
         data_profiles.pop_front();
       } else {
-        data_profiles.front().len -= read_size;
+        data_profiles.front().len -= consume_size;
 
-        read_size = 0;
+        consume_size = 0;
       }
     }
 
-    delete [] read_buf;
+    delete [] consume_buf;
   }
 
   assert(total_write_size == total_transfer_size);
-  assert(total_transfer_size == total_read_size);
+  assert(total_transfer_size == total_consume_size);
 
   EVP_DigestFinal_ex(&control_mdctx, control_digest, &control_digest_len);
 
@@ -613,8 +620,8 @@ int main(int argc, char **argv) {
 
   printf(
     "Total bytes transferred: %" PRIu64 " Bytes (%" PRIu64 " bps)\n",
-      (total_read_size * test_subjects.size()),
-      (total_read_size * test_subjects.size() * 8 * 1000) / millisecs);
+      (total_consume_size * test_subjects.size()),
+      (total_consume_size * test_subjects.size() * 8 * 1000) / millisecs);
 
   test_subjects.clear();
 

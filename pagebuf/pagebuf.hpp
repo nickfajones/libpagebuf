@@ -26,6 +26,7 @@
 namespace pb
 {
 
+class data_reader;
 class line_reader;
 
 
@@ -33,6 +34,7 @@ class line_reader;
 /** C++ wrapper around pb_buffer, using a pb_trivial_buffer. */
 class buffer {
   public:
+    friend class data_reader;
     friend class line_reader;
 
   public:
@@ -420,6 +422,82 @@ class buffer {
 
   protected:
     struct pb_buffer *buffer_;
+};
+
+
+
+/** C++ Wrapper around pb_data_reader. */
+class data_reader {
+  public:
+    data_reader() :
+        data_reader_(0) {
+    }
+
+    explicit data_reader(buffer& buf) :
+        data_reader_(pb_trivial_data_reader_create(buf.buffer_)) {
+    }
+
+    data_reader(data_reader&& rvalue) :
+        data_reader_(rvalue.data_reader_) {
+      rvalue.data_reader_ = 0;
+    }
+
+    data_reader(const data_reader& rvalue) :
+        data_reader_(0) {
+      *this = rvalue;
+    }
+
+    ~data_reader() {
+      destroy();
+    }
+
+  public:
+    data_reader& operator=(data_reader&& rvalue) {
+      destroy();
+
+      data_reader_ = rvalue.data_reader_;
+
+      rvalue.data_reader_ = 0;
+
+      return *this;
+    }
+
+    data_reader& operator=(const data_reader& rvalue) {
+      destroy();
+
+      if (rvalue.data_reader_)
+        data_reader_ = pb_data_reader_clone(rvalue.data_reader_);
+
+      return *this;
+    }
+
+  public:
+    void reset() {
+      if (data_reader_)
+        pb_data_reader_reset(data_reader_);
+    }
+
+  protected:
+    void destroy() {
+      reset();
+
+      if (data_reader_) {
+        pb_data_reader_destroy(data_reader_);
+        data_reader_ = 0;
+      }
+    }
+
+  public:
+    uint64_t read(void * const buf, uint64_t len) {
+      return pb_data_reader_read(data_reader_, buf, len);
+    }
+
+    uint64_t consume(void * const buf, uint64_t len) {
+      return pb_data_reader_consume(data_reader_, buf, len);
+    }
+
+  protected:
+    struct pb_data_reader *data_reader_;
 };
 
 

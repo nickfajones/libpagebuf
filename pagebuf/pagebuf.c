@@ -1737,9 +1737,13 @@ void pb_trivial_buffer_destroy(struct pb_buffer * const buffer) {
 /*******************************************************************************
  */
 struct pb_data_reader_operations pb_trivial_data_reader_operations = {
-  .read = pb_trivial_data_reader_read,
-  .reset = pb_trivial_data_reader_reset,
-  .destroy = pb_trivial_data_reader_destroy,
+  .read = &pb_trivial_data_reader_read,
+  .consume = &pb_trivial_data_reader_consume,
+
+  .clone = &pb_trivial_data_reader_clone,
+
+  .reset = &pb_trivial_data_reader_reset,
+  .destroy = &pb_trivial_data_reader_destroy,
 };
 
 const struct pb_data_reader_operations *pb_get_trivial_data_reader_operations(
@@ -1768,6 +1772,16 @@ struct pb_trivial_data_reader {
 uint64_t pb_data_reader_read(struct pb_data_reader * const data_reader,
     void * const buf, uint64_t len) {
   return data_reader->operations->read(data_reader, buf, len);
+}
+
+uint64_t pb_data_reader_consume(struct pb_data_reader * const data_reader,
+    void * const buf, uint64_t len) {
+  return data_reader->operations->consume(data_reader, buf, len);
+}
+
+struct pb_data_reader *pb_data_reader_clone(
+    struct pb_data_reader * const data_reader) {
+  return data_reader->operations->clone(data_reader);
 }
 
 void pb_data_reader_reset(struct pb_data_reader * const data_reader) {
@@ -1828,18 +1842,21 @@ uint64_t pb_trivial_data_reader_read(
   while ((len > 0) &&
          (!pb_buffer_iterator_is_end(buffer, buffer_iterator))) {
     uint64_t read_len =
-      (pb_buffer_iterator_get_len(buffer_iterator) < len) ?
-       pb_buffer_iterator_get_len(buffer_iterator) : len;
+      ((pb_buffer_iterator_get_len(buffer_iterator) -
+        trivial_data_reader->page_offset) < len) ?
+       (pb_buffer_iterator_get_len(buffer_iterator) -
+        trivial_data_reader->page_offset) : len;
 
     memcpy(
-      (uint8_t*)buf + trivial_data_reader->page_offset + readed,
-      pb_buffer_iterator_get_base(buffer_iterator),
+      (uint8_t*)buf + readed,
+      pb_buffer_iterator_get_base_at(
+        buffer_iterator, trivial_data_reader->page_offset),
       read_len);
+
+    trivial_data_reader->page_offset += read_len;
 
     len -= read_len;
     readed += read_len;
-
-    trivial_data_reader->page_offset += read_len;
 
     if (trivial_data_reader->page_offset !=
           pb_buffer_iterator_get_len(buffer_iterator))
@@ -1858,6 +1875,64 @@ uint64_t pb_trivial_data_reader_read(
   }
 
   return readed;
+}
+
+/*******************************************************************************
+ */
+uint64_t pb_trivial_data_reader_consume(
+    struct pb_data_reader * const data_reader,
+    void * const buf,
+    uint64_t len) {
+  struct pb_trivial_data_reader *trivial_data_reader =
+    (struct pb_trivial_data_reader*)data_reader;
+  struct pb_buffer *buffer = trivial_data_reader->data_reader.buffer;
+  struct pb_buffer_iterator *buffer_iterator =
+    &trivial_data_reader->buffer_iterator;
+
+  pb_data_reader_read(data_reader, buf, len);
+
+  uint64_t seeked = 0;
+
+  struct pb_buffer_iterator seek_iterator;
+  pb_buffer_get_iterator(buffer, &seek_iterator);
+
+  while (!pb_buffer_iterator_is_end(buffer, &seek_iterator) &&
+         !pb_buffer_iterator_cmp(buffer, buffer_iterator, &seek_iterator)) {
+    seeked += pb_buffer_iterator_get_len(&seek_iterator);
+
+    pb_buffer_iterator_next(buffer, &seek_iterator);
+  }
+
+  if ( pb_buffer_iterator_cmp(buffer, buffer_iterator, &seek_iterator) &&
+      (trivial_data_reader->page_offset > 0))
+    seeked += trivial_data_reader->page_offset;
+
+  seeked = pb_buffer_seek(buffer, seeked);
+
+  return seeked;
+}
+
+/*******************************************************************************
+ */
+struct pb_data_reader *pb_trivial_data_reader_clone(
+    struct pb_data_reader * const data_reader) {
+  struct pb_trivial_data_reader *trivial_data_reader =
+    (struct pb_trivial_data_reader*)data_reader;
+  const struct pb_allocator *allocator =
+    data_reader->buffer->allocator;
+
+  struct pb_trivial_data_reader *trivial_data_reader_clone =
+    pb_allocator_alloc(
+      allocator, pb_alloc_type_struct, sizeof(struct pb_trivial_data_reader));
+  if (!trivial_data_reader_clone)
+    return NULL;
+
+  memcpy(
+    trivial_data_reader_clone,
+    trivial_data_reader,
+    sizeof(struct pb_trivial_data_reader));
+
+  return &trivial_data_reader_clone->data_reader;
 }
 
 /*******************************************************************************
