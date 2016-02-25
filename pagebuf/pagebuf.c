@@ -2212,14 +2212,14 @@ struct pb_line_reader *pb_trivial_line_reader_clone(
 
   struct pb_trivial_line_reader *trivial_line_reader_clone =
     pb_allocator_alloc(
-      allocator, pb_alloc_type_struct, sizeof(struct pb_line_reader));
+      allocator, pb_alloc_type_struct, sizeof(struct pb_trivial_line_reader));
   if (!trivial_line_reader_clone)
     return NULL;
 
   memcpy(
     trivial_line_reader_clone,
     trivial_line_reader,
-    sizeof(struct pb_line_reader));
+    sizeof(struct pb_trivial_line_reader));
 
   return &trivial_line_reader_clone->line_reader;
 }
