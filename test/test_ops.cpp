@@ -471,9 +471,95 @@ const char *test_case_rewind1::output = "abcdefghijklmnopqrstuvwxyz";
 
 /*******************************************************************************
  */
+class test_case_rewind2 : public test_case<test_case_rewind2> {
+  public:
+    static const char *input;
+    static const char *output;
+
+  public:
+    virtual int run_test(const test_subject& subject) {
+      subject.buffer->clear();
+
+      TEST_OPS_EVAL(subject.buffer->get_data_size() != 0)
+        return 1;
+
+      if (subject.buffer->get_strategy().rejects_rewind ||
+          subject.buffer->get_strategy().rejects_overwrite)
+        return 0;
+
+      size_t count_limit =
+        ((subject.buffer->get_strategy().page_size * 5) / strlen(input)) + 1;
+
+      for (size_t counter = 0; counter < count_limit; ++counter) {
+        TEST_OPS_EVAL(subject.buffer->write(
+              input, strlen(input)) != strlen(input))
+          return 1;
+      }
+
+      TEST_OPS_EVAL(subject.buffer->get_data_size() !=
+              (count_limit * strlen(input)))
+        return 1;
+
+      count_limit =
+        ((subject.buffer->get_strategy().page_size * 3) / strlen(input)) + 1;
+
+      TEST_OPS_EVAL(subject.buffer->seek(
+            count_limit * strlen(input)) != (count_limit * strlen(input)))
+        return 1;
+
+      count_limit =
+        ((subject.buffer->get_strategy().page_size * 2) / strlen(input));
+
+      TEST_OPS_EVAL(subject.buffer->get_data_size() !=
+              (count_limit * strlen(input)))
+        return 1;
+
+      for (size_t counter = 0; counter < count_limit; ++counter) {
+        TEST_OPS_EVAL(subject.buffer->rewind(strlen(input)) != strlen(input))
+          return 1;
+
+        TEST_OPS_EVAL(subject.buffer->overwrite(
+              input, strlen(input)) != strlen(input))
+        return 1;
+      }
+
+      count_limit =
+        ((subject.buffer->get_strategy().page_size * 4) / strlen(input));
+
+      TEST_OPS_EVAL(subject.buffer->get_data_size() !=
+              (count_limit * strlen(input)))
+        return 1;
+
+      TEST_OPS_EVAL(subject.buffer->rewind(10) != 10)
+        return 1;
+
+      TEST_OPS_EVAL(subject.buffer->overwrite(
+            input + 16, strlen(input) - 16) != (strlen(input) - 16))
+        return 1;
+
+      pb::buffer::byte_iterator byte_itr = subject.buffer->byte_begin();
+
+      for (unsigned int i = 0; i < subject.buffer->get_data_size(); ++i) {
+        TEST_OPS_EVAL(*byte_itr != output[(i + 16) % strlen(output)])
+          return 1;
+
+        ++byte_itr;
+      }
+
+      return 0;
+    }
+};
+
+const char *test_case_rewind2::input = "abcdefghijklmnopqrstuvwxyz";
+const char *test_case_rewind2::output = "abcdefghijklmnopqrstuvwxyz";
+
+
+
+/*******************************************************************************
+ */
 class test_case_trim1 : public test_case<test_case_trim1> {
   public:
-    static const char *input1;
+    static const char *input;
     static const char *output;
 
   public:
@@ -487,7 +573,7 @@ class test_case_trim1 : public test_case<test_case_trim1> {
         return 0;
 
       TEST_OPS_EVAL(subject.buffer->write(
-            input1, strlen(input1)) != strlen(input1))
+            input, strlen(input)) != strlen(input))
         return 1;
 
       TEST_OPS_EVAL(subject.buffer->trim(10) != 10)
@@ -509,7 +595,7 @@ class test_case_trim1 : public test_case<test_case_trim1> {
     }
 };
 
-const char *test_case_trim1::input1 = "abcdefghijklmnopqrstuvwxyz";
+const char *test_case_trim1::input = "abcdefghijklmnopqrstuvwxyz";
 const char *test_case_trim1::output = "abcdefghijklmnop";
 
 
@@ -575,6 +661,7 @@ int main(int argc, char **argv) {
   test_case<test_case_overwrite1>::run_test(test_subjects);
   test_case<test_case_overwrite2>::run_test(test_subjects);
   test_case<test_case_rewind1>::run_test(test_subjects);
+  test_case<test_case_rewind2>::run_test(test_subjects);
   test_case<test_case_trim1>::run_test(test_subjects);
 
   test_subjects.clear();
