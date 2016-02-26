@@ -788,11 +788,6 @@ static void pb_mmap_buffer_iterator_prev(
                             struct pb_buffer_iterator * const buffer_iterator);
 
 
-static uint64_t pb_mmap_buffer_insert(
-                              struct pb_buffer * const buffer,
-                              const struct pb_buffer_iterator *buffer_iterator,
-                              size_t offset,
-                              struct pb_page * const page);
 static uint64_t pb_mmap_buffer_seek(struct pb_buffer * const buffer,
                               uint64_t len);
 static uint64_t pb_mmap_buffer_extend(
@@ -847,7 +842,7 @@ static struct pb_buffer_operations pb_mmap_buffer_operations = {
   .byte_iterator_next = &pb_trivial_buffer_byte_iterator_next,
   .byte_iterator_prev = &pb_trivial_buffer_byte_iterator_prev,
 
-  .insert = &pb_mmap_buffer_insert,
+  .insert = &pb_trivial_buffer_insert,
   .extend = &pb_mmap_buffer_extend,
   .rewind = &pb_mmap_buffer_rewind,
   .seek = &pb_mmap_buffer_seek,
@@ -1057,14 +1052,6 @@ void pb_mmap_buffer_iterator_prev(struct pb_buffer * const buffer,
 
 /*******************************************************************************
  */
-uint64_t pb_mmap_buffer_insert(struct pb_buffer * const buffer,
-    const struct pb_buffer_iterator *buffer_iterator,
-    size_t offset,
-    struct pb_page * const page) {
-  assert(0);
-  return 0;
-}
-
 uint64_t pb_mmap_buffer_extend(struct pb_buffer * const buffer,
     uint64_t len) {
   struct pb_mmap_allocator *mmap_allocator =
