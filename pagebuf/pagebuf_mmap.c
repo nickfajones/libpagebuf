@@ -653,12 +653,6 @@ static uint64_t pb_mmap_allocator_write_data_buffer(
   return written;
 }
 
-static uint64_t pb_mmap_allocator_overwrite_data(
-    struct pb_mmap_allocator * const mmap_allocator,
-    const void *buf, uint64_t len) {
-  return 0;
-}
-
 /*******************************************************************************
  */
 static void pb_mmap_allocator_clear(
@@ -822,10 +816,6 @@ uint64_t pb_mmap_buffer_write_data_ref(
 uint64_t pb_mmap_buffer_write_buffer(
                                    struct pb_buffer * const buffer,
                                    struct pb_buffer * const src_buffer,
-                                   uint64_t len);
-uint64_t pb_mmap_buffer_overwrite_data(
-                                   struct pb_buffer * const buffer,
-                                   const void *buf,
                                    uint64_t len);
 
 
@@ -1157,18 +1147,6 @@ uint64_t pb_mmap_buffer_write_buffer(
     (struct pb_mmap_allocator*)buffer->allocator;
 
   return pb_mmap_allocator_write_data_buffer(mmap_allocator, src_buffer, len);
-}
-
-uint64_t pb_mmap_buffer_overwrite_data(
-    struct pb_buffer * const buffer,
-    const void *buf,
-    uint64_t len) {
-  pb_trivial_buffer_increment_data_revision(buffer);
-
-  struct pb_mmap_allocator *mmap_allocator =
-    (struct pb_mmap_allocator*)buffer->allocator;
-
-  return pb_mmap_allocator_overwrite_data(mmap_allocator, buf, len);
 }
 
 /*******************************************************************************
