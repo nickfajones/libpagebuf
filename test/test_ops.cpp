@@ -731,7 +731,7 @@ class test_case_trim1 : public test_case<test_case_trim1> {
       TEST_OPS_EVAL(subject.buffer->trim(10) != 10)
         return 1;
 
-      TEST_OPS_EVAL(subject.buffer->get_data_size() != 16)
+      TEST_OPS_EVAL(subject.buffer->get_data_size() != (strlen(input) - 10))
         return 1;
 
       pb::buffer::byte_iterator byte_itr = subject.buffer->byte_begin();
@@ -749,6 +749,64 @@ class test_case_trim1 : public test_case<test_case_trim1> {
 
 const char *test_case_trim1::input = "abcdefghijklmnopqrstuvwxyz";
 const char *test_case_trim1::output = "abcdefghijklmnop";
+
+
+
+/*******************************************************************************
+ *  */
+class test_case_trim2 : public test_case<test_case_trim2> {
+  public:
+    static const char *input;
+    static const char *output;
+
+  public:
+    virtual int run_test(const test_subject& subject) {
+      subject.buffer->clear();
+
+      TEST_OPS_EVAL(subject.buffer->get_data_size() != 0)
+        return 1;
+
+      if (subject.buffer->get_strategy().rejects_trim)
+        return 0;
+
+      TEST_OPS_EVAL(subject.buffer->write(
+            input, strlen(input)) != strlen(input))
+        return 1;
+
+      TEST_OPS_EVAL(subject.buffer->get_data_size() != strlen(input))
+        return 1;
+
+      pb::buffer::iterator itr = subject.buffer->begin();
+
+      pb::buffer::byte_iterator byte_itr = subject.buffer->byte_begin();
+      for (unsigned int i = 0; i < strlen(input); ++i) {
+        TEST_OPS_EVAL(*byte_itr != input[i])
+          return 1;
+
+        ++byte_itr;
+      }
+
+      TEST_OPS_EVAL(subject.buffer->trim(10) != 10)
+        return 1;
+
+      TEST_OPS_EVAL(subject.buffer->get_data_size() != (strlen(input) - 10))
+        return 1;
+
+      byte_itr = subject.buffer->byte_begin();
+
+      for (unsigned int i = 0; i < strlen(output); ++i) {
+        TEST_OPS_EVAL(*byte_itr != output[i])
+          return 1;
+
+        ++byte_itr;
+      }
+
+      return 0;
+    }
+};
+
+const char *test_case_trim2::input = "abcdefghijklmnopqrstuvwxyz";
+const char *test_case_trim2::output = "abcdefghijklmnop";
 
 
 
@@ -888,6 +946,7 @@ int main(int argc, char **argv) {
   test_case<test_case_rewind1>::run_test(test_subjects);
   test_case<test_case_rewind2>::run_test(test_subjects);
   test_case<test_case_trim1>::run_test(test_subjects);
+  //test_case<test_case_trim2>::run_test(test_subjects);
   test_case<test_case_extend1>::run_test(test_subjects);
 
   test_subjects.clear();
