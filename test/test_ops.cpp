@@ -120,6 +120,97 @@ class test_case : public test_base {
 
 /*******************************************************************************
  */
+class test_case_iterate1 : public test_case<test_case_iterate1> {
+  public:
+    static const char *input;
+    static const char *output;
+
+  public:
+    virtual int run_test(const test_subject& subject) {
+      subject.buffer->clear();
+
+      TEST_OPS_EVAL(subject.buffer->get_data_size() != 0)
+        return 1;
+
+      size_t count_limit =
+        ((subject.buffer->get_strategy().page_size * 10) / strlen(input)) + 1;
+
+      for (size_t counter = 0; counter < count_limit; ++counter) {
+        TEST_OPS_EVAL(subject.buffer->write(
+              input, strlen(input)) != strlen(input))
+          return 1;
+      }
+
+      TEST_OPS_EVAL(subject.buffer->get_data_size() !=
+              (count_limit * strlen(input)))
+        return 1;
+
+      pb::buffer::byte_iterator byte_itr = subject.buffer->byte_begin();
+
+      for (unsigned int i = 0; i < subject.buffer->get_data_size(); ++i) {
+        TEST_OPS_EVAL(*byte_itr != output[i % strlen(output)])
+          return 1;
+
+        ++byte_itr;
+      }
+
+      return 0;
+    }
+};
+
+const char *test_case_iterate1::input = "abcdefghijklmnopqrstuvwxyz";
+const char *test_case_iterate1::output = "abcdefghijklmnopqrstuvwxyz";
+
+
+
+/*******************************************************************************
+ */
+class test_case_iterate2 : public test_case<test_case_iterate2> {
+  public:
+    static const char *input;
+    static const char *output;
+
+  public:
+    virtual int run_test(const test_subject& subject) {
+      subject.buffer->clear();
+
+      TEST_OPS_EVAL(subject.buffer->get_data_size() != 0)
+        return 1;
+
+      size_t count_limit =
+        ((subject.buffer->get_strategy().page_size * 10) / strlen(input)) + 1;
+
+      for (size_t counter = 0; counter < count_limit; ++counter) {
+        TEST_OPS_EVAL(subject.buffer->write(
+              input, strlen(input)) != strlen(input))
+          return 1;
+      }
+
+      TEST_OPS_EVAL(subject.buffer->get_data_size() !=
+              (count_limit * strlen(input)))
+        return 1;
+
+      pb::buffer::byte_iterator byte_itr = subject.buffer->byte_end();
+      --byte_itr;
+
+      for (unsigned int i = 0; i < subject.buffer->get_data_size(); ++i) {
+        TEST_OPS_EVAL(*byte_itr != output[i % strlen(output)])
+          return 1;
+
+        --byte_itr;
+      }
+
+      return 0;
+    }
+};
+
+const char *test_case_iterate2::input = "abcdefghijklmnopqrstuvwxyz";
+const char *test_case_iterate2::output = "zyxwvutsrqponmlkjihgfedcba";
+
+
+
+/*******************************************************************************
+ */
 class test_case_insert1 : public test_case<test_case_insert1> {
   public:
     static const char *input1;
@@ -655,6 +746,8 @@ int main(int argc, char **argv) {
       pb::mmap_buffer::open_action_overwrite,
       pb::mmap_buffer::close_action_remove));
 
+  test_case<test_case_iterate1>::run_test(test_subjects);
+  test_case<test_case_iterate2>::run_test(test_subjects);
   test_case<test_case_insert1>::run_test(test_subjects);
   test_case<test_case_insert2>::run_test(test_subjects);
   test_case<test_case_insert3>::run_test(test_subjects);
