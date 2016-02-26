@@ -41,16 +41,18 @@
  */
 #define TEST_OPS_MERGE(prefix,counter) prefix##counter
 #define TEST_OPS_UNIQUE_VAR(counter) TEST_OPS_MERGE(cnd_,counter)
-#define TEST_OPS_EVAL(condition) \
+#define TEST_OPS_EVAL_DESCRIPTION(condition,description) \
   bool TEST_OPS_UNIQUE_VAR(__LINE__) = (condition); \
   if (TEST_OPS_UNIQUE_VAR(__LINE__)) \
     fprintf( \
       stderr, \
       "Error Condition Found: Test: '%s', Line: '%d': Subject: '%s': '%s'\n", \
         __PRETTY_FUNCTION__, __LINE__, \
-        subject.description.c_str(), \
+        description, \
         #condition); \
   if (TEST_OPS_UNIQUE_VAR(__LINE__))
+#define TEST_OPS_EVAL(condition) \
+  TEST_OPS_EVAL_DESCRIPTION(condition,subject.description.c_str())
 
 
 
@@ -738,13 +740,32 @@ int main(int argc, char **argv) {
   char buffer_file_path[34];
   sprintf(buffer_file_path, "/tmp/pb_test_ops_buffer-%05d", getpid());
 
-  test_subjects.push_back(test_subject());
-  test_subjects.back().init(
-    "mmap file backed pb_buffer                                            ",
+  pb::mmap_buffer *mmap_buffer =
     new pb::mmap_buffer(
       buffer_file_path,
       pb::mmap_buffer::open_action_overwrite,
-      pb::mmap_buffer::close_action_remove));
+      pb::mmap_buffer::close_action_retain);
+  TEST_OPS_EVAL_DESCRIPTION(
+      (mmap_buffer->get_file_path() != buffer_file_path),
+      "mmap_buffer test get_file_path")
+    return 1;
+
+  TEST_OPS_EVAL_DESCRIPTION(
+      (mmap_buffer->get_close_action() != pb::mmap_buffer::close_action_retain),
+      "mmap_buffer test get_close_action")
+    return 1;
+
+  mmap_buffer->set_close_action(pb::mmap_buffer::close_action_remove);
+
+  TEST_OPS_EVAL_DESCRIPTION(
+      (mmap_buffer->get_close_action() != pb::mmap_buffer::close_action_remove),
+      "mmap_buffer test set_close_action")
+    return 1;
+
+  test_subjects.push_back(test_subject());
+  test_subjects.back().init(
+    "mmap file backed pb_buffer                                            ",
+    mmap_buffer);
 
   test_case<test_case_iterate1>::run_test(test_subjects);
   test_case<test_case_iterate2>::run_test(test_subjects);
