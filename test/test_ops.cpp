@@ -213,6 +213,65 @@ const char *test_case_iterate2::output = "zyxwvutsrqponmlkjihgfedcba";
 
 /*******************************************************************************
  */
+class test_case_iterate3 : public test_case<test_case_iterate3> {
+  public:
+    static const char *input1;
+    static const char *input2;
+    static const char *output;
+
+  public:
+    virtual int run_test(const test_subject& subject) {
+      subject.buffer->clear();
+
+      TEST_OPS_EVAL(subject.buffer->get_data_size() != 0)
+        return 1;
+
+      TEST_OPS_EVAL(subject.buffer->write(
+            input1, strlen(input1)) != strlen(input1))
+        return 1;
+
+      TEST_OPS_EVAL(subject.buffer->get_data_size() != strlen(input1))
+        return 1;
+
+      pb::buffer::iterator itr = subject.buffer->begin();
+
+      pb::buffer::byte_iterator byte_itr = subject.buffer->byte_begin();
+      for (unsigned int i = 0; i < strlen(input1); ++i) {
+        TEST_OPS_EVAL(*byte_itr != input1[i])
+          return 1;
+
+        ++byte_itr;
+      }
+
+      TEST_OPS_EVAL(subject.buffer->write(
+            input2, strlen(input2)) != strlen(input2))
+        return 1;
+
+      TEST_OPS_EVAL(subject.buffer->get_data_size() !=
+          (strlen(input1) + strlen(input2)))
+        return 1;
+
+      byte_itr = subject.buffer->byte_begin();
+
+      for (unsigned int i = 0; i < strlen(output); ++i) {
+        TEST_OPS_EVAL(*byte_itr != output[i])
+          return 1;
+
+        ++byte_itr;
+      }
+
+      return 0;
+    }
+};
+
+const char *test_case_iterate3::input1 = "abcde";
+const char *test_case_iterate3::input2 = "fghijklmnopqrstuvwxyz";
+const char *test_case_iterate3::output = "abcdefghijklmnopqrstuvwxyz";
+
+
+
+/*******************************************************************************
+ */
 class test_case_insert1 : public test_case<test_case_insert1> {
   public:
     static const char *input1;
@@ -820,6 +879,7 @@ int main(int argc, char **argv) {
 
   test_case<test_case_iterate1>::run_test(test_subjects);
   test_case<test_case_iterate2>::run_test(test_subjects);
+  test_case<test_case_iterate3>::run_test(test_subjects);
   test_case<test_case_insert1>::run_test(test_subjects);
   test_case<test_case_insert2>::run_test(test_subjects);
   test_case<test_case_insert3>::run_test(test_subjects);
