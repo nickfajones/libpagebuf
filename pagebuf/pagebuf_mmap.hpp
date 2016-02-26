@@ -51,7 +51,7 @@ class mmap_buffer : public buffer {
             file_path.c_str(),
             pb_mmap_open_action(open__action),
             pb_mmap_close_action(close__action))),
-        file_path_(file_path) {
+        file_path_(pb_mmap_buffer_get_file_path(mmap_buffer_)) {
       buffer_ = pb_mmap_buffer_to_buffer(mmap_buffer_);
     }
 
@@ -66,7 +66,7 @@ class mmap_buffer : public buffer {
             pb_mmap_open_action(open__action),
             pb_mmap_close_action(close__action),
             allocator)),
-        file_path_(file_path) {
+        file_path_(pb_mmap_buffer_get_file_path(mmap_buffer_)) {
       buffer_ = pb_mmap_buffer_to_buffer(mmap_buffer_);
     }
 
