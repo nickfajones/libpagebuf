@@ -288,7 +288,7 @@ static void pb_mmap_allocator_data_destroy(
 static struct pb_page *pb_mmap_allocator_page_map_forward(
     struct pb_mmap_allocator * const mmap_allocator,
     const struct pb_buffer_iterator *buffer_iterator) {
-  struct pb_page *page = buffer_iterator->page;
+  struct pb_page *page = (struct pb_page*)buffer_iterator->data_vec;
   struct pb_mmap_data *mmap_data =
     (page) ?
        (struct pb_mmap_data*)page->data :
@@ -374,7 +374,7 @@ static struct pb_page *pb_mmap_allocator_page_map_forward(
 static struct pb_page *pb_mmap_allocator_page_map_backward(
     struct pb_mmap_allocator * const mmap_allocator,
     const struct pb_buffer_iterator *buffer_iterator) {
-  struct pb_page *page = buffer_iterator->page;
+  struct pb_page *page = (struct pb_page*)buffer_iterator->data_vec;
   struct pb_mmap_data *mmap_data =
     (page) ?
        (struct pb_mmap_data*)page->data :
@@ -640,11 +640,13 @@ static uint64_t pb_mmap_allocator_write_data_buffer(
       iov = iov2;
     }
 
-    uint64_t iov_len =
-      (pb_buffer_iterator_get_len(&src_buffer_iterator) < len) ?
-       pb_buffer_iterator_get_len(&src_buffer_iterator) : len;
+    struct pb_page *src_page = (struct pb_page*)src_buffer_iterator.data_vec;
 
-    iov[iovpos].iov_base = pb_buffer_iterator_get_base(&src_buffer_iterator);
+    uint64_t iov_len =
+      (pb_page_get_len(src_page) < len) ?
+       pb_page_get_len(src_page) : len;
+
+    iov[iovpos].iov_base = pb_page_get_base(src_page);
     iov[iovpos].iov_len = iov_len;
 
     len -= iov_len;

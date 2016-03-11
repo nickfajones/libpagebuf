@@ -294,18 +294,18 @@ size_t pb_page_get_len(const struct pb_page *page) {
  */
 void *pb_buffer_iterator_get_base(
     const struct pb_buffer_iterator *buffer_iterator) {
-  return buffer_iterator->page->data_vec.base;
+  return buffer_iterator->data_vec->base;
 }
 
 void *pb_buffer_iterator_get_base_at(
     const struct pb_buffer_iterator *buffer_iterator,
     size_t offset) {
-  return (uint8_t*)buffer_iterator->page->data_vec.base + offset;
+  return (uint8_t*)buffer_iterator->data_vec->base + offset;
 }
 
 size_t pb_buffer_iterator_get_len(
     const struct pb_buffer_iterator *buffer_iterator) {
-  return buffer_iterator->page->data_vec.len;
+  return buffer_iterator->data_vec->len;
 }
 
 
@@ -710,38 +710,42 @@ void pb_trivial_buffer_get_iterator(struct pb_buffer * const buffer,
     struct pb_buffer_iterator * const buffer_iterator) {
   struct pb_trivial_buffer *trivial_buffer = (struct pb_trivial_buffer*)buffer;
 
-  buffer_iterator->page = trivial_buffer->page_end.next;
+  buffer_iterator->data_vec = &trivial_buffer->page_end.next->data_vec;
 }
 
 void pb_trivial_buffer_get_end_iterator(struct pb_buffer * const buffer,
     struct pb_buffer_iterator * const buffer_iterator) {
   struct pb_trivial_buffer *trivial_buffer = (struct pb_trivial_buffer*)buffer;
 
-  buffer_iterator->page = &trivial_buffer->page_end;
+  buffer_iterator->data_vec = &trivial_buffer->page_end.data_vec;
 }
 
 bool pb_trivial_buffer_is_end_iterator(struct pb_buffer * const buffer,
     const struct pb_buffer_iterator *buffer_iterator) {
   struct pb_trivial_buffer *trivial_buffer = (struct pb_trivial_buffer*)buffer;
 
-  return (buffer_iterator->page == &trivial_buffer->page_end);
+  return (buffer_iterator->data_vec == &trivial_buffer->page_end.data_vec);
 }
 
 bool pb_trivial_buffer_cmp_iterator(struct pb_buffer * const buffer,
     const struct pb_buffer_iterator *lvalue,
     const struct pb_buffer_iterator *rvalue) {
 
-  return (lvalue->page == rvalue->page);
+  return (lvalue->data_vec == rvalue->data_vec);
 }
 
 void pb_trivial_buffer_next_iterator(struct pb_buffer * const buffer,
     struct pb_buffer_iterator * const buffer_iterator) {
-  buffer_iterator->page = buffer_iterator->page->next;
+  struct pb_page *page = (struct pb_page*)buffer_iterator->data_vec;
+
+  buffer_iterator->data_vec = &page->next->data_vec;
 }
 
 void pb_trivial_buffer_prev_iterator(struct pb_buffer * const buffer,
     struct pb_buffer_iterator * const buffer_iterator) {
-  buffer_iterator->page = buffer_iterator->page->prev;
+  struct pb_page *page = (struct pb_page*)buffer_iterator->data_vec;
+
+  buffer_iterator->data_vec = &page->prev->data_vec;
 }
 
 /*******************************************************************************
@@ -917,39 +921,38 @@ uint64_t pb_trivial_buffer_insert(struct pb_buffer * const buffer,
       (pb_buffer_get_data_size(buffer) == 0))
     pb_trivial_buffer_increment_data_revision(buffer);
 
-  if (offset > pb_buffer_iterator_get_len(buffer_iterator))
-    offset = pb_buffer_iterator_get_len(buffer_iterator);
+  struct pb_page *next_page = (struct pb_page*)buffer_iterator->data_vec;
 
-  struct pb_page *page1;
-  struct pb_page *page2;
+  if (offset > pb_page_get_len(next_page))
+    offset = pb_page_get_len(next_page);
+
+  struct pb_page *prev_page;
 
   if (offset != 0) {
-    page2 = buffer_iterator->page;
-    page1 =
+    prev_page =
       pb_page_transfer(
-        page2, pb_page_get_len(page2), 0,
+        next_page, pb_page_get_len(next_page), 0,
         buffer->allocator);
-    if (!page1)
+    if (!prev_page)
       return 0;
 
-    page1->data_vec.len = offset;
-    page1->prev = page2->prev;
-    page1->next = page2;
+    prev_page->data_vec.len = offset;
+    prev_page->prev = next_page->prev;
+    prev_page->next = next_page;
 
-    page2->data_vec.base += offset;
-    page2->data_vec.len -= offset;
-    page2->prev->next = page1;
-    page2->prev = page1;
+    next_page->data_vec.base += offset;
+    next_page->data_vec.len -= offset;
+    next_page->prev->next = prev_page;
+    next_page->prev = prev_page;
   } else {
-    page1 = buffer_iterator->page->prev;
-    page2 = buffer_iterator->page;
+    prev_page = next_page->prev;
   }
 
-  page->prev = page1;
-  page->next = page2;
+  page->prev = prev_page;
+  page->next = next_page;
 
-  page1->next = page;
-  page2->prev = page;
+  prev_page->next = page;
+  next_page->prev = page;
 
   pb_trivial_buffer_increment_data_size(buffer, pb_page_get_len(page));
 
@@ -1055,20 +1058,22 @@ uint64_t pb_trivial_buffer_seek(struct pb_buffer * const buffer, uint64_t len) {
 
   while ((len > 0) &&
          (!pb_buffer_is_end_iterator(buffer, &buffer_iterator))) {
+    struct pb_page *page = (struct pb_page*)buffer_iterator.data_vec;
+
     uint64_t seek_len =
-      (pb_buffer_iterator_get_len(&buffer_iterator) < len) ?
-       pb_buffer_iterator_get_len(&buffer_iterator) : len;
+      (pb_page_get_len(page) < len) ?
+       pb_page_get_len(page) : len;
 
-    buffer_iterator.page->data_vec.base += seek_len;
-    buffer_iterator.page->data_vec.len -= seek_len;
+    page->data_vec.base += seek_len;
+    page->data_vec.len -= seek_len;
 
-    if (pb_buffer_iterator_get_len(&buffer_iterator) == 0) {
-      struct pb_page *page = buffer_iterator.page;
-
+    if (pb_page_get_len(page) == 0) {
       pb_buffer_next_iterator(buffer, &buffer_iterator);
 
-      page->prev->next = buffer_iterator.page;
-      buffer_iterator.page->prev = page->prev;
+      struct pb_page *next_page = (struct pb_page*)buffer_iterator.data_vec;
+
+      page->prev->next = next_page;
+      next_page->prev = page->prev;
 
       page->prev = NULL;
       page->next = NULL;
@@ -1105,19 +1110,21 @@ uint64_t pb_trivial_buffer_trim(struct pb_buffer * const buffer, uint64_t len) {
 
   while ((len > 0) &&
          (!pb_buffer_is_end_iterator(buffer, &buffer_iterator))) {
-    size_t trim_len =
-      (pb_buffer_iterator_get_len(&buffer_iterator) < len) ?
-       pb_buffer_iterator_get_len(&buffer_iterator) : len;
+    struct pb_page *page = (struct pb_page*)buffer_iterator.data_vec;
 
-    buffer_iterator.page->data_vec.len -= trim_len;
+    uint64_t trim_len =
+      (pb_page_get_len(page) < len) ?
+       pb_page_get_len(page) : len;
 
-    if (pb_buffer_iterator_get_len(&buffer_iterator) == 0) {
-      struct pb_page *page = buffer_iterator.page;
+    page->data_vec.len -= trim_len;
 
+    if (pb_page_get_len(page) == 0) {
       pb_buffer_prev_iterator(buffer, &buffer_iterator);
 
-      page->next->prev = buffer_iterator.page;
-      buffer_iterator.page->next = page->next;
+      struct pb_page *prev_page = (struct pb_page*)buffer_iterator.data_vec;
+
+      page->next->prev = prev_page;
+      prev_page->next = page->next;
 
       page->prev = NULL;
       page->next = NULL;
@@ -1159,8 +1166,7 @@ static uint64_t pb_trivial_buffer_insert_data1(
        (buffer->strategy->page_size < len)) ?
         buffer->strategy->page_size : len;
 
-    struct pb_page *page =
-      pb_trivial_buffer_page_create(buffer, insert_len);
+    struct pb_page *page = pb_trivial_buffer_page_create(buffer, insert_len);
     if (!page)
       return inserted;
 
@@ -1262,13 +1268,15 @@ static uint64_t pb_trivial_buffer_insert_buffer1(
 
   while ((len > 0) &&
          (!pb_buffer_is_end_iterator(src_buffer, &src_buffer_iterator))) {
+    struct pb_page *src_page = (struct pb_page*)src_buffer_iterator.data_vec;
+
     uint64_t insert_len =
-      (pb_buffer_iterator_get_len(&src_buffer_iterator) < len) ?
-       pb_buffer_iterator_get_len(&src_buffer_iterator) : len;
+      (pb_page_get_len(src_page) < len) ?
+       pb_page_get_len(src_page) : len;
 
     struct pb_page *page =
       pb_page_transfer(
-        src_buffer_iterator.page, insert_len, 0, buffer->allocator);
+        src_page, insert_len, 0, buffer->allocator);
     if (!page)
       return inserted;
 
@@ -1306,18 +1314,19 @@ static uint64_t pb_trivial_buffer_insert_buffer2(
 
   while ((len > 0) &&
          (!pb_buffer_is_end_iterator(src_buffer, &src_buffer_iterator))) {
-    uint64_t insert_len =
-      (pb_buffer_iterator_get_len(&src_buffer_iterator) < len) ?
-       pb_buffer_iterator_get_len(&src_buffer_iterator) : len;
+    struct pb_page *src_page = (struct pb_page*)src_buffer_iterator.data_vec;
 
-    struct pb_page* page =
-      pb_trivial_buffer_page_create(buffer, insert_len);
+    uint64_t insert_len =
+      (pb_page_get_len(src_page) < len) ?
+       pb_page_get_len(src_page) : len;
+
+    struct pb_page* page = pb_trivial_buffer_page_create(buffer, insert_len);
     if (!page)
       return inserted;
 
     memcpy(
       pb_page_get_base(page),
-      pb_buffer_iterator_get_base_at(&src_buffer_iterator, src_offset),
+      pb_page_get_base_at(src_page, src_offset),
       pb_page_get_len(page));
 
     insert_len = pb_buffer_insert(buffer, buffer_iterator, offset, page);
@@ -1331,7 +1340,7 @@ static uint64_t pb_trivial_buffer_insert_buffer2(
     inserted += insert_len;
     src_offset += insert_len;
 
-    if (src_offset == pb_buffer_iterator_get_len(&src_buffer_iterator)) {
+    if (src_offset == pb_page_get_len(src_page)) {
       pb_buffer_next_iterator(src_buffer, &src_buffer_iterator);
 
       src_offset = 0;
@@ -1359,9 +1368,11 @@ static uint64_t pb_trivial_buffer_insert_buffer3(
 
   while ((len > 0) &&
          (!pb_buffer_is_end_iterator(src_buffer, &src_buffer_iterator))) {
+    struct pb_page *src_page = (struct pb_page*)src_buffer_iterator.data_vec;
+
     uint64_t insert_len =
-      (pb_buffer_iterator_get_len(&src_buffer_iterator) - src_offset < len) ?
-       pb_buffer_iterator_get_len(&src_buffer_iterator) - src_offset : len;
+      (pb_page_get_len(src_page) - src_offset < len) ?
+       pb_page_get_len(src_page) - src_offset : len;
 
     insert_len =
       ((buffer->strategy->page_size != 0) &&
@@ -1369,8 +1380,7 @@ static uint64_t pb_trivial_buffer_insert_buffer3(
         buffer->strategy->page_size : insert_len;
 
     struct pb_page *page =
-      pb_page_transfer(
-        src_buffer_iterator.page, insert_len, src_offset, buffer->allocator);
+      pb_page_transfer(src_page, insert_len, src_offset, buffer->allocator);
     if (!page)
       return inserted;
 
@@ -1385,7 +1395,7 @@ static uint64_t pb_trivial_buffer_insert_buffer3(
     inserted += insert_len;
     src_offset += insert_len;
 
-    if (src_offset == pb_buffer_iterator_get_len(&src_buffer_iterator)) {
+    if (src_offset == pb_page_get_len(src_page)) {
       pb_buffer_next_iterator(src_buffer, &src_buffer_iterator);
 
       src_offset = 0;
@@ -1413,23 +1423,24 @@ static uint64_t pb_trivial_buffer_insert_buffer4(
 
   while ((len > 0) &&
          (!pb_buffer_is_end_iterator(src_buffer, &src_buffer_iterator))) {
+    struct pb_page *src_page = (struct pb_page*)src_buffer_iterator.data_vec;
+
     uint64_t insert_len =
-      (pb_buffer_iterator_get_len(&src_buffer_iterator) - src_offset < len) ?
-       pb_buffer_iterator_get_len(&src_buffer_iterator) - src_offset : len;
+      (pb_page_get_len(src_page) - src_offset < len) ?
+       pb_page_get_len(src_page) - src_offset : len;
 
     insert_len =
       ((buffer->strategy->page_size != 0) &&
        (buffer->strategy->page_size < insert_len)) ?
         buffer->strategy->page_size : insert_len;
 
-    struct pb_page *page =
-      pb_trivial_buffer_page_create(buffer, insert_len);
+    struct pb_page *page = pb_trivial_buffer_page_create(buffer, insert_len);
     if (!page)
       return inserted;
 
     memcpy(
       pb_page_get_base(page),
-      pb_buffer_iterator_get_base_at(&src_buffer_iterator, src_offset),
+      pb_page_get_base_at(src_page, src_offset),
       pb_page_get_len(page));
 
     insert_len = pb_buffer_insert(buffer, buffer_iterator, offset, page);
@@ -1443,7 +1454,7 @@ static uint64_t pb_trivial_buffer_insert_buffer4(
     inserted += insert_len;
     src_offset += insert_len;
 
-    if (src_offset == pb_buffer_iterator_get_len(&src_buffer_iterator)) {
+    if (src_offset == pb_page_get_len(src_page)) {
       pb_buffer_next_iterator(src_buffer, &src_buffer_iterator);
 
       src_offset = 0;
@@ -1559,21 +1570,23 @@ uint64_t pb_trivial_buffer_overwrite_data(struct pb_buffer * const buffer,
 
   while ((len > 0) &&
          (!pb_buffer_is_end_iterator(buffer, &buffer_iterator))) {
-    if ( buffer_iterator.page->is_transfer ||
-        (buffer_iterator.page->data->responsibility == pb_data_referenced)) {
-      if (!pb_trivial_buffer_copy_page_data(buffer, buffer_iterator.page))
+    struct pb_page *page = (struct pb_page*)buffer_iterator.data_vec;
+
+    if ( page->is_transfer ||
+        (page->data->responsibility == pb_data_referenced)) {
+      if (!pb_trivial_buffer_copy_page_data(buffer, page))
         return written;
     }
 
     uint64_t write_len =
-      (pb_buffer_iterator_get_len(&buffer_iterator) < len) ?
-       pb_buffer_iterator_get_len(&buffer_iterator) : len;
+      (pb_page_get_len(page) < len) ?
+       pb_page_get_len(page) : len;
 
     if (write_len == 0)
       break;
 
     memcpy(
-      pb_buffer_iterator_get_base(&buffer_iterator),
+      pb_page_get_base(page),
       (uint8_t*)buf + written,
       write_len);
 
@@ -1608,26 +1621,29 @@ uint64_t pb_trivial_buffer_overwrite_buffer(struct pb_buffer * const buffer,
   while ((len > 0) &&
          (!pb_buffer_is_end_iterator(buffer, &buffer_iterator)) &&
          (!pb_buffer_is_end_iterator(src_buffer, &src_buffer_iterator))) {
-    if ( buffer_iterator.page->is_transfer ||
-        (buffer_iterator.page->data->responsibility == pb_data_referenced)) {
-      if (!pb_trivial_buffer_copy_page_data(buffer, buffer_iterator.page))
+    struct pb_page *page = (struct pb_page*)buffer_iterator.data_vec;
+    struct pb_page *src_page = (struct pb_page*)src_buffer_iterator.data_vec;
+
+    if ( page->is_transfer ||
+        (page->data->responsibility == pb_data_referenced)) {
+      if (!pb_trivial_buffer_copy_page_data(buffer, page))
         return written;
     }
 
     uint64_t write_len =
-      (pb_buffer_iterator_get_len(&buffer_iterator) < len) ?
-       pb_buffer_iterator_get_len(&buffer_iterator) : len;
+      (pb_page_get_len(page) < len) ?
+       pb_page_get_len(page) : len;
 
     write_len =
-      (pb_buffer_iterator_get_len(&src_buffer_iterator) < write_len) ?
-       pb_buffer_iterator_get_len(&src_buffer_iterator) : write_len;
+      (pb_page_get_len(src_page) < write_len) ?
+       pb_page_get_len(src_page) : write_len;
 
     if (write_len == 0)
       break;
 
     memcpy(
-      pb_buffer_iterator_get_base_at(&buffer_iterator, offset),
-      pb_buffer_iterator_get_base_at(&src_buffer_iterator, src_offset),
+      pb_page_get_base_at(page, offset),
+      pb_page_get_base_at(src_page, src_offset),
       write_len);
 
     len -= write_len;
@@ -1635,13 +1651,13 @@ uint64_t pb_trivial_buffer_overwrite_buffer(struct pb_buffer * const buffer,
     offset += write_len;
     src_offset += write_len;
 
-    if (offset == pb_buffer_iterator_get_len(&buffer_iterator)) {
+    if (offset == pb_page_get_len(page)) {
       pb_buffer_next_iterator(buffer, &buffer_iterator);
 
       offset = 0;
     }
 
-    if (src_offset == pb_buffer_iterator_get_len(&src_buffer_iterator)) {
+    if (src_offset == pb_page_get_len(src_page)) {
       pb_buffer_next_iterator(src_buffer, &src_buffer_iterator);
 
       src_offset = 0;
@@ -1667,13 +1683,15 @@ uint64_t pb_trivial_buffer_read_data(struct pb_buffer * const buffer,
 
   while ((len > 0) &&
          (!pb_buffer_is_end_iterator(buffer, &buffer_iterator))) {
+    struct pb_page *page = (struct pb_page*)buffer_iterator.data_vec;
+
     size_t read_len =
-      (pb_buffer_iterator_get_len(&buffer_iterator) < len) ?
-       pb_buffer_iterator_get_len(&buffer_iterator) : len;
+      (pb_page_get_len(page) < len) ?
+       pb_page_get_len(page) : len;
 
     memcpy(
       (uint8_t*)buf + readed,
-      pb_buffer_iterator_get_base(&buffer_iterator),
+      pb_page_get_base(page),
       read_len);
 
     len -= read_len;
@@ -1703,12 +1721,14 @@ static void pb_trivial_buffer_clear_impl(struct pb_buffer * const buffer,
   get_iterator(buffer, &buffer_iterator);
 
   while (!is_end_iterator(buffer, &buffer_iterator)) {
-    struct pb_page *page = buffer_iterator.page;
+    struct pb_page *page = (struct pb_page*)buffer_iterator.data_vec;
 
     next_iterator(buffer, &buffer_iterator);
 
-    page->prev->next = buffer_iterator.page;
-    buffer_iterator.page->prev = page->prev;
+    struct pb_page *next_page = (struct pb_page*)buffer_iterator.data_vec;
+
+    page->prev->next = next_page;
+    next_page->prev = page->prev;
 
     page->prev = NULL;
     page->next = NULL;

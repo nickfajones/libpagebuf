@@ -550,17 +550,13 @@ struct pb_buffer {
 
 
 
-/** A structure used to iterate over memory regions in a pb_buffer,
- *  one page at a time.
+/** A structure used to iterate over memory regions in a pb_buffer.
  *
- * The iterator may point to either pages managed internally by the pb_buffer
- * instance, that represent memory regions and thus data inside the buffer,
- * or it may point to a special 'end' page, that indicates the end pf buffer
- * data has been reached following iteration, or it may point to the special
- * 'end' page after initialisation, indicating there is no data in the buffer.
+ * The iterator may point to either regions of data inside the buffer, or it
+ * may point to a special 'end' region, that indicates the end of the buffer.
  */
 struct pb_buffer_iterator {
-  struct pb_page *page;
+  struct pb_data_vec *data_vec;
 };
 
 

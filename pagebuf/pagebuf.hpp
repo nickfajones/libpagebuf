@@ -131,7 +131,7 @@ class buffer {
 
       public:
         const struct pb_data_vec& operator*() {
-          return buffer_iterator_.page->data_vec;
+          return *buffer_iterator_.data_vec;
         }
 
       private:
