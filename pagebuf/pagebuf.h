@@ -805,7 +805,7 @@ struct pb_buffer_operations {
    *
    * The iterator parameter is best to be a pointer to a stack object.
    */
-  void (*get_iterator_end)(struct pb_buffer * const buffer,
+  void (*get_end_iterator)(struct pb_buffer * const buffer,
                            struct pb_buffer_iterator * const buffer_iterator);
 
   /** Indicates whether an iterator is currently pointing to the 'end' of
@@ -814,7 +814,7 @@ struct pb_buffer_operations {
    * The iterator passed to this function must be initialised using one of the
    * get_iterator* functions above.
    */
-  bool (*iterator_is_end)(struct pb_buffer * const buffer,
+  bool (*is_end_iterator)(struct pb_buffer * const buffer,
                           const struct pb_buffer_iterator *buffer_iterator);
   /** Compare two iterators and indicate whether they are equal where equal is
    *  defined as pointing to the same page in the same buffer.
@@ -822,7 +822,7 @@ struct pb_buffer_operations {
    * The iterators passed to this function must be initialised using one of the
    * get_iterator* functions above.
    */
-  bool (*iterator_cmp)(struct pb_buffer * const buffer,
+  bool (*cmp_iterator)(struct pb_buffer * const buffer,
                        const struct pb_buffer_iterator *lvalue,
                        const struct pb_buffer_iterator *rvalue);
 
@@ -831,14 +831,14 @@ struct pb_buffer_operations {
    * The iterator passed to this function must be initialised using one of the
    * get_iterator* functions above.
    */
-  void (*iterator_next)(struct pb_buffer * const buffer,
+  void (*next_iterator)(struct pb_buffer * const buffer,
                         struct pb_buffer_iterator * const buffer_iterator);
   /** Moves an iterator to the previous page in the data sequence.
    *
    * The iterator passed to this function must be initialised using one of the
    * get_iterator* functions above.
    */
-  void (*iterator_prev)(struct pb_buffer * const buffer,
+  void (*prev_iterator)(struct pb_buffer * const buffer,
                         struct pb_buffer_iterator * const buffer_iterator);
 
 
@@ -854,7 +854,7 @@ struct pb_buffer_operations {
    *
    * The iterator parameter is best to be a pointer to a stack object.
    */
-  void (*get_byte_iterator_end)(struct pb_buffer * const buffer,
+  void (*get_end_byte_iterator)(struct pb_buffer * const buffer,
                                 struct pb_buffer_byte_iterator * const
                                   buffer_byte_iterator);
 
@@ -864,7 +864,7 @@ struct pb_buffer_operations {
    * The iterator passed to this function must be initialised using one of the
    * get_byte_iterator* functions above.
    */
-  bool (*byte_iterator_is_end)(struct pb_buffer * const buffer,
+  bool (*is_end_byte_iterator)(struct pb_buffer * const buffer,
                                struct pb_buffer_byte_iterator * const
                                  buffer_byte_iterator);
   /** Compare two byte iterators and indicate whether they are equal where
@@ -874,7 +874,7 @@ struct pb_buffer_operations {
    * The iterators passed to this function must be initialised using one of the
    * get_byte_iterator* functions above.
    */
-  bool (*byte_iterator_cmp)(struct pb_buffer * const buffer,
+  bool (*cmp_byte_iterator)(struct pb_buffer * const buffer,
                             const struct pb_buffer_byte_iterator *lvalue,
                             const struct pb_buffer_byte_iterator *rvalue);
 
@@ -883,7 +883,7 @@ struct pb_buffer_operations {
    * The iterator passed to this function must be initialised using one of the
    * get_byte_iterator* functions above.
    */
-  void (*byte_iterator_next)(struct pb_buffer * const buffer,
+  void (*next_byte_iterator)(struct pb_buffer * const buffer,
                              struct pb_buffer_byte_iterator * const
                                buffer_byte_iterator);
   /** Moves a byte iterator to the previous byte in the data sequence.
@@ -891,7 +891,7 @@ struct pb_buffer_operations {
    * The iterator passed to this function must be initialised using one of the
    * get_byte_iterator* functions above.
    */
-  void (*byte_iterator_prev)(struct pb_buffer * const buffer,
+  void (*prev_byte_iterator)(struct pb_buffer * const buffer,
                              struct pb_buffer_byte_iterator * const
                                buffer_byte_iterator);
 
@@ -1178,19 +1178,19 @@ uint64_t pb_buffer_get_data_size(struct pb_buffer * const buffer);
 
 void pb_buffer_get_iterator(struct pb_buffer * const buffer,
                             struct pb_buffer_iterator * const buffer_iterator);
-void pb_buffer_get_iterator_end(
+void pb_buffer_get_end_iterator(
                             struct pb_buffer * const buffer,
                             struct pb_buffer_iterator * const buffer_iterator);
-bool pb_buffer_iterator_is_end(
+bool pb_buffer_is_end_iterator(
                             struct pb_buffer * const buffer,
                             const struct pb_buffer_iterator *buffer_iterator);
-bool pb_buffer_iterator_cmp(struct pb_buffer * const buffer,
+bool pb_buffer_cmp_iterator(struct pb_buffer * const buffer,
                             const struct pb_buffer_iterator *lvalue,
                             const struct pb_buffer_iterator *rvalue);
-void pb_buffer_iterator_next(
+void pb_buffer_next_iterator(
                             struct pb_buffer * const buffer,
                             struct pb_buffer_iterator * const buffer_iterator);
-void pb_buffer_iterator_prev(
+void pb_buffer_prev_iterator(
                             struct pb_buffer * const buffer,
                             struct pb_buffer_iterator * const buffer_iterator);
 
@@ -1198,20 +1198,20 @@ void pb_buffer_iterator_prev(
 void pb_buffer_get_byte_iterator(
                          struct pb_buffer * const buffer,
                          struct pb_buffer_byte_iterator * const byte_iterator);
-void pb_buffer_get_byte_iterator_end(
+void pb_buffer_get_end_byte_iterator(
                          struct pb_buffer * const buffer,
                          struct pb_buffer_byte_iterator * const byte_iterator);
-bool pb_buffer_byte_iterator_is_end(
+bool pb_buffer_is_end_byte_iterator(
                          struct pb_buffer * const buffer,
                          struct pb_buffer_byte_iterator * const byte_iterator);
-bool pb_buffer_byte_iterator_cmp(
+bool pb_buffer_cmp_byte_iterator(
                          struct pb_buffer * const buffer,
                          const struct pb_buffer_byte_iterator *lvalue,
                          const struct pb_buffer_byte_iterator *rvalue);
-void pb_buffer_byte_iterator_next(
+void pb_buffer_next_byte_iterator(
                          struct pb_buffer * const buffer,
                          struct pb_buffer_byte_iterator * const byte_iterator);
-void pb_buffer_byte_iterator_prev(
+void pb_buffer_prev_byte_iterator(
                          struct pb_buffer * const buffer,
                          struct pb_buffer_byte_iterator * const byte_iterator);
 
@@ -1355,19 +1355,19 @@ uint64_t pb_trivial_buffer_get_data_size(struct pb_buffer * const buffer);
 void pb_trivial_buffer_get_iterator(
                             struct pb_buffer * const buffer,
                             struct pb_buffer_iterator * const buffer_iterator);
-void pb_trivial_buffer_get_iterator_end(
+void pb_trivial_buffer_get_end_iterator(
                             struct pb_buffer * const buffer,
                             struct pb_buffer_iterator * const buffer_iterator);
-bool pb_trivial_buffer_iterator_is_end(
+bool pb_trivial_buffer_is_end_iterator(
                             struct pb_buffer * const buffer,
                             const struct pb_buffer_iterator *buffer_iterator);
-bool pb_trivial_buffer_iterator_cmp(struct pb_buffer * const buffer,
+bool pb_trivial_buffer_cmp_iterator(struct pb_buffer * const buffer,
                             const struct pb_buffer_iterator *lvalue,
                             const struct pb_buffer_iterator *rvalue);
-void pb_trivial_buffer_iterator_next(
+void pb_trivial_buffer_next_iterator(
                             struct pb_buffer * const buffer,
                             struct pb_buffer_iterator * const buffer_iterator);
-void pb_trivial_buffer_iterator_prev(
+void pb_trivial_buffer_prev_iterator(
                             struct pb_buffer * const buffer,
                             struct pb_buffer_iterator * const buffer_iterator);
 
@@ -1375,19 +1375,19 @@ void pb_trivial_buffer_iterator_prev(
 void pb_trivial_buffer_get_byte_iterator(
                          struct pb_buffer * const buffer,
                          struct pb_buffer_byte_iterator * const byte_iterator);
-void pb_trivial_buffer_get_byte_iterator_end(
+void pb_trivial_buffer_get_end_byte_iterator(
                          struct pb_buffer * const buffer,
                          struct pb_buffer_byte_iterator * const byte_iterator);
-bool pb_trivial_buffer_byte_iterator_is_end(
+bool pb_trivial_buffer_is_end_byte_iterator(
                          struct pb_buffer * const buffer,
                          struct pb_buffer_byte_iterator * const byte_iterator);
-bool pb_trivial_buffer_byte_iterator_cmp(struct pb_buffer * const buffer,
+bool pb_trivial_buffer_cmp_byte_iterator(struct pb_buffer * const buffer,
                          const struct pb_buffer_byte_iterator *lvalue,
                          const struct pb_buffer_byte_iterator *rvalue);
-void pb_trivial_buffer_byte_iterator_next(
+void pb_trivial_buffer_next_byte_iterator(
                          struct pb_buffer * const buffer,
                          struct pb_buffer_byte_iterator * const byte_iterator);
-void pb_trivial_buffer_byte_iterator_prev(
+void pb_trivial_buffer_prev_byte_iterator(
                          struct pb_buffer * const buffer,
                          struct pb_buffer_byte_iterator * const byte_iterator);
 

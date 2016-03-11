@@ -56,7 +56,7 @@ class buffer {
           if (!at_end)
             pb_buffer_get_iterator(buffer_, &buffer_iterator_);
           else
-            pb_buffer_get_iterator_end(buffer_, &buffer_iterator_);
+            pb_buffer_get_end_iterator(buffer_, &buffer_iterator_);
         }
 
       public:
@@ -99,13 +99,13 @@ class buffer {
         bool operator==(const iterator& rvalue) {
           return
             ((buffer_ == rvalue.buffer_) &&
-             (pb_buffer_iterator_cmp(
+             (pb_buffer_cmp_iterator(
                 buffer_, &buffer_iterator_, &rvalue.buffer_iterator_)));
         }
 
       public:
         iterator& operator++() {
-          pb_buffer_iterator_next(buffer_, &buffer_iterator_);
+          pb_buffer_next_iterator(buffer_, &buffer_iterator_);
 
           return *this;
         }
@@ -118,7 +118,7 @@ class buffer {
 
       public:
         iterator& operator--() {
-          pb_buffer_iterator_prev(buffer_, &buffer_iterator_);
+          pb_buffer_prev_iterator(buffer_, &buffer_iterator_);
 
           return *this;
         }
@@ -158,7 +158,7 @@ class buffer {
           if (!at_end)
             pb_buffer_get_byte_iterator(buffer_, &byte_iterator_);
           else
-            pb_buffer_get_byte_iterator_end(buffer_, &byte_iterator_);
+            pb_buffer_get_end_byte_iterator(buffer_, &byte_iterator_);
         }
 
       public:
@@ -200,13 +200,13 @@ class buffer {
         bool operator==(const byte_iterator& rvalue) {
           return
             ((buffer_ == rvalue.buffer_) &&
-             (pb_buffer_byte_iterator_cmp(
+             (pb_buffer_cmp_byte_iterator(
                 buffer_, &byte_iterator_, &rvalue.byte_iterator_)));
         }
 
       public:
         byte_iterator& operator++() {
-          pb_buffer_byte_iterator_next(buffer_, &byte_iterator_);
+          pb_buffer_next_byte_iterator(buffer_, &byte_iterator_);
 
           return *this;
         }
@@ -219,7 +219,7 @@ class buffer {
 
       public:
         byte_iterator& operator--() {
-          pb_buffer_byte_iterator_prev(buffer_, &byte_iterator_);
+          pb_buffer_prev_byte_iterator(buffer_, &byte_iterator_);
 
           return *this;
         }
