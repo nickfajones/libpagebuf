@@ -753,7 +753,7 @@ const char *test_case_trim1::output = "abcdefghijklmnop";
 
 
 /*******************************************************************************
- *  */
+ */
 class test_case_trim2 : public test_case<test_case_trim2> {
   public:
     static const char *input;
@@ -807,6 +807,68 @@ class test_case_trim2 : public test_case<test_case_trim2> {
 
 const char *test_case_trim2::input = "abcdefghijklmnopqrstuvwxyz";
 const char *test_case_trim2::output = "abcdefghijklmnop";
+
+
+
+/*******************************************************************************
+ */
+class test_case_trim3 : public test_case<test_case_trim3> {
+  public:
+    static const char *input;
+    static const char *output;
+
+  public:
+    virtual int run_test(const test_subject& subject) {
+      subject.buffer->clear();
+
+      TEST_OPS_EVAL(subject.buffer->get_data_size() != 0)
+        return 1;
+
+      if (subject.buffer->get_strategy().rejects_trim)
+        return 0;
+
+      int write_max =
+        ((subject.buffer->get_strategy().page_size * 4) / strlen(input)) + 1;
+      for (int counter = 0; counter < write_max; ++counter) {
+        TEST_OPS_EVAL(subject.buffer->write(
+            input, strlen(input)) != strlen(input))
+        return 1;
+      }
+
+pb::buffer::byte_iterator byte_itr = subject.buffer->byte_begin();
+
+      uint64_t old_size = subject.buffer->get_data_size();
+
+      TEST_OPS_EVAL(old_size != (write_max * strlen(input)))
+        return 1;
+
+      uint64_t trim_len = (subject.buffer->get_strategy().page_size * 2);
+
+      TEST_OPS_EVAL(subject.buffer->trim(trim_len) != trim_len)
+        return 1;
+
+byte_itr = subject.buffer->byte_begin();
+
+      uint64_t new_size = subject.buffer->get_data_size();
+
+      TEST_OPS_EVAL(new_size != (old_size - trim_len))
+        return 1;
+
+      byte_itr = subject.buffer->byte_begin();
+
+      for (uint64_t i = 0; i < new_size; ++i) {
+        TEST_OPS_EVAL(*byte_itr != output[i % strlen(output)])
+          return 1;
+
+        ++byte_itr;
+      }
+
+      return 0;
+    }
+};
+
+const char *test_case_trim3::input = "abcdefghijklmnopqrstuvwxyz";
+const char *test_case_trim3::output = "abcdefghijklmnopqrstuvwxyz";
 
 
 
@@ -987,6 +1049,7 @@ int main(int argc, char **argv) {
   test_case<test_case_rewind2>::run_test(test_subjects);
   test_case<test_case_trim1>::run_test(test_subjects);
   //test_case<test_case_trim2>::run_test(test_subjects);
+  test_case<test_case_trim3>::run_test(test_subjects);
   test_case<test_case_extend1>::run_test(test_subjects);
   test_case<test_case_reserve1>::run_test(test_subjects);
 
