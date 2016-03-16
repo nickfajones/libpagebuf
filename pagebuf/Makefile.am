@@ -1,4 +1,4 @@
-h_sources = pagebuf.h pagebuf_mmap.h
+h_sources = pagebuf.h pagebuf_mmap.h pagebuf.hpp pagebuf_mmap.hpp
 
 h_sources_private = pagebuf_hash.h
 
