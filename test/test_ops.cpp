@@ -917,7 +917,10 @@ int main(int argc, char **argv) {
       (mmap_buffer->get_file_path() != buffer_file_path),
       "mmap_buffer test get_file_path")
     return 1;
-
+  TEST_OPS_EVAL_DESCRIPTION(
+      (mmap_buffer->get_fd() == 0),
+      "mmap_buffer test get_fd")
+    return 1;
   TEST_OPS_EVAL_DESCRIPTION(
       (mmap_buffer->get_close_action() != pb::mmap_buffer::close_action_retain),
       "mmap_buffer test get_close_action")

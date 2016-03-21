@@ -113,6 +113,11 @@ class mmap_buffer : public buffer {
     }
 
   public:
+    int get_fd() const {
+      return pb_mmap_buffer_get_fd(mmap_buffer_);
+    }
+
+  public:
     enum close_action get_close_action() const {
       return
         close_action(pb_mmap_buffer_get_close_action(mmap_buffer_));

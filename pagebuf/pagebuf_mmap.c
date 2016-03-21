@@ -1182,6 +1182,15 @@ const char *pb_mmap_buffer_get_file_path(
 
 /*******************************************************************************
  */
+int pb_mmap_buffer_get_fd(struct pb_mmap_buffer * const mmap_buffer) {
+  struct pb_mmap_allocator *mmap_allocator =
+    (struct pb_mmap_allocator*)mmap_buffer->trivial_buffer.buffer.allocator;
+
+  return mmap_allocator->file_fd;
+}
+
+/*******************************************************************************
+ */
 enum pb_mmap_close_action pb_mmap_buffer_get_close_action(
     struct pb_mmap_buffer * const mmap_buffer) {
   struct pb_mmap_allocator *mmap_allocator =
