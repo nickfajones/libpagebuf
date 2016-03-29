@@ -324,6 +324,10 @@ class buffer {
       return pb_buffer_extend(buffer_, len);
     }
 
+    uint64_t reserve(uint64_t size) {
+      return pb_buffer_reserve(buffer_, size);
+    }
+
     uint64_t rewind(uint64_t len) {
       return pb_buffer_rewind(buffer_, len);
     }

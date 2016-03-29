@@ -370,6 +370,7 @@ static struct pb_buffer_operations pb_trivial_buffer_operations = {
 
   .insert = &pb_trivial_buffer_insert,
   .extend = &pb_trivial_buffer_extend,
+  .reserve = &pb_trivial_buffer_reserve,
   .rewind = &pb_trivial_buffer_rewind,
   .seek = &pb_trivial_buffer_seek,
   .trim = &pb_trivial_buffer_trim,
@@ -484,8 +485,14 @@ uint64_t pb_buffer_insert(struct pb_buffer * const buffer,
   return buffer->operations->insert(buffer, buffer_iterator, offset, page);
 }
 
+/*******************************************************************************
+ */
 uint64_t pb_buffer_extend(struct pb_buffer * const buffer, uint64_t len) {
   return buffer->operations->extend(buffer, len);
+}
+
+uint64_t pb_buffer_reserve(struct pb_buffer * const buffer, uint64_t size) {
+  return buffer->operations->reserve(buffer, size);
 }
 
 uint64_t pb_buffer_rewind(struct pb_buffer * const buffer, uint64_t len) {
@@ -958,14 +965,14 @@ uint64_t pb_trivial_buffer_extend(struct pb_buffer * const buffer,
 
   uint64_t extended = 0;
 
+  struct pb_buffer_iterator buffer_iterator;
+  pb_buffer_get_iterator_end(buffer, &buffer_iterator);
+
   while (len > 0) {
     size_t extend_len =
       ((buffer->strategy->page_size != 0) &&
        (buffer->strategy->page_size < len)) ?
         buffer->strategy->page_size : len;
-
-    struct pb_buffer_iterator buffer_iterator;
-    pb_buffer_get_iterator_end(buffer, &buffer_iterator);
 
     struct pb_page *page =
       pb_trivial_buffer_page_create(buffer, extend_len);
@@ -982,6 +989,22 @@ uint64_t pb_trivial_buffer_extend(struct pb_buffer * const buffer,
   }
 
   return extended;
+}
+
+/*******************************************************************************
+ */
+uint64_t pb_trivial_buffer_reserve(struct pb_buffer * const buffer,
+    uint64_t size) {
+  if (buffer->strategy->rejects_extend)
+    return 0;
+
+  uint64_t data_size = pb_buffer_get_data_size(buffer);
+  if (size <= data_size)
+    return 0;
+
+  uint64_t extend_len = size - data_size;
+
+  return pb_buffer_extend(buffer, extend_len);
 }
 
 /*******************************************************************************
@@ -1408,7 +1431,7 @@ static uint64_t pb_trivial_buffer_insert_buffer4(
       pb_page_get_base(page),
       pb_buffer_iterator_get_base_at(&src_buffer_iterator, src_offset),
       pb_page_get_len(page));
-    
+
     insert_len = pb_buffer_insert(buffer, buffer_iterator, offset, page);
 
     if (insert_len == 0)

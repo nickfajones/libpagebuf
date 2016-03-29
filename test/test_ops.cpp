@@ -863,6 +863,37 @@ const char *test_case_extend1::output = "abcdefghijklmnopqrstuvwxyz";
 
 /*******************************************************************************
  */
+class test_case_reserve1 : public test_case<test_case_reserve1> {
+  public:
+    virtual int run_test(const test_subject& subject) {
+      subject.buffer->clear();
+
+      TEST_OPS_EVAL(subject.buffer->get_data_size() != 0)
+        return 1;
+
+      if (subject.buffer->get_strategy().rejects_extend)
+        return 0;
+
+      TEST_OPS_EVAL(subject.buffer->reserve(1024) != 1024)
+        return 1;
+
+      TEST_OPS_EVAL(subject.buffer->get_data_size() != 1024)
+        return 1;
+
+      TEST_OPS_EVAL(subject.buffer->reserve(5120) != 4096)
+        return 1;
+
+      TEST_OPS_EVAL(subject.buffer->get_data_size() != 5120)
+        return 1;
+
+      return 0;
+    }
+};
+
+
+
+/*******************************************************************************
+ */
 int main(int argc, char **argv) {
   std::list<test_subject> test_subjects;
 
@@ -951,6 +982,7 @@ int main(int argc, char **argv) {
   test_case<test_case_trim1>::run_test(test_subjects);
   //test_case<test_case_trim2>::run_test(test_subjects);
   test_case<test_case_extend1>::run_test(test_subjects);
+  test_case<test_case_reserve1>::run_test(test_subjects);
 
   test_subjects.clear();
 

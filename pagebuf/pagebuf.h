@@ -680,7 +680,7 @@ struct pb_buffer_strategy {
   /** Alteration flags: control access to functions that alter the state of
    *  the buffer.
    */
- 
+
   /** Indicates whether a pb_buffer rejects (fails to support) insert
    *  operations.  That is: operations that write to places in the buffer
    *  other than the end.
@@ -693,14 +693,14 @@ struct pb_buffer_strategy {
    */
   bool rejects_insert;
 
-  /** Indicates whether a pb_buffer rejects (fails to support) the extend
-   *  operation.
+  /** Indicates whether a pb_buffer rejects (fails to support) the extend or
+   *  reserve operations.
    *
    * Available behaviours:
-   * no reject (false): extend operations can be performed with expected
-   *                    results.
+   * no reject (false): extend/reserve operations can be performed with
+   *                    expected results.
    *
-   * reject     (true): extend operations will immediately return 0.
+   * reject     (true): extend/reserve operations will immediately return 0.
    */
   bool rejects_extend;
 
@@ -923,21 +923,36 @@ struct pb_buffer_operations {
                    struct pb_page * const page);
   /** Increase the size of the buffer by adding data to the end.
    *
-   * This is a protected function and should not be called externally.
-   *
    * len: the amount of data to add in bytes.
    *
    * Depending on the buffer implementation details, the extended data may be
    * comprised of multiple pages.
    *
-   * The return value is the amount of data successfully added to the buffer.
+   * The return value is the amount of capacity successfully added to the
+   * buffer.
    */
   uint64_t (*extend)(
                    struct pb_buffer * const buffer,
                    uint64_t len);
-  /** Increase the size of the buffer by adding data to the head.
+  /** Assure the size of the buffer is at least a specific size.
    *
-   * This is a protected function and should not be called externally.
+   * size: the minimum size of the buffer.
+   *
+   * If the current size of the buffer is less than the requested mimimum
+   * size, then the buffer will be extended to meet that size.
+   * If the current size of the buffer is greater than the requested minimum
+   * size, then the buffer will remain unchanged.
+   *
+   * Depending on the buffer implementation details, the extended data may be
+   * comprised of multiple pages.
+   *
+   * The return value is the amount of capacity successfully added to the
+   * buffer.
+   */
+  uint64_t (*reserve)(
+                   struct pb_buffer * const buffer,
+                   uint64_t size);
+  /** Increase the size of the buffer by adding data to the head.
    *
    * len: the amount of data to add in bytes.
    *
@@ -951,8 +966,6 @@ struct pb_buffer_operations {
                    uint64_t len);
   /** Seek the starting point of the buffer data.
    *
-   * This is a protected function and should not be called externally.
-   *
    * len: the amount of data to seek in bytes.
    *
    * Depending on the buffer implementation details, the seek operation may
@@ -964,8 +977,6 @@ struct pb_buffer_operations {
   uint64_t (*seek)(struct pb_buffer * const buffer,
                    uint64_t len);
   /** Trim the end of the buffer data.
-   *
-   * This is a protected function and should not be called externally.
    *
    * len: the amount of data to seek in bytes.
    *
@@ -1212,6 +1223,8 @@ uint64_t pb_buffer_insert(
                         struct pb_page * const page);
 uint64_t pb_buffer_extend(
                         struct pb_buffer * const buffer, uint64_t len);
+uint64_t pb_buffer_reserve(
+                        struct pb_buffer * const buffer, uint64_t size);
 uint64_t pb_buffer_rewind(
                         struct pb_buffer * const buffer, uint64_t len);
 uint64_t pb_buffer_seek(struct pb_buffer * const buffer, uint64_t len);
@@ -1387,6 +1400,9 @@ uint64_t pb_trivial_buffer_insert(
 uint64_t pb_trivial_buffer_extend(
                               struct pb_buffer * const buffer,
                               uint64_t len);
+uint64_t pb_trivial_buffer_reserve(
+                              struct pb_buffer * const buffer,
+                              uint64_t size);
 uint64_t pb_trivial_buffer_rewind(
                               struct pb_buffer * const buffer,
                               uint64_t len);

@@ -476,6 +476,18 @@ static uint64_t pb_mmap_allocator_extend(
   return len;
 }
 
+static uint64_t pb_mmap_allocator_reserve(
+    struct pb_mmap_allocator * const mmap_allocator,
+    size_t size) {
+  uint64_t data_size = pb_mmap_allocator_get_data_size(mmap_allocator);
+  if (size <= data_size)
+    return 0;
+
+  uint64_t extend_len = size - data_size;
+
+  return pb_mmap_allocator_extend(mmap_allocator, extend_len);
+}
+
 static uint64_t pb_mmap_allocator_rewind(
     struct pb_mmap_allocator * const mmap_allocator,
     size_t len) {
@@ -788,13 +800,16 @@ static void pb_mmap_buffer_iterator_prev(
                             struct pb_buffer_iterator * const buffer_iterator);
 
 
-static uint64_t pb_mmap_buffer_seek(struct pb_buffer * const buffer,
-                              uint64_t len);
 static uint64_t pb_mmap_buffer_extend(
                               struct pb_buffer * const buffer,
                               uint64_t len);
+static uint64_t pb_mmap_buffer_reserve(
+                              struct pb_buffer * const buffer,
+                              uint64_t size);
 static uint64_t pb_mmap_buffer_rewind(
                               struct pb_buffer * const buffer,
+                              uint64_t len);
+static uint64_t pb_mmap_buffer_seek(struct pb_buffer * const buffer,
                               uint64_t len);
 static uint64_t pb_mmap_buffer_trim(
                               struct pb_buffer * const buffer,
@@ -844,6 +859,7 @@ static struct pb_buffer_operations pb_mmap_buffer_operations = {
 
   .insert = &pb_trivial_buffer_insert,
   .extend = &pb_mmap_buffer_extend,
+  .reserve = &pb_mmap_buffer_reserve,
   .rewind = &pb_mmap_buffer_rewind,
   .seek = &pb_mmap_buffer_seek,
   .trim = &pb_mmap_buffer_trim,
@@ -1057,7 +1073,15 @@ uint64_t pb_mmap_buffer_extend(struct pb_buffer * const buffer,
   struct pb_mmap_allocator *mmap_allocator =
     (struct pb_mmap_allocator*)buffer->allocator;
 
-  return pb_mmap_allocator_extend(mmap_allocator, len);;
+  return pb_mmap_allocator_extend(mmap_allocator, len);
+}
+
+uint64_t pb_mmap_buffer_reserve(struct pb_buffer * const buffer,
+    uint64_t size) {
+  struct pb_mmap_allocator *mmap_allocator =
+    (struct pb_mmap_allocator*)buffer->allocator;
+
+  return pb_mmap_allocator_reserve(mmap_allocator, size);
 }
 
 uint64_t pb_mmap_buffer_rewind(struct pb_buffer * const buffer,
