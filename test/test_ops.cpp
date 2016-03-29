@@ -886,6 +886,12 @@ class test_case_reserve1 : public test_case<test_case_reserve1> {
       TEST_OPS_EVAL(subject.buffer->get_data_size() != 5120)
         return 1;
 
+      TEST_OPS_EVAL(subject.buffer->reserve(4096) != 0)
+        return 1;
+
+      TEST_OPS_EVAL(subject.buffer->get_data_size() != 5120)
+        return 1;
+
       return 0;
     }
 };
