@@ -233,8 +233,6 @@ class test_case_iterate3 : public test_case<test_case_iterate3> {
       TEST_OPS_EVAL(subject.buffer->get_data_size() != strlen(input1))
         return 1;
 
-      pb::buffer::iterator itr = subject.buffer->begin();
-
       pb::buffer::byte_iterator byte_itr = subject.buffer->byte_begin();
       for (unsigned int i = 0; i < strlen(input1); ++i) {
         TEST_OPS_EVAL(*byte_itr != input1[i])
@@ -835,8 +833,6 @@ class test_case_trim3 : public test_case<test_case_trim3> {
         return 1;
       }
 
-pb::buffer::byte_iterator byte_itr = subject.buffer->byte_begin();
-
       uint64_t old_size = subject.buffer->get_data_size();
 
       TEST_OPS_EVAL(old_size != (write_max * strlen(input)))
@@ -847,14 +843,12 @@ pb::buffer::byte_iterator byte_itr = subject.buffer->byte_begin();
       TEST_OPS_EVAL(subject.buffer->trim(trim_len) != trim_len)
         return 1;
 
-byte_itr = subject.buffer->byte_begin();
-
       uint64_t new_size = subject.buffer->get_data_size();
 
       TEST_OPS_EVAL(new_size != (old_size - trim_len))
         return 1;
 
-      byte_itr = subject.buffer->byte_begin();
+      pb::buffer::byte_iterator byte_itr = subject.buffer->byte_begin();
 
       for (uint64_t i = 0; i < new_size; ++i) {
         TEST_OPS_EVAL(*byte_itr != output[i % strlen(output)])
