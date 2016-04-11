@@ -1,5 +1,7 @@
 /*******************************************************************************
  *  Copyright 2015, 2016 Nick Jones <nick.fa.jones@gmail.com>
+ *  Copyright 2016 Network Box Corporation Limited
+ *      Jeff He <jeff.he@network-box.com>
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -230,7 +232,6 @@ struct pb_page *pb_page_transfer(const struct pb_page *src_page,
 
   page->data_vec.base = pb_page_get_base_at(src_page, src_off);
   page->data_vec.len = len;
-  page->is_transfer = true;
 
   return page;
 }
@@ -244,7 +245,6 @@ void pb_page_destroy(struct pb_page *page,
   page->data = NULL;
   page->prev = NULL;
   page->next = NULL;
-  page->is_transfer = false;
 
   pb_allocator_free(
     allocator, pb_alloc_type_struct, page, sizeof(struct pb_page));
@@ -262,9 +262,6 @@ void pb_page_set_data(struct pb_page * const page,
   page->data_vec.base = pb_data_get_base(data);
   page->data_vec.len = pb_data_get_len(data);
   page->data = data;
-  page->prev = NULL;
-  page->next = NULL;
-  page->is_transfer = false;
 
   pb_data_get(data);
 }
@@ -890,7 +887,7 @@ struct pb_page *pb_trivial_buffer_page_create_ref(
 
 /*******************************************************************************
  */
-bool pb_trivial_buffer_copy_page_data(struct pb_buffer * const buffer,
+bool pb_trivial_buffer_dup_page_data(struct pb_buffer * const buffer,
     struct pb_page * const page) {
   const struct pb_allocator *allocator = buffer->allocator;
 
@@ -900,9 +897,9 @@ bool pb_trivial_buffer_copy_page_data(struct pb_buffer * const buffer,
     return false;
 
   memcpy(
-    pb_page_get_base(page),
     pb_data_get_base(data),
-    pb_data_get_len(data));
+    pb_page_get_base(page),
+    pb_page_get_len(page));
 
   pb_page_set_data(page, data);
 
@@ -1570,10 +1567,10 @@ uint64_t pb_trivial_buffer_overwrite_data(struct pb_buffer * const buffer,
          (!pb_buffer_is_end_iterator(buffer, &buffer_iterator))) {
     struct pb_page *page = (struct pb_page*)buffer_iterator.data_vec;
 
-    if ( page->is_transfer ||
+    if (!buffer->strategy->clone_on_write ||
         (page->data->responsibility == pb_data_referenced)) {
-      if (!pb_trivial_buffer_copy_page_data(buffer, page))
-        return written;
+      if (!pb_trivial_buffer_dup_page_data(buffer, page))
+        break;
     }
 
     uint64_t write_len =
@@ -1622,10 +1619,10 @@ uint64_t pb_trivial_buffer_overwrite_buffer(struct pb_buffer * const buffer,
     struct pb_page *page = (struct pb_page*)buffer_iterator.data_vec;
     struct pb_page *src_page = (struct pb_page*)src_buffer_iterator.data_vec;
 
-    if ( page->is_transfer ||
+    if (!buffer->strategy->clone_on_write ||
         (page->data->responsibility == pb_data_referenced)) {
-      if (!pb_trivial_buffer_copy_page_data(buffer, page))
-        return written;
+      if (!pb_trivial_buffer_dup_page_data(buffer, page))
+        break;
     }
 
     uint64_t write_len =

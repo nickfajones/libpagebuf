@@ -1,5 +1,7 @@
 /*******************************************************************************
  *  Copyright 2015, 2016 Nick Jones <nick.fa.jones@gmail.com>
+ *  Copyright 2016 Network Box Corporation Limited
+ *      Jeff He <jeff.he@network-box.com>
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -449,13 +451,6 @@ struct pb_page {
   struct pb_page *prev;
   /** Next page in a buffer structure */
   struct pb_page *next;
-
-  /** Indicates whether the data that the page refers to is a transfer,
-   *  or not exclusive nor created with the page.
-   *
-   * This flag is used for Copy On Write decision making.
-   */
-  bool is_transfer;
 };
 
 
@@ -1484,19 +1479,20 @@ struct pb_page *pb_trivial_buffer_page_create_ref(
                               struct pb_buffer * const buffer,
                               const uint8_t *buf, size_t len);
 
-/** Copy the data of a page.
+/** Duplicate the data of a page and set the duplicate into the page.
  *
  * The existing data in a page has its data memory region duplicated into a
- * new pb_data object, and has it data replaced with the new data.
+ * new pb_data object.  The new pb_data object replaces the old data object in
+ * the page.
  *
- * This is primarily done when the pb_data has been transferred to the
- * current page, or the original memory region was a reference, and now
- * that data needs to be modified.
- *
- * In these cases the data will be Copied On Write.
+ * This is primarily done when an overwrite operation is performed on a buffer
+ * that has a strategy setting of clone_on_write = false.  In this case, the
+ * data will be duplicated to prevent the overwrite operation from interfering
+ * with data objects that are shared with other buffers.
+ * It will also be done if the target data objet references a memory region.
  */
-bool pb_trivial_buffer_copy_page_data(struct pb_buffer * const buffer,
-                                      struct pb_page * const page);
+bool pb_trivial_buffer_dup_page_data(struct pb_buffer * const buffer,
+                                     struct pb_page * const page);
 
 
 
