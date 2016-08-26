@@ -981,8 +981,10 @@ uint64_t pb_trivial_buffer_extend(struct pb_buffer * const buffer,
 
     extend_len = pb_buffer_insert(buffer, &buffer_iterator, 0, page);
 
-    if (extend_len == 0)
+    if (extend_len == 0) {
+      pb_page_destroy(page, buffer->allocator);
       break;
+    }
 
     len -= extend_len;
     extended += extend_len;
@@ -1032,8 +1034,10 @@ uint64_t pb_trivial_buffer_rewind(struct pb_buffer * const buffer,
 
     rewind_len = pb_buffer_insert(buffer, &buffer_iterator, 0, page);
 
-    if (rewind_len == 0)
+    if (rewind_len == 0) {
+      pb_page_destroy(page, buffer->allocator);
       break;
+    }
 
     len -= rewind_len;
     rewinded += rewind_len;
@@ -1172,8 +1176,10 @@ static uint64_t pb_trivial_buffer_insert_data1(
 
     insert_len = pb_buffer_insert(buffer, buffer_iterator, offset, page);
 
-    if (insert_len == 0)
+    if (insert_len == 0) {
+      pb_page_destroy(page, buffer->allocator);
       break;
+    }
 
     offset = 0;
 
@@ -1220,8 +1226,10 @@ static uint64_t pb_trivial_buffer_insert_data_ref1(
 
     insert_len = pb_buffer_insert(buffer, buffer_iterator, offset, page);
 
-    if (insert_len == 0)
+    if (insert_len == 0) {
+      pb_page_destroy(page, buffer->allocator);
       break;
+    }
 
     offset = 0;
 
@@ -1277,8 +1285,10 @@ static uint64_t pb_trivial_buffer_insert_buffer1(
 
     insert_len = pb_buffer_insert(buffer, buffer_iterator, offset, page);
 
-    if (insert_len == 0)
+    if (insert_len == 0) {
+      pb_page_destroy(page, buffer->allocator);
       break;
+    }
 
     offset = 0;
 
@@ -1326,8 +1336,10 @@ static uint64_t pb_trivial_buffer_insert_buffer2(
 
     insert_len = pb_buffer_insert(buffer, buffer_iterator, offset, page);
 
-    if (insert_len == 0)
+    if (insert_len == 0) {
+      pb_page_destroy(page, buffer->allocator);
       break;
+    }
 
     offset = 0;
 
@@ -1381,8 +1393,10 @@ static uint64_t pb_trivial_buffer_insert_buffer3(
 
     insert_len = pb_buffer_insert(buffer, buffer_iterator, offset, page);
 
-    if (insert_len == 0)
+    if (insert_len == 0) {
+      pb_page_destroy(page, buffer->allocator);
       break;
+    }
 
     offset = 0;
 
@@ -1440,8 +1454,10 @@ static uint64_t pb_trivial_buffer_insert_buffer4(
 
     insert_len = pb_buffer_insert(buffer, buffer_iterator, offset, page);
 
-    if (insert_len == 0)
+    if (insert_len == 0) {
+      pb_page_destroy(page, buffer->allocator);
       break;
+    }
 
     offset = 0;
 
