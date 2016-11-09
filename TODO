@@ -1,1 +1,24 @@
+- Inline Documentation
+- Copy On Write for buffer pages, with last-reference checking operation part of data_operations
+- Unity between strategy (particularly rejects_insert(false), and allocators or let allocators dictate insertion
+- Consider renaming pb_allocator_type
+- Consider dropping type from free functions
+- Consider removing pb_get_trivial_allocator_operations
+- Consider removing pb_page_set_data
+- Consider making iterator_get operations part of pb_buffer so they may be specialised
+- Consider a data_revision policy for iterators
+- Consider changing the way strategy flags are set, maybe modifier functions or parameterisable initialisers
+- Consider iterators holding reference counts to pages
+- Consider iterators as virtual classes, created by the get_iterator operations rather than initialised by it
+- Consider joining extend and reserve operations
+- Consider splitting trivial implementatiosn to separate .h, .c
+- Consider consolidating some of the write interfaces
+- Consider making operations purely internal or separate internal functions into _protected.h
+- Consider a pb_trivial_buffer_page_create_mem function (memory region to be taken over by the buffer)
+- Consider flattening trivial *readers into the base reader, as they only use base interfaces
+- Re-ordering of pb_data structures and functions
+- Re-ordering of pb_buffer, pb_buffer_iterator and pb_buffer_strategy
+- Only describe generic behaviour or describe buffer operations objectively in
+  the base class documentation.  Specific behaviours descibed in the subclass.
+  (eg, concept of data revision)
 - Add a thread exclusivity debugging API

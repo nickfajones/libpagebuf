@@ -1,5 +1,5 @@
 /*******************************************************************************
- *  Copyright 2015, 2016 Nick Jones <nick.fa.jones@gmail.com>
+ *  Copyright 2015 - 2017 Nick Jones <nick.fa.jones@gmail.com>
  *  Copyright 2016 Network Box Corporation Limited
  *      Jeff He <jeff.he@network-box.com>
  *
@@ -34,119 +34,95 @@ extern "C" {
  *
  * Developers of software that involves IO, for example networking IO, face
  * the challenge of dealing with large amounts of data.  Whether the data is
- * passing quickly through the system or not, this data will at the least need
- * to be stored after it is received from the input side, then that same data
- * may need to be arranged for writing back to the output side.
+ * passing quickly through the system or not, this data will need to be stored
+ * after it is received from the input side, then arranged for writing back to
+ * the output side.
  * Additionally, the data may require processing as it moves in then out of
- * the system, processing such as parsing and even modification and
- * manipulation.
+ * the system.  Processing includes parsing and analysis, and can even include
+ * modification.
  *
- * When that software system is non-blocking and event driven, additional
- * challenges exist, such as the need to capture data that arrives in a
- * piecewise manner, in uncertain size and delay patterns, then the need to
- * gain access to that data in a linear form to allow proper parsing and
- * manipulation.
+ * When that software system is non-blocking and event driven, an additional
+ * challenge exists in that data may arrive in a piecewise manner with
+ * uncertain size and delay patterns.  Authors of such applications may need
+ * to be access the data in a sequential way, or in a way that deals as little
+ * as possible with the underlying fragmentation.  libpagebuf is designed to
+ * provide a solution to these data storage challenges.
  *
- * And all of this needs to be done as resource and time efficiently as
- * possible.
- *
- * libpagebuf is designed to provide a solution to the data storage challenges
- * faced in particular by developers of IO oriented, non-blocking event driven
- * systems.  At its core, it implements a set of data structures and
- * algorithms for the management of regions of system memory.  On the surface,
- * through the use of the central pb_buffer class, it provides a means of
- * reading and manipulating the data that is stored in those memory regions,
- * that is abstracted away from the underlying arrangement of those memory
- * regions in the system memory space.
- *
- * An author may use pb_buffer to receive data from input sources as
- * fragments, then perform read actions such as searching and copying in
- * addition to some more intrusive actions such as insertion or truncation on
- * that data, without any regard for the underlying fragmentation of the
- * memory regions that the data is stored in.
+ * On the surface, through the use of the primary pb_buffer class, libpagbuf
+ * provides a means of writing or copying blocks of data, then a means of
+ * reading and manipulating that data as if it was sequential and unfragmented.
+ * An author may use pb_buffer to receive data from input sources as fragments,
+ * then perform read actions such as searching and copying in addition to some
+ * more intrusive actions such as insertion or truncation on that data, without
+ * any regard for the underlying fragmentation, positioning in system memory
+ * (or other storage) or even ordering in memory of the the data.
  *
  * libpagebuf is also designed with concerns of non-blocking event driven
  * and multithreaded systems in mind, through the inclusion of interfaces for
- * the use of custom memory allocators, debugging to check internal structure
- * integrity and thread exclusivity, interfaces in both C and C++,
- * C++ interfaces complying to the ASIO ConstBufferSequence,
+ * the integration of custom memory allocators, debugging to check internal
+ * structure integrity and thread exclusivity.
+ *
+ * The core API and implementation is in C but a thin C++ wrapper is provided.
+ * There exist C++ objects that comply to the ASIO ConstBufferSequence,
  * MutableBufferSequence and DynamicBufferSequence concepts, as well as the
  * BidirectionanIterator concept used in particular by boost::regex.
  *
  * libpagebuf is designed for efficiency, using reference counting and
- * zero-copy semantics at its core, as well as providing a class like
- * interface in C that provides a path for subclassing and modifying
- * implementation details.
+ * zero-copy semantics, as well as providing a class like interface in C that
+ * provides a path for subclassing and modifying implementation details.
  */
 
 /** libpagebuf classes
  *
- * Although it is written in C, libpagebuf implements several of its most
- * important data structures in an object like fashion.
+ * Although it is written in C, libpagebuf interfaces with its data structures
+ * in an object like style.
  *
- * Each of these objects possesses a '_operations' structure, which is a group
- * of function pointers implementing key internal functions on an instance of
- * said object.  Concrete implementations of important objects will define
- * a const pointer to a _operations structure, populated with functions that
- * are either pre-existing, or borrowed from a 'base' class that implement
- * the same functionality as the base class, or with functions that are
- * unique to the relevant implementation, and override the default behaviour
- * of the base class.  Of course an _operations structure may contain a
- * combination of both types of functions.  These _operations structures are
- * akin to vtables in C++ objects.
+ * Each core object possesses a '_operations' structure, which is a group of
+ * function pointers acting like a vtable, providing an overridable index of
+ * object functionality.
+ * Concrete implementations of core objects will define a const pointer to an
+ * _operations structure, populated with functions that are either pr-defined,
+ * most often already in use in the 'base class', or with functions that are
+ * unique to the relevant implementation, that override specific behaviour of
+ * some of the functions of the base class.
  *
  * Concrete implementations will also define 'factory' functions, which are
- * akin to specific constructors of buffers of the relevant implementation.
- * These factory functions may accept specific arguments to configure the
- * specific behaviour and functionality of the implementations but one thing
- * must remain consistent amongst all factory functions, and that is they
- * must return a pointer to the lowest base type of the particular object
- * tree, so that those objects may be treated polymorphicly, either by the
- * user directly, or by other objects internally.  For example, any derivative
- * implementations of a pb_allocator must be created by a factory method,
- * that may take arguments specific to the particular implementation, however
- * that function must return a pointer to a pb_allocator, which can then
- * be called polymorphically by other objects such as pb_data and pb_buffer
- * without any regard to the underlying implementation (other than the
- * expectation that it works properly)
+ * akin to constructors in C++.  These factory functions may accept specific
+ * arguments to configure the behaviour and functionality of the constructed
+ * instance implementations.  Factory functions return pointers to fully
+ * initialised instances of objects.  They will most often return the pointer
+ * in the form of the base type, to allow maximum polymorphism, however in
+ * special cases, factory functions may return subclasses to allow specific
+ * functions to be executed against them, but in these cases, a convenience
+ * conversion function should be provided to convert the subclass to the base
+ * class.
  *
- * Concreate implementations do not need to to make their _operations
- * structures publicly available, the binding of an object to its _operations
- * can be done opaquely inside the factory function.
+ * Concrete implementations do not need to to make their _operations structures
+ * publicly available, for example through a public accessor function declared
+ * in a public header file.  The binding of an object to its _operations can be
+ * done opaquely inside the factory function.
  *
  * In order to subclass an object, use the typical C object embedding method
  * where an instance of the base class object is the first member of the
- * subclass object.  The factory function will return the address of the
- * embedded base instance which will have the same address as the subclass.
- * Similarly, when a subclass specific over-ridden function receives the
- * pointer to the base class object as a parameter, it can then 'upcast' the
- * base back up to the subclass.
- *
- * libpagebuf allows subclassing of the following classes:
- * pb_allocator,
- * pb_data,
- * pb_buffer
- *
- * libpagebuf provides a base implementation of allocator, data and buffer
- * functionality named 'trivial', which uses a straight forward list based
- * arrangement of pages, backed by heap sourced memory regions.
- *
- * In addition, libpagebuf provides a mmap buffer, which uses arranges data in
- * a sparse list, backed by memory regions mapping to a file on disk.
+ * subclass object.  The factory function will return the address and type of
+ * the embedded base object, thus 'downcast'ing the subclass. Similarly, when a
+ * subclass specific over-ridden function receives a pointer to the base class
+ * object as a parameter, it can 'upcast' the base object pointer back up to
+ * the subclass.
  */
 
 /** Thread safety
  *
  * The pb_buffer, its supporting classes and API is explicitly NOT thread safe.
  *
- * There is no notion of locking in any of the pb_buffer operations, and even
- * pb_data and other object reference counts are not modified in a globally
- * atomic fashion.
+ * There is no notion of locking in any of the pb_buffer operations.  Reference
+ * counted objects such as pb_data do not have their counts modified in a
+ * globally atomic fashion.
  *
- * It is the responsibility of users to ensure that buffers are not accessed
+ * It is the responsibility of authors to ensure that buffers are not accessed
  * concurrently from across thread boundaries, and even if such a thing is
- * done in a serialised way, users must ensure that cleanup operations, in
- * particular pb_allocator frees are internally thread safe.
+ * done in a serialised way, authors must ensure that pb_data cleanup
+ * operations, consider thread safety.
  */
 
 
@@ -154,12 +130,19 @@ extern "C" {
 
 
 
-/* Pre-declare operations. */
+/* Pre-declare allocator operations. */
 struct pb_allocator_operations;
 
 
 
-/** Indicates the intended use of an allocated memory block. */
+/** Indicates the intended use of an allocated memory block.
+ *
+ * type_struct: The memory region will be used to store a data structure.
+ *              The region will be initialised to all zero bytes before it is
+ *              returned to the caller.
+ * type_region: The memory block will be used as a memory region for the
+ *              storage of data.  It will not be initialised.
+ */
 enum pb_allocator_type {
   pb_alloc_type_struct,
   pb_alloc_type_region,
@@ -167,19 +150,11 @@ enum pb_allocator_type {
 
 
 
-/** Wrapper for allocation and freeing of blocks of memory
+/** Responsible for allocation and freeing of blocks of memory
  *
- * Allocate and free memory blocks through these interfaces.  The allocated
- * blocks will be used to hold data structures (pb_alloc_type_struct) or
- * for use as memory regions (pb_alloc_type_region), as indicated by the
- * caller.
- *
- * Memory to be used for structs must be zero'd after allocation and before
- * returning to the caller, and zero'd again after being handed back to the
- * allocator and before being freed.
- *
- * Memory to be used as a data region, storage areas for user data, need not be
- * treated in any special way by an allocator.
+ * Allocate and free memory blocks through functions operating on an allocator.
+ * The allocator subclass will provide state and logic that define a memory
+ * allocation strategy.
  */
 struct pb_allocator {
   const struct pb_allocator_operations *operations;
@@ -189,24 +164,44 @@ struct pb_allocator {
 
 /** The structure that holds the operations that implement pb_allocator
  *  functionality.
+ *
+ * Authors:
+ * pb_allocator its subclasses are briefly mentioned in public APIs, but this
+ * is usually where they are the return value of public functions.  These
+ * references are expected to be passed immediately into object factory
+ * functions in order to use the pb_allocator to create that object, and also
+ * to bind the pb_allocator to the object but it is not expected that
+ * Application Authors will interract directly with pb_allocator instances.
+ * 
+ * Having said that, it is not strictly illegal to do so, and doing so should
+ * not confound an allocator implementation.
+ *
+ * Implementors:
+ * While pb_allocator operations are only invoked internally by pagebuf classes,
+ * it can be expected that Authors will use these operations in their own
+ * Allocator functions are used by other pagebuf objects to perform memory
+ * allocations and frees.  Although it is not encouraged that these interfaces
+ * be used directly by Authors, it is not illegal or confounding to libpagebuf,
+ * and Implementors who provide custom allocator backends should accomodate
+ * such usage.
  */
 struct pb_allocator_operations {
   /** Allocate a memory block.
    *
-   * type indicates what the allocated memory block will be used for
+   * type: indicates what the allocated memory block will be used for
    *
-   * size is the size of the memory block to allocate.
+   * size: the size of the memory block to allocate.
    */
   void *(*alloc)(const struct pb_allocator *allocator,
                  enum pb_allocator_type type, size_t size);
   /** Free a memory block.
    *
-   * type indicates how the memory block was used.
+   * type: indicates how the memory block was used.
    *
-   * obj is the address of beginning of the memory region.
+   * obj: the address of beginning of the memory region.
    *
-   * size indicates the size of the memory region that was allocated and now
-   *      freed.
+   * size: indicates the size of the memory region that was allocated and now
+   *       freed.
    */
   void  (*free)(const struct pb_allocator *allocator,
                 enum pb_allocator_type type, void *obj, size_t size);
@@ -218,8 +213,11 @@ struct pb_allocator_operations {
  *
  * These interfaces should be used to invoke the allocator operations.
  *
- * However, given that allocators are protected members of buffers, these
- * operations are not intended to be called by end users.
+ * Given that allocators are protected members of buffers, these functions are
+ * not intended to be called by authors, however they can be used as a useful
+ * interface for a host application to use the allocator consistently along
+ * with libpagebuf, especially in conjunction with the trivial built in
+ * allocator defined below.
  */
 void *pb_allocator_alloc(
                        const struct pb_allocator *allocator,
@@ -239,7 +237,10 @@ const struct pb_allocator_operations *pb_get_trivial_allocator_operations(void);
 
 /** Get a built in, trivial heap based allocator.
  *
- * This function is public and available to end users.
+ * The trivial allocator simply wraps around malloc and free.  It may be called
+ * during the construction of other types, namely pb_buffer instances.
+ *
+ * This function is public and available to authors.
  */
 const struct pb_allocator *pb_get_trivial_allocator(void);
 
@@ -248,7 +249,12 @@ const struct pb_allocator *pb_get_trivial_allocator(void);
 
 
 
-/** A structure used to describe a data region. */
+/* Pre-declare data operations. */
+struct pb_data_operations;
+
+
+
+/** Describes a memory region, as a starting address and length. */
 struct pb_data_vec {
   /** The starting address of the region. */
   uint8_t *base;
@@ -258,20 +264,19 @@ struct pb_data_vec {
 
 
 
-
-
-
-/* Pre-declare operations. */
-struct pb_data_operations;
-
-
-
-/** Indicates the responsibility of a pb_data instance has over its data region.
+/** Indicates the responsibility a pb_data instance has over its memory region.
  *
- * Either owned exclusively by the pb_data instance (pb_data_owned), thus freed
- * when pb_data use count reaches zero, or merely referenced by the pb_data
- * instance (pb_data_referenced), whereby the data region is not freed when the
- * pb_data use_count reaches zero.
+ * owned: the memory region is owned by the pb_data instance, usually because
+ *        the memory region was created when the pb_data instance was created,
+ *        but this may not always be the case.
+ *        When the pb_data instance is destroyed, it is responsible for also
+ *        freeing the memory region.
+ *
+ * referenced: the memory region is merely referenced by the pb_data instance
+ *             as the pb_data instance has no control or even awareness of the
+ *             origins of that memory region.
+ *             When the pb_data instance is detroyed, it will simply NULLify
+ *             the base address pointer.
  */
 enum pb_data_responsibility {
   pb_data_owned,
@@ -280,19 +285,24 @@ enum pb_data_responsibility {
 
 
 
-/** Reference counted structure that represents a memory region.
+/** Reference counted structure that directly represents a memory region.
  *
+ * Authors:
+ * The pb_data object is used internally by pb_buffer classes and occurrences
+ * of pb_data leaking out to the public API should be considered a bug.
+ *
+ * Implementors:
  * Each pb_data instance has a one-to-one relationship to its memory region,
- * whether that region is owned or referenced, and the description of the
- * bounds of the data region, the data_vec member, is immutable and will not
- * change during the lifetime of the pb_data instance.
+ * whether that region is owned or referenced.  The object used as the
+ * descriptor of the bounds of the data region, the data_vec member, is
+ * immutable and will not change during the lifetime of the pb_data instance.
  *
  * Where a pb_data instance owns its memory region, the instance and the
- * region should be created at the same time, with the same allocator,
+ * region are usually created at the same time, with the same allocator,
  * ideally in a factory function (such as pb_trivial_data_create)
- * Where a pb_data instance merely referenced a pre-allocated memory region,
- * an association between the two should be created as soon as possible so
- * that the lifecycle and relevance of the memory region can be tracked by
+ * Where a pb_data instance merely references an externally allocated memory
+ * region, the memory region will exist both before the pb_data instance is
+ * created and after it is destroyed.  The memory region is simply described by
  * the pb_data instance.
  *
  * Instances of pb_data must be created using the create routines below, but
@@ -300,32 +310,34 @@ enum pb_data_responsibility {
  * functions should be used to maintain the use_count of pb_data instances:
  * pb_data_get is to be called by new owners of a pb_data_instance,
  * pb_data_put is to be called when an owner no longer needs a pb_data
- * instance.  When a call to pb_data_put finds a zero use_count it will
- * destroy.
+ * instance.  When a call to pb_data_put finds a zero use_count it must
+ * destroy the instance.
  *
  * Seeing as the pb_data class has such a close relationship with the
  * memory region it references, pb_buffer subclasses that enact particular
  * internal behaviour will find it neccessary to also subclass pb_data.
- * pb_data is indeed fit for this purpose.
  */
 struct pb_data {
-  /** The bounds of the region: base memory address and size (length). Cannot
-   *  be changed after creation.
+  /** The description of the region: base memory address and size (length).
+   *  Cannot be changed after creation of the parent pb_data instance.
    */
   struct pb_data_vec data_vec;
 
   /** Responsibility that the instance has over its memory region. */
   enum pb_data_responsibility responsibility;
 
-  /** Use count, maintained with atomic operations. */
+  /** Use count.  How many pb_page instances reference this data (see later) */
   uint16_t use_count;
 
-  /** Operations for the pb_buffer instance.  Cannot be changed after creation.
-   */
+  /** Operations for the pb_data instance. */
   const struct pb_data_operations *operations;
 
-  /** The allocator used to allocate memory blocks for this struct and its
-   *  owned memory region, in addition to freeing these same blocks.
+  /** The allocator used to allocate memory blocks for this struct and the
+   *  referenced memory region if th responsibility is 'owned'.  The purpose
+   *  of encouraging this consistency is so that not only is the pb_data
+   *  instance destroyed by the allocator that created it, but so is the memory
+   *  region.  Unless a pb_data subclass can find another way to ensure similar
+   *  consistency.
    */
   const struct pb_allocator *allocator;
 };
@@ -342,10 +354,9 @@ struct pb_data_operations {
   /** Decrement the use count of the pb_data instance.
    *
    * Will destroy the instance if the use count becomes zero.
-   * The memory region of the instance will be freed if it is owned by the
-   * instance (see pb_data_responsibility below).
-   * The memory block associated with the pb_data instance itself will be
-   * freed.
+   * The memory region of the instance will be freed if it is 'owned' by the
+   * instance.  The memory block associated with the pb_data instance itself
+   * will be freed.
    */
   void (*put)(struct pb_data * const data);
 };
@@ -356,8 +367,8 @@ struct pb_data_operations {
  *
  * These interfaces should be used to invoke the data operations.
  *
- * However, given that data intances are protected members of buffers, these
- * operations are not intended to be called by end users.
+ * Given pb_data intances are protected members of buffers, these functions
+ * are not intended to be called by authors.
  */
 void pb_data_get(struct pb_data * const data);
 void pb_data_put(struct pb_data * const data);
@@ -365,9 +376,10 @@ void pb_data_put(struct pb_data * const data);
 
 
 /** Functional interfaces for accessing a memory region through the
- *  pb_page class.
+ *  pb_data class.
  *
- * These functions are public and may be called by end users.
+ * Given pb_data intances are protected members of buffers, these functions
+ * are not intended to be called by authors.
  */
 void *pb_data_get_base(const struct pb_data *data);
 void *pb_data_get_base_at(
@@ -376,7 +388,11 @@ size_t pb_data_get_len(const struct pb_data *data);
 
 
 
-/** Get a built in, trivial set of pb_data operations.
+/** The trivial data implementation and its supporting functions.
+ *
+ * The trivial data doesn't need to add anything to the pb_data base structure.
+ *
+ * Below is a built in, trivial set of pb_data operations.
  *
  * This is a protected function and should not be called externally.
  */
@@ -384,10 +400,15 @@ const struct pb_data_operations *pb_get_trivial_data_operations(void);
 
 
 
-/** Factory functions for a trivial implementation of pb_data using trivial
- *  operations.
+/** Factory functions for trivial data, using trivial operations.
  *
  * These are protected functions and should not be called externally.
+ *
+ * The 'create' function creates an instances and an 'owned' memory region of
+ * the given size.
+ *
+ * The 'create_ref' function receives a pointer to a memory region and its size
+ * and creates a pb_data instance that is 'referenced'.
  */
 struct pb_data *pb_trivial_data_create(size_t len,
                                        const struct pb_allocator *allocator);
@@ -410,38 +431,66 @@ void pb_trivial_data_put(struct pb_data * const data);
 
 
 
-/** Non-exclusive owner of a pb_data instance, maintaining a modifiable
- *  reference to the pb_data memory region.
+/** Non-exclusive owner of a pb_data instance, holding a modifiable reference
+ *  to the memory region.
  *
- * This class embodies the consumption of the memory region referenced by the
- * member pb_data instance.  A pb_page instance holds a use_count reference
- * against its pb_data instance member, thus influencing its lifecycle.
- * The data_vec of the pb_page is initialised as a (non-proper) subset of the
- * data_vec of the pb_data, depending what the context of the pb_page
- * initialisation and data usage patterns in the running application.
- * The pb_page data_vec will always reside inside the pb_data data vec, in
- * terms of both base position and length (from the base position).  Any
- * deviation from this is an error.
+ * The pb_page structure is used by buffers to represent a portion of a memory
+ * region.  Buffers internally will maintain an ordered list of these pb_page
+ * structures and the entirety if this list represents the data contained in
+ * the buffer.
  *
- * There is a many-to-one relationship between pb_page instances and pb_data
- * instances in some types of pb_buffer.  Each pb_page holds a use_count
- * reference on the same pb_data, collectively influencing its lifecyle.
+ * There being multiple pages in the buffer represents the notion of the
+ * fragmentation of the buffers' view of that data, either because of the
+ * configuration of the buffer or because of the pattern that data is written
+ * into the buffer (or both).
  *
- * There is a one-to-one relationship between pb_buffer instances and
- * pb_page instances.  pb_pages instances will never travel outside a
- * pb_buffer and the pb_buffer will maintain full control of the lifecycle of
- * its own pages, by means of the allocator associated with the pb_buffer.
- * pb_page therefore does not required reference counting, nor is it
- * required to retain its allocator.
- * pb_data refererenced by a pb_buffer through a pb_page may be passed from
- * one pb_buffer to another, depending on the behaviour built into the target
- * pb_buffer.
+ * A pb_page instance will always remain inside its parent buffer.  It will be
+ * consumed or manipulated in response to requests to consome or manipulate the
+ * data in the buffer.  The pb_page is a 'dumb' object, meaning there is no
+ * scope to subclass it for the purpose of implementing a new class of buffer.
+ * If an author wishes to create a new buffer class, they should explore
+ * subclassing the pb_allocator, pb_data and pb_buffer itself, but the role and
+ * implementation of pb_page must remain generic.
  *
- * The pb_page class is thoroughly lightweight and internal to pb_buffer so
- * it should never be subclassed to provide buffer class specific behaviour.
+ * While a pb_data instance represents an unchanging, direct, reference to a
+ * memory region and also closely models that memory region's lifecycle, the
+ * pb_page object represents the opposite:
+ *
+ * pb_data, while maintaining a description of the same memory region, may
+ * change that description, and the lifecycle of the pb_page is only indirectly
+ * tied to that of the pb_data instance and the memory region.
+ *
+ * Although pb_page will only every reference one pb_data and memory region,
+ * and will never adjust the pb_data description of the memory region, it can
+ * adjust it's own.  However, the pb_page description of the memory region will
+ * always reside within the pb_data's description of the same region.  This
+ * means the pb_page description will be either equal too or strictly a
+ * subset of the pb_data description, in regard to both value of the base
+ * address and the length:
+ *
+ * data.base <= page.base + page.len < data.base + data.len
+ *
+ * A pb_page is either initialised with a new pb_data instance, in the case
+ * where a buffer is extended to grow its capacity.  In the case of a write
+ * from one buffer to another, depending on the target buffers' internal
+ * implementation, the properties of the pb_page of the source buffer will be
+ * copied into a new pb_page of the target buffer, but the pb_data from the
+ * source pb_page will actually be shared between the two pb_pages and the
+ * two buffers.  This is the notion of zero copy, where writes don't cause the
+ * data to be copied, instead, a second reference to the same data is created.
+ *
+ * When a pb_page instance is initialised with either a new pb_data or an
+ * existing one, the pb_page will will increment the reference count of the
+ * pb_data instance using the pb_data_get function.  This will ensure the
+ * pb_data instance says alive for as long as the pb_page instance is alive.
+ * When the pb_page instance reaches the end of its lifecycle and is destroyed,
+ * the reference count to the pb_data will be decremented using the pb_data_get
+ * function.  Only when the pb_data reference count reaches zero, meaning all
+ * pb_page instances referencing the pb_data are destroyed, will the pb_data
+ * itself be destroyed.
  */
 struct pb_page {
-  /** The offset into the referenced region, and the length of the reference */
+  /** The description of the referenced pb_data memory region description. */
   struct pb_data_vec data_vec;
 
   /** The reference to the pb_data instance. */
@@ -457,19 +506,19 @@ struct pb_page {
 
 /** Create a pb_page instance.
  *
- * This is a protected function and should not be called externally.
- *
  * The pb_data instance has its use count incremented.
+ *
+ * This is a protected function and should not be called externally.
  */
 struct pb_page *pb_page_create(struct pb_data *data,
                                const struct pb_allocator *allocator);
 
 /** Create a pb_page using properties of another.
  *
- * This is a protected function and should not be called externally.
- *
  * The new pb_page instance will duplicate the base and len values of the
  * source page, and reference pb_data instance of the source page.
+ *
+ * This is a protected function and should not be called externally.
  */
 struct pb_page *pb_page_transfer(const struct pb_page *src_page,
                                  size_t len, size_t src_off,
@@ -477,9 +526,9 @@ struct pb_page *pb_page_transfer(const struct pb_page *src_page,
 
 /** Destroy a pb_page instance.
  *
- * This is a protected function and should not be called externally.
- *
  * The pb_data instance will be de-referenced once.
+ *
+ * This is a protected function and should not be called externally.
  */
 void pb_page_destroy(struct pb_page *page,
                      const struct pb_allocator *allocator);
@@ -492,10 +541,9 @@ void pb_page_set_data(struct pb_page * const page,
 
 
 
-/** Functional interfaces for accessing a memory region through the
- *  pb_page class.
+/** Functional interfaces for accessing a memory region through pb_page.
  *
- * These functions are public and may be called by end users.
+ * These functions are public and may be called by authors.
  */
 void *pb_page_get_base(const struct pb_page *page);
 void *pb_page_get_base_at(
@@ -519,20 +567,26 @@ struct pb_buffer_operations;
  * functionality of the library and is the primary interface for accessing
  * this functionality.
  *
- * The base pb_buffer only references high level structures that are
- * fundamental to the identity and operation a buffer.
+ * The pb_buffer represents data, that the author has written in, or wishes
+ * to read out.  The pb_buffer is FIFO in terms of data and will preserve the
+ * order of data read out.
+ *
+ * The pb_buffer itself is a base class that merely provides a framework for
+ * concrete implementations.  Implementations will opaquely manage the handling
+ * of data written in, the storage of that data, then the retrieval of data as
+ * it is read out.
+ *
  */
 struct pb_buffer {
-  /** The description of the core behaviour of the buffer.  May or may not be
-   *  variable between buffer instances, depending on the specific buffer
-   *  class, however in all cases, these behaviours are not expected nor should
-   *  be permitted to change after a buffer instance is created.
+  /** The description of the core behaviour of the buffer.  These strategy
+   *  flags should be constant for the lifetime of a pb_buffer instance.
    */
   const struct pb_buffer_strategy *strategy;
 
   /** The structure describing the concrete implementation of the buffer
-   *  functions.  Immutable and identical for all instances of same buffer
-   *  classes.
+   *  functions.  These should not only be constant for the lifetime of the
+   *  buffer instance, they should be immutable and identical for all instances
+   *  of same buffer classes.
    */
   const struct pb_buffer_operations *operations;
 
@@ -545,10 +599,67 @@ struct pb_buffer {
 
 
 
-/** A structure used to iterate over memory regions in a pb_buffer.
+
+
+/** A structure used to sequentially access data regions in a pb_buffer.
  *
- * The iterator may point to either regions of data inside the buffer, or it
- * may point to a special 'end' region, that indicates the end of the buffer.
+ * Iterators provide an interface to traverse the pages contained within a
+ * pb_buffer.
+ *
+ * Because pb_buffer subtypes may vary in how they split their data into pages,
+ * the iterator is used as a token for page traversal and access to data.
+ *
+ * Iterators are initialised and manipulated using buffer operations, meaning
+ * the implementation of their functions are buffer subclass specific, thus
+ * allowing authors to tailor iterator operations to suit their pb_buffer
+ * subclasses' internal data arrangement.
+ *
+ * Iterators act similarly to container iterators in C++:
+ * - When initialised to the start of a non-empty pb_buffer instance, using the
+ *   buffer operation:
+ *     pb_buffer_get_iterator,
+ *   then the iterator will point to a pb_data_vec refererence to the first
+ *   data in that buffer.  The functions:
+ *     pb_buffer_iterator_get_base and
+ *     pb_buffer_iterator_get_len
+ *   can be used to access the vector values.
+ *
+ * - When initialised to the start of an empty pb_buffer instance, or as the
+ *   end of the pb_buffer using the buffer operation:
+ *     pb_buffer_get_end_iterator,
+ *   the pb_data_vec reference will be to a special 'end' data reference.
+ *   This 'end' iterator value will cause the buffer operation:
+ *     pb_buffer_is_end_iterator
+ *   to return true.
+ *
+ * - To advance through the pages of a pb_buffer, execute the following buffer
+ *   operation on an initialised, non-'end' iterator:
+ *     pb_buffer_next_iterator
+ *   If the previously referenced buffer page was the last in the pb_buffer
+ *   instances sequence, the iterator will now point to the 'end' data
+ *   reference and the buffer operation:
+ *     pb_buffer_is_end_iterator
+ *   will now return true, and forward iteration should go no further.
+ *   It is not advised to call:
+ *     pb_buffer_next_iterator
+ *   on the 'end' reference, as the result may be an invalid iterator,
+ *   depending on the implementation of the pb_buffer subclass.
+ *
+ * - To reverse through the pages of a pb_buffer, execute the following buffer
+ *   operation on an initialised, non-'end' iterator:
+ *     pb_buffer_prev_iterator
+ *   If the previously referenced buffer page was the first in the pb_buffer
+ *   instances sequence, the iterator will now point to the 'end' data
+ *   reference and the buffer operation:
+ *     pb_buffer_is_end_iterator
+ *   will now return true and reverse iteration should go no further.
+ *   It is not advised to call:
+ *     pb_buffer_prev_iterator
+ *   on the 'end' reference, as the result may be an invalid iterator,
+ *   depending on the implementation of the pb_buffer subclass.
+ * 
+ * Implementors who create new subclasses of pb_buffer should make sure their
+ * implementations obey the above behaviour.
  */
 struct pb_buffer_iterator {
   struct pb_data_vec *data_vec;
@@ -571,8 +682,24 @@ size_t pb_buffer_iterator_get_len(
 
 
 
-/** A structure used to iterate over memory regions in a pb_buffer,
- *  one byte at a time. */
+
+
+
+/** A structure used to sequentially access data regions in a pb_buffer,
+ *  one byte at a time.
+ *
+ * The semantics of initialisation and manipulation of a byte iterator is
+ * the same as iterators:
+ * - Operations:
+ *     pb_buffer_get_byte_iterator
+ *     pb_buffer_get_end_byte_iterator
+ *     pb_buffer_is_end_byte_iterator
+ *     pb_buffer_next_byte_iterator
+ *     pb_buffer_prev_byte_iterator
+ *
+ * - To access the byte currently referenced by the iterator:
+ *     pb_buffer_byte_iterator_get_current_byte
+ * */
 struct pb_buffer_byte_iterator {
   struct pb_buffer_iterator buffer_iterator;
 
@@ -593,6 +720,9 @@ char pb_buffer_byte_iterator_get_current_byte(
 
 
 
+
+
+
 /** The default size of pb_buffer memory regions. */
 #define PB_BUFFER_DEFAULT_PAGE_SIZE                       4096
 /** The hard maximum size of automatically sized memory regions. */
@@ -602,9 +732,19 @@ char pb_buffer_byte_iterator_get_current_byte(
 
 /** A structure that describes the internal strategy of a pb_buffer.
  *
- * A buffer strategy describes properties, such as page_size, and also
- * describes ways that a buffer will carry out actions such as writing of data
- * and management of memory regions.
+ * A buffer strategy describes of a pb_buffer instance (or class), the
+ * property of: page_size
+ *
+ * A buffer strategy also describes how a pb_buffer subclass will behave during
+ * specific internal operations.  These behaviours can be categorised as:
+ * - Data Treatment: how data written into the buffer is treated, which may
+ *   be for the purpose of preserving specific arrangements of data inside the
+ *   pb_buffer subclass, or data treatment may reflect some aspect of the
+ *   specific implementation of the pb_buffer subclass.
+ *
+ * - Feature: control specific operations on bufferred data.  These flags are
+ *   usually artefacts of specific pb_buffer subclass backends, that due to
+ *   their nature, may or may not support some operations.
  *
  * Some buffer classes may accept strategies as parameters to their factory
  * methods or constructors, in which case behaviour may be tuned on an instance
@@ -614,6 +754,11 @@ char pb_buffer_byte_iterator_get_current_byte(
  * Once a strategy is implanted in a pb_buffer instance (its values are copied
  * into the pb_buffer instance), then these strategy values will not be changed
  * internally and certainly shouldnt be changed externally.
+ *
+ * Implementors who create new subclasses of pb_buffer should restrict or disable
+ * access to their subclasses' buffer strategy as necessary, because the
+ * strategy not only informs the implementation on how it should behave, it
+ * also informs Authors on how implementations will behave.
  */
 struct pb_buffer_strategy {
   /** The size of memory regions that the pb_buffer will internally dynamically
@@ -629,32 +774,48 @@ struct pb_buffer_strategy {
    */
   size_t page_size;
 
-  /** Indicates whether data written into the buffer (from another buffer) is
-   *  to be referenced or copied.
+  /** Data Treatment Flags: how data is to be treated as it is written into the
+   *  buffer.
+   */
+
+  /** clone_on_write: indicates whether data written into the buffer (from
+   *  another buffer) is to be referenced or copied.
    *
-   * Available behaviours:
-   * not cloned (false):reference to the pb_data instance is incremented.
+   * Supported behaviours:
+   * false(not cloned): data is moved between the source and target buffer by
+   *                    transferring page data, and incrementing pb_data
+   *                    reference counts.
    *
-   * cloned     (true): new pb_data instance created and memory regions copied.
+   * true     (cloned): data is moved between the source and target buffer by
+   *                    copying: a new buffer page is created with a new memory
+   *                    region, and the contents of the source memory region is
+   *                    copied to the new data region.
    */
   bool clone_on_write;
 
-  /** Indicates how data written to the pb_buffer will be fragmented.
+  /** fragment_as_target: indicates how data written to the pb_buffer will be
+   *  fragmented.
    *
-   * Available behaviours:
-   * as source (false): source data fragmentation takes precedence.
+   * Supported behaviours:
+   * false (as source): source data fragmentation takes precedence
    *
    *                    clone_on_write (false):
-   *                    When clone_on_write is false, source pages are
-   *                    moved to the target as is and pb_data references are
-   *                    incremented.
+   *                    When clone_on_write is false, pages from the source
+   *                    buffer are moved to the target buffer status quo,
+   *                    without being fragmented further, unless the size of a
+   *                    source page exceeds the page_size of the target, in
+   *                    which case it is split into multiple pages in the
+   *                    target, albeit each referencing different parts of the
+   *                    same pb_data instance.
    *
    *                    clone_on_write (true):
-   *                    When clone_on_write is true, source pages are
-   *                    fragmented according to the lower of the source
-   *                    page size and the target page_size.
+   *                    When clone_on_write is true, data is copied between the
+   *                    source and target buffers, with the fragmentation of
+   *                    the new target pages matching that of the source pages,
+   *                    unless the source page size exceeds the target buffer
+   *                    page_size.
    *
-   * as target  (true): target pb_buffer page_size takes precedence.
+   * true  (as target): target pb_buffer page_size takes precedence:
    *
    *                    clone_on_write (false):
    *                    When clone_on_write is false, source pages that
@@ -668,7 +829,7 @@ struct pb_buffer_strategy {
    */
   bool fragment_as_target;
 
-  /** Alteration flags: control access to functions that alter the state of
+  /** Feature Flags: control access to functions that alter the state of
    *  the buffer.
    */
 
@@ -762,16 +923,17 @@ struct pb_buffer_operations {
    * The data revision is a counter that is increased every time that data
    * already inside the buffer is modified.
    *
-   * Operations that cause a change in data revision include:
-   * seeking, rewinding, trimming, inserting, overwriting
-   *
-   * Operations that don't cause a change in data revision include:
-   * expanding, writing to the end of the buffer, reading
-   *
    * External readers such as line readers can use changes in this value to
    * determine whether their view on the buffer data is still relevant, thus
    * allowing them to keep reading, or whether their data view is invalidated
-   * thus requiring them to restart.
+   * thus requiring them to reset or invalidate (immediately go to the end).
+   *
+   * Operations that cause a change in data revision in trivial buffers are:
+   * seek, rewind, trimm, insert, overwrite
+   *
+   * Operations that don't cause a change in data revision in trivial buffers
+   * are:
+   * expand, write (to the end of the buffer), read, iteration.
    */
   uint64_t (*get_data_revision)(struct pb_buffer * const buffer);
   /** Increment the data revision.
@@ -781,53 +943,38 @@ struct pb_buffer_operations {
   void (*increment_data_revision)(
                                 struct pb_buffer * const buffer);
 
-  /** Return the amount of data in the buffer, in bytes. */
+  /** Return the amount of data in the buffer, in bytes.
+   */
   uint64_t (*get_data_size)(struct pb_buffer * const buffer);
 
 
-  /** Initialise an iterator to point to the first data in the buffer, or
+  /** Initialise an iterator to point to the first page in the buffer, or
    *  to the 'end' page if the buffer is empty.
-   *
-   * The iterator parameter is best to be a pointer to a stack object.
    */
   void (*get_iterator)(struct pb_buffer * const buffer,
                        struct pb_buffer_iterator * const buffer_iterator);
-  /** Initialise an iterator to point to the 'end' of the buffer.
-   *
-   * The iterator parameter is best to be a pointer to a stack object.
+  /** Initialise an iterator to point to the 'end' page of the buffer.
    */
   void (*get_end_iterator)(struct pb_buffer * const buffer,
                            struct pb_buffer_iterator * const buffer_iterator);
 
   /** Indicates whether an iterator is currently pointing to the 'end' of
    *  a buffer or not.
-   *
-   * The iterator passed to this function must be initialised using one of the
-   * get_iterator* functions above.
    */
   bool (*is_end_iterator)(struct pb_buffer * const buffer,
                           const struct pb_buffer_iterator *buffer_iterator);
   /** Compare two iterators and indicate whether they are equal where equal is
    *  defined as pointing to the same page in the same buffer.
-   *
-   * The iterators passed to this function must be initialised using one of the
-   * get_iterator* functions above.
    */
   bool (*cmp_iterator)(struct pb_buffer * const buffer,
                        const struct pb_buffer_iterator *lvalue,
                        const struct pb_buffer_iterator *rvalue);
 
   /** Moves an iterator to the next page in the data sequence.
-   *
-   * The iterator passed to this function must be initialised using one of the
-   * get_iterator* functions above.
    */
   void (*next_iterator)(struct pb_buffer * const buffer,
                         struct pb_buffer_iterator * const buffer_iterator);
   /** Moves an iterator to the previous page in the data sequence.
-   *
-   * The iterator passed to this function must be initialised using one of the
-   * get_iterator* functions above.
    */
   void (*prev_iterator)(struct pb_buffer * const buffer,
                         struct pb_buffer_iterator * const buffer_iterator);
@@ -835,15 +982,11 @@ struct pb_buffer_operations {
 
   /** Initialise a byte iterator to the first byte of the first page in the
    *  buffer, or to the 'end' byte if the buffer is empty.
-   *
-   * The iterator parameter is best to be a pointer to a stack object.
    */
   void (*get_byte_iterator)(struct pb_buffer * const buffer,
                             struct pb_buffer_byte_iterator * const
                               buffer_byte_iterator);
   /** Initialise a byte iterator to the 'end' of the pb_buffer instance data.
-   *
-   * The iterator parameter is best to be a pointer to a stack object.
    */
   void (*get_end_byte_iterator)(struct pb_buffer * const buffer,
                                 struct pb_buffer_byte_iterator * const
@@ -851,9 +994,6 @@ struct pb_buffer_operations {
 
   /** Indicates whether a byte iterator is currently pointing to the 'end' of
    *  a buffer or not.
-   *
-   * The iterator passed to this function must be initialised using one of the
-   * get_byte_iterator* functions above.
    */
   bool (*is_end_byte_iterator)(struct pb_buffer * const buffer,
                                struct pb_buffer_byte_iterator * const
@@ -861,26 +1001,17 @@ struct pb_buffer_operations {
   /** Compare two byte iterators and indicate whether they are equal where
    *  equal is defined as pointing to the same byte in the same page in the
    *  same buffer.
-   *
-   * The iterators passed to this function must be initialised using one of the
-   * get_byte_iterator* functions above.
    */
   bool (*cmp_byte_iterator)(struct pb_buffer * const buffer,
                             const struct pb_buffer_byte_iterator *lvalue,
                             const struct pb_buffer_byte_iterator *rvalue);
 
   /** Moves a byte iterator to the next byte in the data sequence.
-   *
-   * The iterator passed to this function must be initialised using one of the
-   * get_byte_iterator* functions above.
    */
   void (*next_byte_iterator)(struct pb_buffer * const buffer,
                              struct pb_buffer_byte_iterator * const
                                buffer_byte_iterator);
   /** Moves a byte iterator to the previous byte in the data sequence.
-   *
-   * The iterator passed to this function must be initialised using one of the
-   * get_byte_iterator* functions above.
    */
   void (*prev_byte_iterator)(struct pb_buffer * const buffer,
                              struct pb_buffer_byte_iterator * const
@@ -889,23 +1020,24 @@ struct pb_buffer_operations {
 
   /** Insert a pb_page instance into the pb_buffer.
    *
-   * This is a protected function and should not be called externally.
+   * buffer_iterator: the position in the buffer: page and page offset, before
+   *                  which the new page will be inserted.
    *
-   * buffer_iterator: the position in the buffer, before which or into which
-   *                  the page will be inserted.
    * offset: the position within the iterator page, before which the page will
    *         be inserted.
    *
    * page: the new page to insert into the buffer.  This page is created
    *       elsewhere within the buffer, using the buffers allocator.
    *
-   * If the offset is zero, the page will be inserted in front of the iterator
-   * page.  If the offset is non-zero, the iterator page will be split into
-   * two sub-pages at the point of the offset, and the page will be inserted
-   * between them.
+   * If the iterator offset is zero, the new page will be inserted in front of
+   * the iterator page.  If the offset is non-zero, the iterator page will be
+   * split into two sub-pages at the point of the offset, and the new page will
+   * be inserted between them.
    *
    * The return value is the amount of data successfully inserted into the
    * buffer.
+   *
+   * This is a protected function and should not be called externally.
    */
   uint64_t (*insert)(
                    struct pb_buffer * const buffer,
@@ -915,9 +1047,6 @@ struct pb_buffer_operations {
   /** Increase the size of the buffer by adding data to the end.
    *
    * len: the amount of data to add in bytes.
-   *
-   * Depending on the buffer implementation details, the extended data may be
-   * comprised of multiple pages.
    *
    * The return value is the amount of capacity successfully added to the
    * buffer.
@@ -929,13 +1058,10 @@ struct pb_buffer_operations {
    *
    * size: the minimum size of the buffer.
    *
-   * If the current size of the buffer is less than the requested mimimum
-   * size, then the buffer will be extended to meet that size.
-   * If the current size of the buffer is greater than the requested minimum
-   * size, then the buffer will remain unchanged.
-   *
-   * Depending on the buffer implementation details, the extended data may be
-   * comprised of multiple pages.
+   * If the current size of the buffer is less than the requested size, then
+   * the buffer will be extended to meet that size.
+   * If the current size of the buffer is greater than the requested size, then
+   * the buffer will remain unchanged.
    *
    * The return value is the amount of capacity successfully added to the
    * buffer.
@@ -947,21 +1073,18 @@ struct pb_buffer_operations {
    *
    * len: the amount of data to add in bytes.
    *
-   * Depending on the buffer implementation details, the rewound data may be
-   * comprised of multiple pages.
-   *
    * The return value is the amount of data successfully added to the buffer.
    */
   uint64_t (*rewind)(
                    struct pb_buffer * const buffer,
                    uint64_t len);
-  /** Seek the starting point of the buffer data.
+  /** Seek the starting point of the buffer.
    *
    * len: the amount of data to seek in bytes.
    *
-   * Depending on the buffer implementation details, the seek operation may
-   * zero one or more pages in the buffer, causing those pages to be freed,
-   * and their corresponding data pages to have their use count decremented.
+   * The seek operation may cause one or more pages at the begining of the
+   * buffer to be released, causing those pages to be freed and the
+   * corresponding data pages to have their reference count decremented.
    *
    * The return value is the amount of data successfully seeked in the buffer.
    */
@@ -971,9 +1094,9 @@ struct pb_buffer_operations {
    *
    * len: the amount of data to seek in bytes.
    *
-   * Depending on the buffer implementation details, the trim operation may
-   * zero one or more pages in the buffer, causing those pages to be freed,
-   * and their corresponding data pages to have their use count decremented.
+   * The trim operation may cause one or more pages at the end of the buffer to
+   * be released, causing those pages to be freed and their corresponding data
+   * pages to have their reference count decremented.
    *
    * The return value is the amount of data successfully trimmed from the
    * buffer.
@@ -984,11 +1107,14 @@ struct pb_buffer_operations {
 
   /** Insert data from a memory region to the buffer.
    *
-   * buffer_iterator: the position in the buffer, before which or into which
-   *                  the data will be inserted.
+   * buffer_iterator: the page in the buffer, before or into which the data
+   *                  will be inserted.
+   *
    * offset: the position within the iterator page, before which the data will
    *         be inserted.
+   *
    * buf: the start of the source memory region.
+   *
    * len: the amount of data to insert in bytes.
    *
    * If the offset is zero, the data will be inserted in front of the iterator
@@ -1006,11 +1132,14 @@ struct pb_buffer_operations {
                           uint64_t len);
   /** Insert data from a memory region to the buffer, referencing only.
    *
-   * buffer_iterator: the position in the buffer, before which or into which
-   *                  the data will be inserted.
+   * buffer_iterator: the page in the buffer, before or into which the data
+   *                  will be inserted.
+   *
    * offset: the position within the iterator page, before which the data will
    *         be inserted.
+   *
    * buf: the start of the source memory region.
+   *
    * len: the amount of data to write in bytes.
    *
    * If the offset is zero, the data will be inserted in front of the iterator
@@ -1028,12 +1157,15 @@ struct pb_buffer_operations {
                               uint64_t len);
   /** Insert data from a source buffer to the buffer.
    *
-   * buffer_iterator: the position in the buffer, before which or into which
-   *                  the data will be inserted.
+   * buffer_iterator: the page in the buffer, before or into which the data
+   *                  will be inserted.
+   *
    * offset: the position within the iterator page, before which the data will
    *         be inserted.
+   *
    * src_buffer: the buffer to write from.  This pb_buffer instance will not
    *             have its data modified.
+   *
    * len: the amount of data to write in bytes.
    *
    * If the offset is zero, the data will be inserted in front of the iterator
@@ -1054,6 +1186,7 @@ struct pb_buffer_operations {
   /** Write data from a memory region to the buffer.
    *
    * buf: the start of the source memory region.
+   *
    * len: the amount of data to write in bytes.
    *
    * Data will be appended to the end of the buffer.
@@ -1067,6 +1200,7 @@ struct pb_buffer_operations {
   /** Write data from memory region to the buffer, referencing only.
    *
    * buf: the start of the source memory region.
+   *
    * len: the amount of data to write in bytes.
    *
    * Data will be appended to the end of the buffer.
@@ -1081,6 +1215,7 @@ struct pb_buffer_operations {
    *
    * src_buffer: the buffer to write from.  This pb_buffer instance will not
    *             have its data modified.
+   *
    * len: the amount of data to insert in bytes.
    *
    * Data will be appended to the end of the buffer.
@@ -1096,6 +1231,7 @@ struct pb_buffer_operations {
   /** Overwrite the head of a buffer with data from a memory region.
    *
    * buf: the start of the source memory region.
+   *
    * len: the amount of data to write in bytes.
    *
    * Data is written to the head of the buffer, overwriting existing data.
@@ -1112,6 +1248,7 @@ struct pb_buffer_operations {
    *
    * src_buffer: the buffer to write from.  This pb_buffer instance will not
    *             have its data modified.
+   *
    * len: the amount of data to write in bytes.
    *
    * Data is written to the head of the buffer, overwriting existing data.
@@ -1129,6 +1266,7 @@ struct pb_buffer_operations {
   /** Read data from the head of a buffer to a memory region.
    *
    * buf: the start of the target memory region.
+   *
    * len: the amount of data to read in bytes.
    *
    * Data is read from the head of the buffer.  The amount of data read is the
@@ -1160,7 +1298,7 @@ struct pb_buffer_operations {
 
 /** Functional interfaces for the generic pb_buffer class.
  *
- * These functions are public and may be called by end users.
+ * These functions are public and are intended to be called by end users.
  */
 uint64_t pb_buffer_get_data_revision(struct pb_buffer * const buffer);
 
@@ -1275,13 +1413,17 @@ void pb_buffer_destroy(
 
 
 
+
+
+
 /** The trivial buffer implementation and its supporting functions.
  *
  * The trivial buffer is a reference implementation of pb_buffer.
  *
- * It defines a classic strategy and operations structure and uses this when
- * the user does not specifiy their own.  However, all permutations of
- * strategy settings are supported internally by the trivial buffer.
+ * Because the trivial buffer uses heap based memory allocations (by default),
+ * and defines operations that support all strategy options, it is maximally
+ * flexible, meaning authors can tweak any of the strategy parameters when
+ * creating a trivial buffer instance.
  */
 struct pb_trivial_buffer {
   struct pb_buffer buffer;
@@ -1296,15 +1438,22 @@ struct pb_trivial_buffer {
 
 /** Get a trivial buffer strategy.
  *
- * page_size is 4096
+ * This default, immutable, buffer strategy for trivial buffer is flexible and
+ * efficient: allowing zero copy transfers, minimal fragmentation of transfers,
+ * and allowing insertion operations.  The trivial buffer was designed with
+ * TCP networked systems, using non-blocking IO, in mind, where data read from
+ * sockets can be highly fragmented, and parsing and splitting of network
+ * data can be intensive.
  *
- * clone_on_write is false: zero copy transfer of data from other buffers
+ * page_size: 4096
  *
- * fragment_as_source is false: fragments written from other buffers or memory
- *                              regions are not additionally fragmented within
- *                              the 4k page limit
+ * clone_on_write: false: zero copy transfer of data from other buffers
  *
- * rejects_insert is false: inserts into the middle of the buffer are allowed.
+ * fragment_as_source: false: fragments written from other buffers or memory
+ *                            regions are not additionally fragmented within
+ *                            the 4k page limit
+ *
+ * rejects_insert: false: inserts into the middle of the buffer are allowed.
  */
 const struct pb_buffer_strategy *pb_get_trivial_buffer_strategy(void);
 
@@ -1318,10 +1467,12 @@ const struct pb_buffer_operations *pb_get_trivial_buffer_operations(void);
 
 
 
-/** Factory functions producing trivial pb_buffer instances.
+/** Factory functions producing trivial pb_trivial_buffer instances.
  *
- * Users may use either default, trivial strategy and allocator, or supply
- * their own.
+ * Users may use either use the default trivial strategy and/or trivial
+ * allocator, or supply their own.
+ *
+ * The instances are returned as a pointer to the embedded pb_buffer struct.
  */
 struct pb_buffer *pb_trivial_buffer_create(void);
 struct pb_buffer *pb_trivial_buffer_create_with_strategy(
@@ -1504,16 +1655,21 @@ struct pb_data_reader_operations;
 
 
 
-/** An interface for reading data from a pb_buffer.
+/** An interface for reading data from a buffer.
  *
  * The data reader attaches to a pb_buffer instance and provides an interface
- * for performing continuous reads from that buffer.  The reader keeps track
- * of its last read position in the buffer as it completes one read and
- * allows the user to continue reads from that same point in the next read.
+ * for performing sequential reads from that buffer.  The data reader keeps
+ * track of its last read position in the buffer as it completes a read and
+ * allows the user to continue from that same point in the next read.
+ *
+ * When a data reader is initialised, or reset, it will be set back to the
+ * beginning of the buffer that it observes.
  */
 struct pb_data_reader {
+  /** The structure storing the operations of the data reader. */
   const struct pb_data_reader_operations *operations;
 
+  /** The buffer instance that is being operated on by the data reader. */
   struct pb_buffer *buffer;
 };
 
@@ -1526,6 +1682,7 @@ struct pb_data_reader_operations {
   /** Read data from the pb_buffer instance, into a memory region.
    *
    * buf: the start of the target memory region.
+   *
    * len: the amount of data to read in bytes.
    *
    * Data is read from the head of the buffer.  The amount of data read is the
@@ -1535,9 +1692,9 @@ struct pb_data_reader_operations {
    * end of the read, thus, a subsequent call to read will continue from
    * where the last read finished.
    *
-   * However, if the buffer undergoes an operation that alters its data
-   * revision, a subsequent call to read on the data reader will read from the
-   * beginning of the buffer.
+   * However, in the meantime, if the buffer undergoes an operation that alters
+   * its data revision, the subsequent call to read on the data reader will
+   * read from the beginning of the buffer.
    *
    * The return value is the amount of data successfully read from the buffer.
    */
@@ -1547,6 +1704,7 @@ struct pb_data_reader_operations {
   /** Consume data from the pb_buffer instance, into a memory region.
    *
    * buf: the start of the target memory region.
+   *
    * len: the amount of data to consume in bytes.
    *
    * Data is consumed from the head of the buffer.  The amount of data
@@ -1557,11 +1715,8 @@ struct pb_data_reader_operations {
    * A subsequent call to read or consume will continue from where the last
    * consume finished.
    *
-   * However, if the buffer undergoes an operation that alters its data
-   * revision, a subsequent call to read on the data reader will read from the
-   * beginning of the buffer.
-   *
-   * The return value is the amount of data successfully read from the buffer.
+   * The return value is the amount of data successfully consumed from the
+   * buffer.
    */
   uint64_t (*consume)(
                   struct pb_data_reader * const data_reader,
@@ -1665,9 +1820,9 @@ struct pb_line_reader_operations;
  * The line reader will use the subject buffers' data revision to monitor the
  * state of the buffer data, which means that a search that previously failed
  * to find a line end can be continued at the same point whe nnew data is
- * wriitten to the end of the buffer.  However, modifications to the buffer
- * that cause the data revision to be updated will invalidate the line search
- * and require the line reader to re-start at the begining of the buffer.
+ * wriitten to the end of the buffer however, modifications to the buffer that
+ * cause the data revision to be updated will invalidate the line search and
+ * require the line reader to re-start at the begining of the buffer.
  */
 struct pb_line_reader {
   const struct pb_line_reader_operations *operations;
@@ -1711,13 +1866,14 @@ struct pb_line_reader_operations {
    * If the has_line function has been previously called and retuned true,
    * then this function will return the length of the line that was
    * discovered.
-   * If no line was discovered or has_line was never called, zero will be
-   * returned.
+   * If no line was discovered or has_line was never called or has_line was
+   * called but returned false, this function will return zero.
    */
   size_t (*get_line_len)(struct pb_line_reader * const line_reader);
   /** Read data from the discovered line into a memory region.
    *
    * buf: the start of the target memory region.
+   *
    * len: the amount of data to read in bytes.
    *
    * Data is read from the head of the buffer.  The amount of data read is the
