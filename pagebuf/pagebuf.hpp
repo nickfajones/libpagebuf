@@ -467,7 +467,7 @@ class data_reader {
     }
 
     explicit data_reader(buffer& buf) :
-        data_reader_(pb_trivial_data_reader_create(buf.buffer_)) {
+        data_reader_(pb_data_reader_create(buf.buffer_)) {
     }
 
     data_reader(data_reader&& rvalue) :
@@ -544,7 +544,7 @@ class line_reader {
     }
 
     explicit line_reader(buffer& buf) :
-        line_reader_(pb_trivial_line_reader_create(buf.buffer_)),
+        line_reader_(pb_line_reader_create(buf.buffer_)),
         has_line_(false) {
     }
 
