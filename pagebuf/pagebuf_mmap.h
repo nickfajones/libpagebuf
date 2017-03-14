@@ -19,6 +19,7 @@
 
 
 #include <pagebuf/pagebuf.h>
+#include <pagebuf/pagebuf_protected.h>
 
 
 #ifdef __cplusplus

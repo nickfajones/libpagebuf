@@ -1,4 +1,5 @@
 - Inline Documentation
+- data.base <= page.base + page.len <= data.base + data.len
 - Copy On Write for buffer pages, with last-reference checking operation part of data_operations
 - Unity between strategy (particularly rejects_insert(false), and allocators or let allocators dictate insertion
 - Consider renaming pb_allocator_type

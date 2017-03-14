@@ -17,6 +17,7 @@
  ******************************************************************************/
 
 #include "pagebuf.h"
+#include "pagebuf_protected.h"
 
 #include <errno.h>
 #include <assert.h>
