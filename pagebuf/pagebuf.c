@@ -38,33 +38,16 @@ void pb_allocator_free(const struct pb_allocator *allocator,
   allocator->operations->free(allocator, type, obj, size);
 }
 
-/*******************************************************************************
- */
-static void *pb_trivial_alloc(const struct pb_allocator *allocator,
-    enum pb_allocator_type type, size_t size) {
-  void *obj = malloc(size);
-  if (!obj)
-    return NULL;
 
-  if (type == pb_alloc_type_struct)
-    memset(obj, 0, size);
 
-  return obj;
-}
 
-static void pb_trivial_free(const struct pb_allocator *allocator,
-    enum pb_allocator_type type, void *obj, size_t size) {
-  memset(obj, 0, size);
-
-  free(obj);
-}
 
 
 /*******************************************************************************
  */
 static struct pb_allocator_operations pb_trivial_allocator_operations = {
-  .alloc = pb_trivial_alloc,
-  .free = pb_trivial_free,
+  .alloc = pb_trivial_allocator_alloc,
+  .free = pb_trivial_allocator_free,
 };
 
 const struct pb_allocator_operations *pb_get_trivial_allocator_operations(void) {
@@ -85,6 +68,60 @@ const struct pb_allocator *pb_get_trivial_allocator(void) {
 
 
 
+/*******************************************************************************
+ */
+void *pb_trivial_allocator_alloc(const struct pb_allocator *allocator,
+    enum pb_allocator_type type, size_t size) {
+  void *obj = malloc(size);
+  if (!obj)
+    return NULL;
+
+  if (type == pb_alloc_type_struct)
+    memset(obj, 0, size);
+
+  return obj;
+}
+
+void pb_trivial_allocator_free(const struct pb_allocator *allocator,
+    enum pb_allocator_type type, void *obj, size_t size) {
+  memset(obj, 0, size);
+
+  free(obj);
+}
+
+
+
+
+
+
+/*******************************************************************************
+ */
+void pb_data_get(struct pb_data *data) {
+  data->operations->get(data);
+}
+
+void pb_data_put(struct pb_data *data) {
+  data->operations->put(data);
+}
+
+
+
+/*******************************************************************************
+ */
+void *pb_data_get_base(const struct pb_data *data) {
+  return data->data_vec.base;
+}
+
+void *pb_data_get_base_at(const struct pb_data *data, size_t offset) {
+  return (uint8_t*)data->data_vec.base + offset;
+}
+
+size_t pb_data_get_len(const struct pb_data *data) {
+  return data->data_vec.len;
+}
+
+
+
 
 
 
@@ -97,17 +134,6 @@ static struct pb_data_operations pb_trivial_data_operations = {
 
 const struct pb_data_operations *pb_get_trivial_data_operations(void) {
   return &pb_trivial_data_operations;
-}
-
-
-/*******************************************************************************
- */
-void pb_data_get(struct pb_data *data) {
-  data->operations->get(data);
-}
-
-void pb_data_put(struct pb_data *data) {
-  data->operations->put(data);
 }
 
 
@@ -167,6 +193,10 @@ struct pb_data *pb_trivial_data_create_ref(const uint8_t *buf, size_t len,
   return data;
 }
 
+
+
+/*******************************************************************************
+ */
 void pb_trivial_data_get(struct pb_data *data) {
   ++data->use_count;
 }
@@ -184,22 +214,6 @@ void pb_trivial_data_put(struct pb_data *data) {
 
   pb_allocator_free(
     allocator, pb_alloc_type_struct, data, sizeof(struct pb_data));
-}
-
-
-
-/*******************************************************************************
- */
-void *pb_data_get_base(const struct pb_data *data) {
-  return data->data_vec.base;
-}
-
-void *pb_data_get_base_at(const struct pb_data *data, size_t offset) {
-  return (uint8_t*)data->data_vec.base + offset;
-}
-
-size_t pb_data_get_len(const struct pb_data *data) {
-  return data->data_vec.len;
 }
 
 

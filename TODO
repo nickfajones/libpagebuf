@@ -1,11 +1,9 @@
 - Inline Documentation
 - Implement pb_line_reader_terminate_line_check_cr
-- data.base <= page.base + page.len <= data.base + data.len
 - Copy On Write for buffer pages, with last-reference checking operation part of data_operations
 - Unity between strategy (particularly rejects_insert(false), and allocators or let allocators dictate insertion
 - Consider renaming pb_allocator_type
 - Consider dropping type from free functions
-- Consider removing pb_get_trivial_allocator_operations
 - Consider removing pb_page_set_data
 - Consider making iterator_get operations part of pb_buffer so they may be specialised
 - Consider a data_revision policy for iterators
@@ -16,7 +14,6 @@
 - Consider consolidating some of the write interfaces
 - Consider making operations purely internal or separate internal functions into _protected.h
 - Consider a pb_trivial_buffer_page_create_mem function (memory region to be taken over by the buffer)
-- Re-ordering of pb_data structures and functions
 - Re-ordering of pb_buffer, pb_buffer_iterator and pb_buffer_strategy
 - Only describe generic behaviour or describe buffer operations objectively in
   the base class documentation.  Specific behaviours descibed in the subclass.
