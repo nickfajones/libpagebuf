@@ -143,9 +143,9 @@ struct pb_allocator_operations;
  * type_region: The memory block will be used as a memory region for the
  *              storage of data.  It will not be initialised.
  */
-enum pb_allocator_type {
-  pb_alloc_type_struct,
-  pb_alloc_type_region,
+enum pb_allocator_alloc_type {
+  pb_allocator_alloc_type_struct,
+  pb_allocator_alloc_type_region,
 };
 
 
@@ -193,7 +193,7 @@ struct pb_allocator_operations {
    * size: the size of the memory block to allocate.
    */
   void *(*alloc)(const struct pb_allocator *allocator,
-                 enum pb_allocator_type type, size_t size);
+                 enum pb_allocator_alloc_type type, size_t size);
   /** Free a memory block.
    *
    * type: indicates how the memory block was used.
@@ -204,7 +204,7 @@ struct pb_allocator_operations {
    *       freed.
    */
   void  (*free)(const struct pb_allocator *allocator,
-                enum pb_allocator_type type, void *obj, size_t size);
+                enum pb_allocator_alloc_type type, void *obj, size_t size);
 };
 
 
@@ -221,9 +221,10 @@ struct pb_allocator_operations {
  */
 void *pb_allocator_alloc(
                        const struct pb_allocator *allocator,
-                       enum pb_allocator_type type, size_t size);
+                       enum pb_allocator_alloc_type type, size_t size);
 void pb_allocator_free(const struct pb_allocator *allocator,
-                       enum pb_allocator_type type, void *obj, size_t size);
+                       enum pb_allocator_alloc_type type,
+                       void *obj, size_t size);
 
 
 

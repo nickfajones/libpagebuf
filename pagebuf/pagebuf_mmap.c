@@ -32,10 +32,10 @@
  */
 #define pb_uthash_malloc(sz) \
   (pb_allocator_alloc( \
-     mmap_allocator->struct_allocator, pb_alloc_type_struct, sz))
+     mmap_allocator->struct_allocator, pb_allocator_alloc_type_struct, sz))
 #define pb_uthash_free(ptr,sz) \
   (pb_allocator_free( \
-     mmap_allocator->struct_allocator, pb_alloc_type_struct, ptr, sz))
+     mmap_allocator->struct_allocator, pb_allocator_alloc_type_struct, ptr, sz))
 #include "pagebuf_hash.h"
 
 
@@ -98,22 +98,22 @@ struct pb_mmap_allocator {
 /*******************************************************************************
  */
 static void *pb_mmap_allocator_alloc(const struct pb_allocator *allocator,
-    enum pb_allocator_type type, size_t size) {
+    enum pb_allocator_alloc_type type, size_t size) {
   struct pb_mmap_allocator *mmap_allocator =
     (struct pb_mmap_allocator*)allocator;
 
-  if (type == pb_alloc_type_struct)
+  if (type == pb_allocator_alloc_type_struct)
     return pb_allocator_alloc(mmap_allocator->struct_allocator, type, size);
 
   return NULL;
 }
 
 static void pb_mmap_allocator_free(const struct pb_allocator *allocator,
-    enum pb_allocator_type type, void *obj, size_t size) {
+    enum pb_allocator_alloc_type type, void *obj, size_t size) {
   struct pb_mmap_allocator *mmap_allocator =
     (struct pb_mmap_allocator*)allocator;
 
-  if (type == pb_alloc_type_struct) {
+  if (type == pb_allocator_alloc_type_struct) {
     pb_allocator_free(mmap_allocator->struct_allocator, type, obj, size);
 
     return;
@@ -145,7 +145,7 @@ static struct pb_mmap_allocator *pb_mmap_allocator_create(const char *file_path,
   struct pb_mmap_allocator *mmap_allocator =
     pb_allocator_alloc(
       allocator,
-      pb_alloc_type_struct, sizeof(struct pb_mmap_allocator));
+      pb_allocator_alloc_type_struct, sizeof(struct pb_mmap_allocator));
   if (!mmap_allocator)
     return NULL;
 
@@ -162,7 +162,7 @@ static struct pb_mmap_allocator *pb_mmap_allocator_create(const char *file_path,
   mmap_allocator->file_path =
     pb_allocator_alloc(
       mmap_allocator->struct_allocator,
-      pb_alloc_type_struct, (file_path_len + 1));
+      pb_allocator_alloc_type_struct, (file_path_len + 1));
   if (!mmap_allocator->file_path) {
     int temp_errno = errno;
 
@@ -242,7 +242,7 @@ static struct pb_mmap_data *pb_mmap_allocator_data_create(
   struct pb_mmap_data *mmap_data =
     pb_allocator_alloc(
       mmap_allocator->struct_allocator,
-      pb_alloc_type_struct, sizeof(struct pb_mmap_data));
+      pb_allocator_alloc_type_struct, sizeof(struct pb_mmap_data));
   if (!mmap_data) {
     munmap(mmap_base, mmap_len);
 
@@ -252,7 +252,7 @@ static struct pb_mmap_data *pb_mmap_allocator_data_create(
   mmap_data->data.data_vec.base = mmap_base;
   mmap_data->data.data_vec.len = mmap_len;
 
-  mmap_data->data.responsibility = pb_data_owned;
+  mmap_data->data.responsibility = pb_data_responsibility_owned;
 
   mmap_data->data.use_count = 1;
 
@@ -278,7 +278,7 @@ static void pb_mmap_allocator_data_destroy(
 
   pb_allocator_free(
     mmap_allocator->struct_allocator,
-    pb_alloc_type_struct, mmap_data, sizeof(struct pb_mmap_data));
+    pb_allocator_alloc_type_struct, mmap_data, sizeof(struct pb_mmap_data));
 
   pb_mmap_allocator_put(mmap_allocator);
 }
@@ -611,7 +611,7 @@ static uint64_t pb_mmap_allocator_write_data_buffer(
   struct iovec *iov =
     pb_allocator_alloc(
       mmap_allocator->struct_allocator,
-      pb_alloc_type_struct, sizeof(struct iovec) * iovlim);
+      pb_allocator_alloc_type_struct, sizeof(struct iovec) * iovlim);
   if (!iov)
     return 0;
 
@@ -626,7 +626,7 @@ static uint64_t pb_mmap_allocator_write_data_buffer(
       struct iovec *iov2 =
         pb_allocator_alloc(
           mmap_allocator->struct_allocator,
-          pb_alloc_type_struct, sizeof(struct iovec) * iovlim);
+          pb_allocator_alloc_type_struct, sizeof(struct iovec) * iovlim);
       if (!iov2)
         break;
 
@@ -634,7 +634,7 @@ static uint64_t pb_mmap_allocator_write_data_buffer(
 
       pb_allocator_free(
         mmap_allocator->struct_allocator,
-        pb_alloc_type_struct,
+        pb_allocator_alloc_type_struct,
         iov, sizeof(struct iovec) * iovpos);
 
       iov = iov2;
@@ -661,7 +661,7 @@ static uint64_t pb_mmap_allocator_write_data_buffer(
 
   pb_allocator_free(
     mmap_allocator->struct_allocator,
-    pb_alloc_type_struct,
+    pb_allocator_alloc_type_struct,
     iov, sizeof(struct iovec) * iovlim);
 
   return written;
@@ -708,7 +708,7 @@ static void pb_mmap_allocator_put(
   if (mmap_allocator->file_path) {
     pb_allocator_free(
       struct_allocator,
-      pb_alloc_type_struct,
+      pb_allocator_alloc_type_struct,
       mmap_allocator->file_path, strlen(mmap_allocator->file_path) + 1);
 
     mmap_allocator->file_path = 0;
@@ -716,7 +716,8 @@ static void pb_mmap_allocator_put(
 
   pb_allocator_free(
     struct_allocator,
-    pb_alloc_type_struct, mmap_allocator, sizeof(struct pb_mmap_allocator));
+    pb_allocator_alloc_type_struct,
+    mmap_allocator, sizeof(struct pb_mmap_allocator));
 }
 
 
@@ -921,7 +922,7 @@ struct pb_mmap_buffer *pb_mmap_buffer_create_with_alloc(const char *file_path,
   struct pb_mmap_buffer *mmap_buffer =
     pb_allocator_alloc(
       mmap_allocator->struct_allocator,
-      pb_alloc_type_struct, sizeof(struct pb_mmap_buffer));
+      pb_allocator_alloc_type_struct, sizeof(struct pb_mmap_buffer));
   if (!mmap_buffer) {
     pb_mmap_allocator_put(mmap_allocator);
 
@@ -1182,7 +1183,8 @@ static void pb_mmap_buffer_destroy(struct pb_buffer * const buffer) {
     (struct pb_mmap_allocator*)buffer->allocator;
 
   pb_allocator_free(
-    &mmap_allocator->allocator, pb_alloc_type_struct,
+    &mmap_allocator->allocator,
+    pb_allocator_alloc_type_struct,
     mmap_buffer, sizeof(struct pb_mmap_buffer));
 
   pb_mmap_allocator_put(mmap_allocator);

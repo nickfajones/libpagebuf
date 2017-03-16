@@ -55,9 +55,10 @@ const struct pb_allocator_operations *pb_get_trivial_allocator_operations(void);
 /** Implementations of allocator operations for the trivial allocator. */
 void *pb_trivial_allocator_alloc(
                                const struct pb_allocator *allocator,
-                               enum pb_allocator_type type, size_t size);
+                               enum pb_allocator_alloc_type type, size_t size);
 void pb_trivial_allocator_free(const struct pb_allocator *allocator,
-                               enum pb_allocator_type type, void *obj, size_t size);
+                               enum pb_allocator_alloc_type type,
+                               void *obj, size_t size);
 
 
 
@@ -82,8 +83,8 @@ struct pb_data_operations;
  *             the base address pointer.
  */
 enum pb_data_responsibility {
-  pb_data_owned,
-  pb_data_referenced,
+  pb_data_responsibility_owned,
+  pb_data_responsibility_referenced,
 };
 
 

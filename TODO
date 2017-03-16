@@ -2,7 +2,6 @@
 - Implement pb_line_reader_terminate_line_check_cr
 - Copy On Write for buffer pages, with last-reference checking operation part of data_operations
 - Unity between strategy (particularly rejects_insert(false), and allocators or let allocators dictate insertion
-- Consider renaming pb_allocator_type
 - Consider dropping type from free functions
 - Consider removing pb_page_set_data
 - Consider making iterator_get operations part of pb_buffer so they may be specialised
