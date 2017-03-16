@@ -291,7 +291,7 @@ struct pb_data_vec {
  * subset of the pb_data description, in regard to both value of the base
  * address and the length:
  *
- * data.base <= page.base + page.len < data.base + data.len
+ * data.base <= page.base + page.len <= data.base + data.len
  *
  * A pb_page is either initialised with a new pb_data instance, in the case
  * where a buffer is extended to grow its capacity.  In the case of a write
