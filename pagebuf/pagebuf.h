@@ -1204,37 +1204,6 @@ void pb_buffer_destroy(
 
 
 
-/** Get a trivial buffer strategy.
- *
- * This default, immutable, buffer strategy for trivial buffer is flexible and
- * efficient: allowing zero copy transfers, minimal fragmentation of transfers,
- * and allowing insertion operations.  The trivial buffer was designed with
- * TCP networked systems, using non-blocking IO, in mind, where data read from
- * sockets can be highly fragmented, and parsing and splitting of network
- * data can be intensive.
- *
- * page_size: 4096
- *
- * clone_on_write: false: zero copy transfer of data from other buffers
- *
- * fragment_as_source: false: fragments written from other buffers or memory
- *                            regions are not additionally fragmented within
- *                            the 4k page limit
- *
- * rejects_insert: false: inserts into the middle of the buffer are allowed.
- */
-const struct pb_buffer_strategy *pb_get_trivial_buffer_strategy(void);
-
-
-
-/** Get a trivial buffer operations structure.
- *
- * This is a protected function and should not be called externally.
- */
-const struct pb_buffer_operations *pb_get_trivial_buffer_operations(void);
-
-
-
 /** Factory functions producing trivial pb_trivial_buffer instances.
  *
  * Users may use either use the default trivial strategy and/or trivial
