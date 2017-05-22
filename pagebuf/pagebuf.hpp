@@ -46,9 +46,10 @@ class buffer {
         friend class buffer;
 
       public:
-        typedef std::bidirectional_iterator_tag iterator_category;
-        typedef struct pb_data_vec value_type;
         typedef std::ptrdiff_t difference_type;
+        typedef std::bidirectional_iterator_tag iterator_category;
+
+        typedef struct pb_data_vec value_type;
         typedef struct pb_data_vec* pointer;
         typedef struct pb_data_vec& reference;
 
