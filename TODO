@@ -11,7 +11,6 @@
 - Consider iterators as virtual classes, created by the get_iterator operations rather than initialised by it
 - Consider joining extend and reserve operations
 - Consider consolidating some of the write interfaces
-- Consider making operations purely internal or separate internal functions into _protected.h
 - Consider a pb_trivial_buffer_page_create_mem function (memory region to be taken over by the buffer)
 - Re-ordering of pb_buffer, pb_buffer_iterator and pb_buffer_strategy
 - Only describe generic behaviour or describe buffer operations objectively in
