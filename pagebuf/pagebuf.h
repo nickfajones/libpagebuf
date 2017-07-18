@@ -255,82 +255,6 @@ struct pb_data_vec {
 
 
 
-/** Non-exclusive owner of a pb_data instance, holding a modifiable reference
- *  to the memory region.
- *
- * The pb_page structure is used by buffers to represent a portion of a memory
- * region.  Buffers internally will maintain an ordered list of these pb_page
- * structures and the entirety if this list represents the data contained in
- * the buffer.
- *
- * There being multiple pages in the buffer represents the notion of the
- * fragmentation of the buffers' view of that data, either because of the
- * configuration of the buffer or because of the pattern that data is written
- * into the buffer (or both).
- *
- * A pb_page instance will always remain inside its parent buffer.  It will be
- * consumed or manipulated in response to requests to consome or manipulate the
- * data in the buffer.  The pb_page is a 'dumb' object, meaning there is no
- * scope to subclass it for the purpose of implementing a new class of buffer.
- * If an author wishes to create a new buffer class, they should explore
- * subclassing the pb_allocator, pb_data and pb_buffer itself, but the role and
- * implementation of pb_page must remain generic.
- *
- * While a pb_data instance represents an unchanging, direct, reference to a
- * memory region and also closely models that memory region's lifecycle, the
- * pb_page object represents the opposite:
- *
- * pb_data, while maintaining a description of the same memory region, may
- * change that description, and the lifecycle of the pb_page is only indirectly
- * tied to that of the pb_data instance and the memory region.
- *
- * Although pb_page will only every reference one pb_data and memory region,
- * and will never adjust the pb_data description of the memory region, it can
- * adjust it's own.  However, the pb_page description of the memory region will
- * always reside within the pb_data's description of the same region.  This
- * means the pb_page description will be either equal too or strictly a
- * subset of the pb_data description, in regard to both value of the base
- * address and the length:
- *
- * data.base <= page.base + page.len <= data.base + data.len
- *
- * A pb_page is either initialised with a new pb_data instance, in the case
- * where a buffer is extended to grow its capacity.  In the case of a write
- * from one buffer to another, depending on the target buffers' internal
- * implementation, the properties of the pb_page of the source buffer will be
- * copied into a new pb_page of the target buffer, but the pb_data from the
- * source pb_page will actually be shared between the two pb_pages and the
- * two buffers.  This is the notion of zero copy, where writes don't cause the
- * data to be copied, instead, a second reference to the same data is created.
- *
- * When a pb_page instance is initialised with either a new pb_data or an
- * existing one, the pb_page will will increment the reference count of the
- * pb_data instance using the pb_data_get function.  This will ensure the
- * pb_data instance says alive for as long as the pb_page instance is alive.
- * When the pb_page instance reaches the end of its lifecycle and is destroyed,
- * the reference count to the pb_data will be decremented using the pb_data_get
- * function.  Only when the pb_data reference count reaches zero, meaning all
- * pb_page instances referencing the pb_data are destroyed, will the pb_data
- * itself be destroyed.
- */
-struct pb_page {
-  /** The description of the referenced pb_data memory region description. */
-  struct pb_data_vec data_vec;
-
-  /** The reference to the pb_data instance. */
-  struct pb_data *data;
-
-  /** Previous page in a buffer structure. */
-  struct pb_page *prev;
-  /** Next page in a buffer structure */
-  struct pb_page *next;
-};
-
-
-
-
-
-
 /** A structure used to sequentially access data regions in a pb_buffer.
  *
  * Iterators provide an interface to traverse the pages contained within a
@@ -794,32 +718,6 @@ struct pb_buffer_operations {
                                buffer_byte_iterator);
 
 
-  /** Insert a pb_page instance into the pb_buffer.
-   *
-   * buffer_iterator: the position in the buffer: page and page offset, before
-   *                  which the new page will be inserted.
-   *
-   * offset: the position within the iterator page, before which the page will
-   *         be inserted.
-   *
-   * page: the new page to insert into the buffer.  This page is created
-   *       elsewhere within the buffer, using the buffers allocator.
-   *
-   * If the iterator offset is zero, the new page will be inserted in front of
-   * the iterator page.  If the offset is non-zero, the iterator page will be
-   * split into two sub-pages at the point of the offset, and the new page will
-   * be inserted between them.
-   *
-   * The return value is the amount of data successfully inserted into the
-   * buffer.
-   *
-   * This is a protected function and should not be called externally.
-   */
-  uint64_t (*insert)(
-                   struct pb_buffer * const buffer,
-                   const struct pb_buffer_iterator *buffer_iterator,
-                   size_t offset,
-                   struct pb_page * const page);
   /** Increase the size of the buffer by adding data to the end.
    *
    * len: the amount of data to add in bytes.
@@ -1121,11 +1019,6 @@ void pb_buffer_prev_byte_iterator(
                          struct pb_buffer_byte_iterator * const byte_iterator);
 
 
-uint64_t pb_buffer_insert(
-                        struct pb_buffer * const buffer,
-                        const struct pb_buffer_iterator *buffer_iterator,
-                        size_t offset,
-                        struct pb_page * const page);
 uint64_t pb_buffer_extend(
                         struct pb_buffer * const buffer, uint64_t len);
 uint64_t pb_buffer_reserve(

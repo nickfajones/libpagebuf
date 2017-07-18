@@ -860,7 +860,6 @@ static struct pb_buffer_operations pb_mmap_buffer_operations = {
   .next_byte_iterator = &pb_trivial_buffer_next_byte_iterator,
   .prev_byte_iterator = &pb_trivial_buffer_prev_byte_iterator,
 
-  .insert = &pb_trivial_buffer_insert,
   .extend = &pb_mmap_buffer_extend,
   .reserve = &pb_mmap_buffer_reserve,
   .rewind = &pb_mmap_buffer_rewind,
