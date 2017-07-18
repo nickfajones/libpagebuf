@@ -1,19 +1,19 @@
-- Inline Documentation
+- A static buffer class, that is a simple wrapper around existing memory regions,
+  where those regions are assured to last longer than the static buffer
+- Re-name re-naming back to: object + action, is currently action + object e.g
+  is_end_byte_iterator
 - Implement pb_line_reader_terminate_line_check_cr
-- Copy On Write for buffer pages, with last-reference checking operation part of data_operations
-- Unity between strategy (particularly rejects_insert(false), and allocators or let allocators dictate insertion
+- Copy On Write for buffer pages, with last-reference checking operation part of
+  data_operations
+- Add calloc and realloc allocator operations
 - Consider dropping type from free functions
-- Consider removing pb_page_set_data
-- Consider making iterator_get operations part of pb_buffer so they may be specialised
 - Consider a data_revision policy for iterators
-- Consider changing the way strategy flags are set, maybe modifier functions or parameterisable initialisers
-- Consider iterators holding reference counts to pages
-- Consider iterators as virtual classes, created by the get_iterator operations rather than initialised by it
+- Consider changing the way strategy flags are set, maybe modifier functions or
+  parameterisable initialisers
+- Consider iterators as virtual classes, created by the get_iterator operations
+  rather than initialised by it
 - Consider joining extend and reserve operations
 - Consider consolidating some of the write interfaces
-- Consider a pb_trivial_buffer_page_create_mem function (memory region to be taken over by the buffer)
-- Re-ordering of pb_buffer, pb_buffer_iterator and pb_buffer_strategy
-- Only describe generic behaviour or describe buffer operations objectively in
-  the base class documentation.  Specific behaviours descibed in the subclass.
-  (eg, concept of data revision)
+- Consider a pb_trivial_buffer_page_create_mem function (memory region to be
+  taken over by the buffer)
 - Add a thread exclusivity debugging API
