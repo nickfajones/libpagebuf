@@ -29,13 +29,19 @@
 
 /*******************************************************************************
  */
-void *pb_allocator_alloc(const struct pb_allocator *allocator,
-    enum pb_allocator_alloc_type type, size_t size) {
-  return allocator->operations->alloc(allocator, type, size);
+void *pb_allocator_malloc(const struct pb_allocator *allocator, size_t size) {
+  return allocator->operations->malloc(allocator, size);
+}
+void *pb_allocator_calloc(const struct pb_allocator *allocator, size_t size) {
+  return allocator->operations->calloc(allocator, size);
+}
+void *pb_allocator_realloc(const struct pb_allocator *allocator,
+    void *obj, size_t oldsize, size_t newsize) {
+  return allocator->operations->realloc(allocator, obj, oldsize, newsize);
 }
 void pb_allocator_free(const struct pb_allocator *allocator,
-    enum pb_allocator_alloc_type type, void *obj, size_t size) {
-  allocator->operations->free(allocator, type, obj, size);
+    void *obj, size_t size) {
+  allocator->operations->free(allocator, obj, size);
 }
 
 
@@ -46,7 +52,9 @@ void pb_allocator_free(const struct pb_allocator *allocator,
 /*******************************************************************************
  */
 static struct pb_allocator_operations pb_trivial_allocator_operations = {
-  .alloc = pb_trivial_allocator_alloc,
+  .malloc = pb_trivial_allocator_malloc,
+  .calloc = pb_trivial_allocator_calloc,
+  .realloc = pb_trivial_allocator_realloc,
   .free = pb_trivial_allocator_free,
 };
 
@@ -70,22 +78,23 @@ const struct pb_allocator *pb_get_trivial_allocator(void) {
 
 /*******************************************************************************
  */
-void *pb_trivial_allocator_alloc(const struct pb_allocator *allocator,
-    enum pb_allocator_alloc_type type, size_t size) {
-  void *obj = malloc(size);
-  if (!obj)
-    return NULL;
+void *pb_trivial_allocator_malloc(const struct pb_allocator *allocator,
+    size_t size) {
+  return malloc(size);
+}
 
-  if (type == pb_allocator_alloc_type_struct)
-    memset(obj, 0, size);
+void *pb_trivial_allocator_calloc(const struct pb_allocator *allocator,
+    size_t size) {
+  return calloc(1, size);
+}
 
-  return obj;
+void *pb_trivial_allocator_realloc(const struct pb_allocator *allocator,
+    void *obj, size_t oldsize, size_t newsize) {
+  return realloc(obj, newsize);
 }
 
 void pb_trivial_allocator_free(const struct pb_allocator *allocator,
-    enum pb_allocator_alloc_type type, void *obj, size_t size) {
-  memset(obj, 0, size);
-
+    void *obj, size_t size) {
   free(obj);
 }
 
@@ -142,18 +151,15 @@ const struct pb_data_operations *pb_get_trivial_data_operations(void) {
  */
 struct pb_data *pb_trivial_data_create(size_t len,
     const struct pb_allocator *allocator) {
-  void *buf =
-    pb_allocator_alloc(allocator, pb_allocator_alloc_type_region, len);
+  void *buf = pb_allocator_malloc(allocator, len);
   if (!buf)
     return NULL;
 
-  struct pb_data *data =
-    pb_allocator_alloc(
-      allocator, pb_allocator_alloc_type_struct, sizeof(struct pb_data));
+  struct pb_data *data = pb_allocator_calloc(allocator, sizeof(struct pb_data));
   if (!data) {
     int temp_errno = errno;
 
-    pb_allocator_free(allocator, pb_allocator_alloc_type_region, buf, len);
+    pb_allocator_free(allocator, buf, len);
 
     errno = temp_errno;
 
@@ -175,9 +181,7 @@ struct pb_data *pb_trivial_data_create(size_t len,
 
 struct pb_data *pb_trivial_data_create_ref(const uint8_t *buf, size_t len,
     const struct pb_allocator *allocator) {
-  struct pb_data *data =
-    pb_allocator_alloc(
-      allocator, pb_allocator_alloc_type_struct, sizeof(struct pb_data));
+  struct pb_data *data = pb_allocator_calloc(allocator, sizeof(struct pb_data));
   if (!data)
     return NULL;
 
@@ -209,12 +213,9 @@ void pb_trivial_data_put(struct pb_data *data) {
     return;
 
   if (data->responsibility == pb_data_responsibility_owned)
-    pb_allocator_free(
-      allocator, pb_allocator_alloc_type_struct,
-      pb_data_get_base(data), pb_data_get_len(data));
+    pb_allocator_free(allocator, pb_data_get_base(data), pb_data_get_len(data));
 
-  pb_allocator_free(
-    allocator, pb_allocator_alloc_type_struct, data, sizeof(struct pb_data));
+  pb_allocator_free(allocator, data, sizeof(struct pb_data));
 }
 
 
@@ -226,9 +227,7 @@ void pb_trivial_data_put(struct pb_data *data) {
  */
 struct pb_page *pb_page_create(struct pb_data *data,
     const struct pb_allocator *allocator) {
-  struct pb_page *page =
-    pb_allocator_alloc(
-      allocator, pb_allocator_alloc_type_struct, sizeof(struct pb_page));
+  struct pb_page *page = pb_allocator_calloc(allocator, sizeof(struct pb_page));
   if (!page)
     return NULL;
 
@@ -240,9 +239,7 @@ struct pb_page *pb_page_create(struct pb_data *data,
 struct pb_page *pb_page_transfer(const struct pb_page *src_page,
     size_t len, size_t src_off,
     const struct pb_allocator *allocator) {
-  struct pb_page *page =
-    pb_allocator_alloc(
-      allocator, pb_allocator_alloc_type_struct, sizeof(struct pb_page));
+  struct pb_page *page = pb_allocator_calloc(allocator, sizeof(struct pb_page));
   if (!page)
     return NULL;
 
@@ -264,8 +261,7 @@ void pb_page_destroy(struct pb_page *page,
   page->prev = NULL;
   page->next = NULL;
 
-  pb_allocator_free(
-    allocator, pb_allocator_alloc_type_struct, page, sizeof(struct pb_page));
+  pb_allocator_free(allocator, page, sizeof(struct pb_page));
 }
 
 
@@ -623,23 +619,17 @@ struct pb_buffer *pb_trivial_buffer_create_with_strategy_with_alloc(
     const struct pb_buffer_strategy *strategy,
     const struct pb_allocator *allocator) {
   struct pb_buffer_strategy *buffer_strategy =
-    pb_allocator_alloc(
-      allocator,
-      pb_allocator_alloc_type_struct, sizeof(struct pb_buffer_strategy));
+    pb_allocator_calloc(allocator, sizeof(struct pb_buffer_strategy));
   if (!buffer_strategy)
     return NULL;
 
   memcpy(buffer_strategy, strategy, sizeof(struct pb_buffer_strategy));
 
   struct pb_trivial_buffer *trivial_buffer =
-    pb_allocator_alloc(
-      allocator,
-      pb_allocator_alloc_type_struct, sizeof(struct pb_trivial_buffer));
+    pb_allocator_calloc(allocator, sizeof(struct pb_trivial_buffer));
   if (!trivial_buffer) {
     pb_allocator_free(
-      allocator,
-      pb_allocator_alloc_type_struct,
-      buffer_strategy, sizeof(struct pb_buffer_strategy));
+      allocator, buffer_strategy, sizeof(struct pb_buffer_strategy));
 
     return NULL;
   }
@@ -1789,14 +1779,10 @@ void pb_trivial_buffer_destroy(struct pb_buffer * const buffer) {
   const struct pb_allocator *allocator = buffer->allocator;
 
   pb_allocator_free(
-    allocator,
-    pb_allocator_alloc_type_struct,
-    buffer_strategy, sizeof(struct pb_buffer_strategy));
+    allocator, buffer_strategy, sizeof(struct pb_buffer_strategy));
 
   pb_allocator_free(
-    allocator,
-    pb_allocator_alloc_type_struct,
-    trivial_buffer, sizeof(struct pb_trivial_buffer));
+    allocator, trivial_buffer, sizeof(struct pb_trivial_buffer));
 }
 
 
@@ -1824,8 +1810,7 @@ struct pb_data_reader *pb_data_reader_create(struct pb_buffer * const buffer) {
   const struct pb_allocator *allocator = buffer->allocator;
 
   struct pb_data_reader *data_reader =
-    pb_allocator_alloc(
-      allocator, pb_allocator_alloc_type_struct, sizeof(struct pb_data_reader));
+    pb_allocator_calloc(allocator, sizeof(struct pb_data_reader));
   if (!data_reader)
     return NULL;
 
@@ -1932,8 +1917,7 @@ struct pb_data_reader *pb_data_reader_clone(
   const struct pb_allocator *allocator = data_reader->buffer->allocator;
 
   struct pb_data_reader *data_reader_clone =
-    pb_allocator_alloc(
-      allocator, pb_allocator_alloc_type_struct, sizeof(struct pb_data_reader));
+    pb_allocator_calloc(allocator, sizeof(struct pb_data_reader));
   if (!data_reader_clone)
     return NULL;
 
@@ -1960,10 +1944,7 @@ void pb_data_reader_reset(struct pb_data_reader * const data_reader) {
 void pb_data_reader_destroy(struct pb_data_reader * const data_reader) {
   const struct pb_allocator *allocator = data_reader->buffer->allocator;
 
-  pb_allocator_free(
-    allocator,
-    pb_allocator_alloc_type_struct,
-    data_reader, sizeof(struct pb_data_reader));
+  pb_allocator_free(allocator, data_reader, sizeof(struct pb_data_reader));
 }
 
 
@@ -2001,8 +1982,7 @@ struct pb_line_reader *pb_line_reader_create(struct pb_buffer * const buffer) {
   const struct pb_allocator *allocator = buffer->allocator;
 
   struct pb_line_reader *line_reader =
-    pb_allocator_alloc(
-      allocator, pb_allocator_alloc_type_struct, sizeof(struct pb_line_reader));
+    pb_allocator_calloc(allocator, sizeof(struct pb_line_reader));
   if (!line_reader)
     return NULL;
 
@@ -2185,8 +2165,7 @@ struct pb_line_reader *pb_line_reader_clone(
     line_reader->buffer->allocator;
 
   struct pb_line_reader *line_reader_clone =
-    pb_allocator_alloc(
-      allocator, pb_allocator_alloc_type_struct, sizeof(struct pb_line_reader));
+    pb_allocator_calloc(allocator, sizeof(struct pb_line_reader));
   if (!line_reader_clone)
     return NULL;
 
@@ -2224,8 +2203,5 @@ void pb_line_reader_destroy(struct pb_line_reader * const line_reader) {
 
   pb_line_reader_reset(line_reader);
 
-  pb_allocator_free(
-    allocator,
-    pb_allocator_alloc_type_struct,
-    line_reader, sizeof(struct pb_line_reader));
+  pb_allocator_free(allocator, line_reader, sizeof(struct pb_line_reader));
 }

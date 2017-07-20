@@ -53,11 +53,16 @@ const struct pb_allocator_operations *pb_get_trivial_allocator_operations(void);
 
 
 /** Implementations of allocator operations for the trivial allocator. */
-void *pb_trivial_allocator_alloc(
+void *pb_trivial_allocator_malloc(
                                const struct pb_allocator *allocator,
-                               enum pb_allocator_alloc_type type, size_t size);
+                               size_t size);
+void *pb_trivial_allocator_calloc(
+                               const struct pb_allocator *allocator,
+                               size_t size);
+void *pb_trivial_allocator_realloc(
+                               const struct pb_allocator *allocator,
+                               void *obj, size_t oldsize, size_t newsize);
 void pb_trivial_allocator_free(const struct pb_allocator *allocator,
-                               enum pb_allocator_alloc_type type,
                                void *obj, size_t size);
 
 

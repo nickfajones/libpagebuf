@@ -135,21 +135,6 @@ struct pb_allocator_operations;
 
 
 
-/** Indicates the intended use of an allocated memory block.
- *
- * type_struct: The memory region will be used to store a data structure.
- *              The region will be initialised to all zero bytes before it is
- *              returned to the caller.
- * type_region: The memory block will be used as a memory region for the
- *              storage of data.  It will not be initialised.
- */
-enum pb_allocator_alloc_type {
-  pb_allocator_alloc_type_struct,
-  pb_allocator_alloc_type_region,
-};
-
-
-
 /** Responsible for allocation and freeing of blocks of memory
  *
  * Allocate and free memory blocks through functions operating on an allocator.
@@ -188,23 +173,45 @@ struct pb_allocator {
 struct pb_allocator_operations {
   /** Allocate a memory block.
    *
-   * type: indicates what the allocated memory block will be used for
-   *
    * size: the size of the memory block to allocate.
    */
-  void *(*alloc)(const struct pb_allocator *allocator,
-                 enum pb_allocator_alloc_type type, size_t size);
-  /** Free a memory block.
+  void *(*malloc)(const struct pb_allocator *allocator, size_t size);
+  /** Allocate a memory block, zeroing that block before returning it.
    *
-   * type: indicates how the memory block was used.
+   * size: the size of the memory block to callocate.
+   */
+  void *(*calloc)(const struct pb_allocator *allocator, size_t size);
+  /** Allocate a new memory block to replace an existing block.
+   *
+   * obj: the address of the beginning of the old block
+   *
+   * oldsize: the size of the memory block that is to be freed.
+   *
+   * newsize: the size of the memory block to allocate.
+   *
+   * Semantics preserved from traditional realloc:
+   * - Bytes up to minimum of oldsize and newsize will be copied to the new
+   *   block
+   * - Memory in excess of newsize over oldsize may not be initialised to zero
+   *   and should not be relied upon
+   * - If obj is NULL, then the call is equivalent to malloc(newsize)
+   * - If newsize is equal to zero, call is equivalient to free(obj, oldsize)
+   * - Return value is the location of the new block or NULL if the operation
+   *   failed.
+   * - If the operation failed, the block at ptr will remain unchanged
+   * - Old value of obj should not be relied on after the call and should be
+   *   discarded
+   */
+  void *(*realloc)(const struct pb_allocator *allocator,
+                   void *obj, size_t oldsize, size_t newsize);
+  /** Free a memory block.
    *
    * obj: the address of beginning of the memory region.
    *
-   * size: indicates the size of the memory region that was allocated and now
-   *       freed.
+   * size: the size of the memory block that is to be freed.
    */
   void  (*free)(const struct pb_allocator *allocator,
-                enum pb_allocator_alloc_type type, void *obj, size_t size);
+                void *obj, size_t size);
 };
 
 
@@ -219,11 +226,14 @@ struct pb_allocator_operations {
  * with libpagebuf, especially in conjunction with the trivial built in
  * allocator defined below.
  */
-void *pb_allocator_alloc(
+void *pb_allocator_malloc(
+                       const struct pb_allocator *allocator, size_t size);
+void *pb_allocator_calloc(
+                       const struct pb_allocator *allocator, size_t size);
+void *pb_allocator_realloc(
                        const struct pb_allocator *allocator,
-                       enum pb_allocator_alloc_type type, size_t size);
+                       void *obj, size_t oldsize, size_t newsize);
 void pb_allocator_free(const struct pb_allocator *allocator,
-                       enum pb_allocator_alloc_type type,
                        void *obj, size_t size);
 
 
