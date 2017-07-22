@@ -3,17 +3,10 @@
 - Re-name re-naming back to: object + action, is currently action + object e.g
   is_end_byte_iterator
 - Implement pb_line_reader_terminate_line_check_cr
-- Copy On Write for buffer pages, with last-reference checking operation part of
-  data_operations
-- Add calloc and realloc allocator operations
-- Consider dropping type from free functions
 - Consider a data_revision policy for iterators
 - Consider changing the way strategy flags are set, maybe modifier functions or
   parameterisable initialisers
-- Consider iterators as virtual classes, created by the get_iterator operations
-  rather than initialised by it
-- Consider joining extend and reserve operations
-- Consider consolidating some of the write interfaces
+- Consider consolidatieng some of the write interfaces
 - Consider a pb_trivial_buffer_page_create_mem function (memory region to be
   taken over by the buffer)
 - Add a thread exclusivity debugging API

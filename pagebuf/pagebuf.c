@@ -1588,6 +1588,7 @@ uint64_t pb_trivial_buffer_overwrite_data(struct pb_buffer * const buffer,
     struct pb_page *page = (struct pb_page*)buffer_iterator.data_vec;
 
     if (!buffer->strategy->clone_on_write ||
+        (page->data->use_count > 1) ||
         (page->data->responsibility == pb_data_responsibility_referenced)) {
       if (!pb_trivial_buffer_dup_page_data(buffer, page))
         break;
@@ -1640,6 +1641,7 @@ uint64_t pb_trivial_buffer_overwrite_buffer(struct pb_buffer * const buffer,
     struct pb_page *src_page = (struct pb_page*)src_buffer_iterator.data_vec;
 
     if (!buffer->strategy->clone_on_write ||
+        (page->data->use_count > 1) ||
         (page->data->responsibility == pb_data_responsibility_referenced)) {
       if (!pb_trivial_buffer_dup_page_data(buffer, page))
         break;
