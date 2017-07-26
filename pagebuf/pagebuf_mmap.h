@@ -1,5 +1,5 @@
 /*******************************************************************************
- *  Copyright 2015, 2016 Nick Jones <nick.fa.jones@gmail.com>
+ *  Copyright 2015 - 2017 Nick Jones <nick.fa.jones@gmail.com>
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -28,19 +28,6 @@ extern "C" {
 
 
 
-/** Indicates which actions to take when opening and closing mmap'd files. */
-enum pb_mmap_open_action {
-  pb_mmap_open_action_append =                            1,
-  pb_mmap_open_action_overwrite =                         2,
-};
-
-enum pb_mmap_close_action {
-  pb_mmap_close_action_retain =                           1,
-  pb_mmap_close_action_remove =                           2,
-};
-
-
-
 /** The mmap buffer.
  *
  * The mmap buffer has a specific strategy and customised operations that
@@ -60,6 +47,19 @@ enum pb_mmap_close_action {
  */
 struct pb_mmap_buffer {
   struct pb_trivial_buffer trivial_buffer;
+};
+
+
+
+/** Indicates which actions to take when opening and closing mmap'd files. */
+enum pb_mmap_open_action {
+  pb_mmap_open_action_append =                            1,
+  pb_mmap_open_action_overwrite =                         2,
+};
+
+enum pb_mmap_close_action {
+  pb_mmap_close_action_retain =                           1,
+  pb_mmap_close_action_remove =                           2,
 };
 
 
