@@ -157,7 +157,7 @@ struct pb_allocator {
  * functions in order to use the pb_allocator to create that object, and also
  * to bind the pb_allocator to the object but it is not expected that
  * Application Authors will interract directly with pb_allocator instances.
- * 
+ *
  * Having said that, it is not strictly illegal to do so, and doing so should
  * not confound an allocator implementation.
  *
@@ -321,7 +321,7 @@ struct pb_data_vec {
  *     pb_buffer_prev_iterator
  *   on the 'end' reference, as the result may be an invalid iterator,
  *   depending on the implementation of the pb_buffer subclass.
- * 
+ *
  * Implementors who create new subclasses of pb_buffer should make sure their
  * implementations obey the above behaviour.
  */
@@ -646,12 +646,7 @@ struct pb_buffer_operations {
    * expand, write (to the end of the buffer), read, iteration.
    */
   uint64_t (*get_data_revision)(struct pb_buffer * const buffer);
-  /** Increment the data revision.
-   *
-   * This is a protected function and should not be called externally.
-   */
-  void (*increment_data_revision)(
-                                struct pb_buffer * const buffer);
+
 
   /** Return the amount of data in the buffer, in bytes.
    */

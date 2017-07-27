@@ -816,7 +816,6 @@ static void pb_mmap_buffer_destroy(
  */
 static struct pb_buffer_operations pb_mmap_buffer_operations = {
   .get_data_revision = &pb_trivial_buffer_get_data_revision,
-  .increment_data_revision = &pb_trivial_buffer_increment_data_revision,
 
   .get_data_size = &pb_mmap_buffer_get_data_size,
 

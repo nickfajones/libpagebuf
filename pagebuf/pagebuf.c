@@ -361,7 +361,6 @@ const struct pb_buffer_strategy *pb_get_trivial_buffer_strategy(void) {
  */
 static struct pb_buffer_operations pb_trivial_buffer_operations = {
   .get_data_revision = &pb_trivial_buffer_get_data_revision,
-  .increment_data_revision = &pb_trivial_buffer_increment_data_revision,
 
   .get_data_size = &pb_trivial_buffer_get_data_size,
 
