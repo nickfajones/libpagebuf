@@ -814,7 +814,8 @@ static void pb_mmap_buffer_destroy(
 
 /*******************************************************************************
  */
-static struct pb_buffer_operations pb_mmap_buffer_operations = {
+static struct pb_trivial_buffer_operations pb_mmap_buffer_operations = {
+  .buffer_operations = {
   .get_data_revision = &pb_trivial_buffer_get_data_revision,
 
   .get_data_size = &pb_mmap_buffer_get_data_size,
@@ -854,10 +855,17 @@ static struct pb_buffer_operations pb_mmap_buffer_operations = {
 
   .clear = &pb_mmap_buffer_clear,
   .destroy = &pb_mmap_buffer_destroy,
+  },
+
+  .page_create = &pb_trivial_buffer_page_create,
+  .page_create_ref = &pb_trivial_buffer_page_create_ref,
+
+  .dup_page_data = &pb_trivial_buffer_dup_page_data,
+  .resolve_iterator = &pb_trivial_buffer_resolve_iterator,
 };
 
 static const struct pb_buffer_operations *pb_get_mmap_buffer_operations(void) {
-  return &pb_mmap_buffer_operations;
+  return &pb_mmap_buffer_operations.buffer_operations;
 }
 
 

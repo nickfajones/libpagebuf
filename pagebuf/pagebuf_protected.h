@@ -370,6 +370,48 @@ void pb_page_set_data(struct pb_page * const page,
 
 
 
+/** The structure that holds the operations that implement specific
+ *  pb_trivial_buffer functionality.
+ */
+struct pb_trivial_buffer_operations {
+  /** The base buffer operations. */
+  struct pb_buffer_operations buffer_operations;
+
+  struct pb_page *(*page_create)(struct pb_buffer * const buffer,
+                                 size_t len);
+  struct pb_page *(*page_create_ref)(
+                                 struct pb_buffer * const buffer,
+                                 const uint8_t *buf, size_t len);
+
+  /** Duplicate the memory region and the data of a page and set the duplicate
+   *  into the page.
+   *
+   * This is primarily done when the target data object references a memory region
+   * that is shared with other pages.
+   * It will also be done if an overwrite operation is performed on a buffer
+   * that has a strategy setting of clone_on_write = false.  In this case, the
+   * data will be duplicated to prevent the overwrite operation from interfering
+   * with data objects that are shared with other buffers.
+   */
+  bool (*dup_page_data)(struct pb_buffer * const buffer,
+                        struct pb_page * const page);
+
+
+  /** Convert an iterator into an underlying pb_page structure.
+   *
+   * The returned pb_page object will still remain attached to the iterator
+   * and will not be cleaned up or deleted by the caller.
+   */
+  struct pb_page *(*resolve_iterator)(
+                        struct pb_buffer * const buffer,
+                        const struct pb_buffer_iterator *buffer_iterator);
+};
+
+
+
+
+
+
 /** The trivial buffer implementation and its supporting functions.
  *
  * The trivial buffer is a reference implementation of pb_buffer.
@@ -382,9 +424,23 @@ void pb_page_set_data(struct pb_page * const page,
 struct pb_trivial_buffer {
   struct pb_buffer buffer;
 
+  /** The anchor node of the pb_page list.
+   */
   struct pb_page page_end;
 
+  /** Revision: A monotonic counter describing the 'revision' state of the
+   *  buffer.
+   */
   uint64_t data_revision;
+
+  /** A running total buffer size counter.
+   *
+   * Kept up to date after any operation that adds or removes data from the
+   * buffer, it is used to describe the buffer size in an optimised way, to
+   * avoid iterating and measuring all pages whenever the buffer size is
+   * queried.  Debug builds will do an iterate and measure and compare the
+   * result to the data_size to assure correctness.
+   */
   uint64_t data_size;
 };
 
@@ -569,6 +625,23 @@ void pb_trivial_buffer_destroy(
                              struct pb_buffer * const buffer);
 
 
+/** Implementations of unique Trivial buffer operations. */
+struct pb_page *pb_trivial_buffer_page_create(
+                            struct pb_buffer * const buffer,
+                            size_t len);
+struct pb_page *pb_trivial_buffer_page_create_ref(
+                            struct pb_buffer * const buffer,
+                            const uint8_t *buf, size_t len);
+
+bool pb_trivial_buffer_dup_page_data(
+                            struct pb_buffer * const buffer,
+                            struct pb_page * const page);
+
+struct pb_page *pb_trivial_buffer_resolve_iterator(
+                            struct pb_buffer * const buffer,
+                            const struct pb_buffer_iterator *buffer_iterator);
+
+
 /** Utility functions for the trivial buffer implementation.
  *
  * These are protected functions and should not be called externally.
@@ -582,28 +655,6 @@ void pb_trivial_buffer_increment_data_size(
 void pb_trivial_buffer_decrement_data_size(
                                          struct pb_buffer * const buffer,
                                          uint64_t size);
-
-struct pb_page *pb_trivial_buffer_page_create(
-                              struct pb_buffer * const buffer,
-                              size_t len);
-struct pb_page *pb_trivial_buffer_page_create_ref(
-                              struct pb_buffer * const buffer,
-                              const uint8_t *buf, size_t len);
-
-/** Duplicate the data of a page and set the duplicate into the page.
- *
- * The existing data in a page has its data memory region duplicated into a
- * new pb_data object.  The new pb_data object replaces the old data object in
- * the page.
- *
- * This is primarily done when an overwrite operation is performed on a buffer
- * that has a strategy setting of clone_on_write = false.  In this case, the
- * data will be duplicated to prevent the overwrite operation from interfering
- * with data objects that are shared with other buffers.
- * It will also be done if the target data objet references a memory region.
- */
-bool pb_trivial_buffer_dup_page_data(struct pb_buffer * const buffer,
-                                     struct pb_page * const page);
 
 
 
