@@ -95,16 +95,16 @@ struct pb_mmap_buffer *pb_mmap_buffer_create_with_alloc(const char *file_path,
 
 
 
-/** mmap buffer conversion function. */
-struct pb_buffer *pb_mmap_buffer_to_buffer(
-                                   struct pb_mmap_buffer * const mmap_buffer);
+/** The mmap buffers' open status. */
+bool pb_mmap_buffer_is_open(
+                          const struct pb_mmap_buffer *mmap_buffer);
 
 /** The mmap buffers' backing file path and name. */
 const char *pb_mmap_buffer_get_file_path(
-                                   struct pb_mmap_buffer * const mmap_buffer);
+                          const struct pb_mmap_buffer *mmap_buffer);
 
 /** The mmap buffers' backing file descriptor. */
-int pb_mmap_buffer_get_fd(struct pb_mmap_buffer * const mmap_buffer);
+int pb_mmap_buffer_get_fd(const struct pb_mmap_buffer *mmap_buffer);
 
 /** Query or set the mmap buffers' closing action.
  *
@@ -112,10 +112,14 @@ int pb_mmap_buffer_get_fd(struct pb_mmap_buffer * const mmap_buffer);
  * buffer is created.
  */
 enum pb_mmap_close_action pb_mmap_buffer_get_close_action(
-                                   struct pb_mmap_buffer * const mmap_buffer);
+                                   const struct pb_mmap_buffer *mmap_buffer);
 void pb_mmap_buffer_set_close_action(
                                    struct pb_mmap_buffer * const mmap_buffer,
                                    enum pb_mmap_close_action close_action);
+
+/** mmap buffer conversion function. */
+struct pb_buffer *pb_mmap_buffer_to_buffer(
+                                   struct pb_mmap_buffer * const mmap_buffer);
 
 #ifdef __cplusplus
 } /* extern "C" */
