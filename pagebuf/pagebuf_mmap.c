@@ -157,6 +157,8 @@ static struct pb_mmap_allocator *pb_mmap_allocator_create(const char *file_path,
   mmap_allocator->file_path[file_path_len] = '\0';
 
   int open_flags =
+    (open_action == pb_mmap_open_action_read) ?
+       O_RDONLY|O_CLOEXEC :
     (open_action == pb_mmap_open_action_append) ?
        O_RDWR|O_APPEND|O_CREAT|O_CLOEXEC :
        O_RDWR|O_APPEND|O_CREAT|O_TRUNC|O_CLOEXEC;
@@ -885,7 +887,8 @@ struct pb_mmap_buffer *pb_mmap_buffer_create_with_alloc(const char *file_path,
     enum pb_mmap_open_action open_action,
     enum pb_mmap_close_action close_action,
     const struct pb_allocator *allocator) {
-  if (((open_action != pb_mmap_open_action_append) &&
+  if (((open_action != pb_mmap_open_action_read) &&
+       (open_action != pb_mmap_open_action_append) &&
        (open_action != pb_mmap_open_action_overwrite)) ||
       ((close_action != pb_mmap_close_action_retain) &&
        (close_action != pb_mmap_close_action_remove))) {

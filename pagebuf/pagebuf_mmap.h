@@ -53,8 +53,9 @@ struct pb_mmap_buffer {
 
 /** Indicates which actions to take when opening and closing mmap'd files. */
 enum pb_mmap_open_action {
-  pb_mmap_open_action_append =                            1,
-  pb_mmap_open_action_overwrite =                         2,
+  pb_mmap_open_action_read =                              1,
+  pb_mmap_open_action_append =                            2,
+  pb_mmap_open_action_overwrite =                         3,
 };
 
 enum pb_mmap_close_action {
