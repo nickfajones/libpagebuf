@@ -88,6 +88,7 @@ struct pb_mmap_allocator {
 
   struct pb_mmap_data *data_tree;
 
+  enum pb_mmap_open_action open_action;
   enum pb_mmap_close_action close_action;
 };
 
@@ -169,6 +170,7 @@ static struct pb_mmap_allocator *pb_mmap_allocator_create(const char *file_path,
 
   mmap_allocator->file_head_offset = 0;
 
+  mmap_allocator->open_action = open_action;
   mmap_allocator->close_action = close_action;
 
   return mmap_allocator;
@@ -224,7 +226,9 @@ static struct pb_mmap_data *pb_mmap_allocator_data_create(
   void *mmap_base =
     mmap64(
       NULL, mmap_len,
-      PROT_READ | PROT_WRITE, MAP_SHARED,
+      (mmap_allocator->open_action == pb_mmap_open_action_read) ?
+        PROT_READ : PROT_READ | PROT_WRITE,
+      MAP_SHARED,
       mmap_allocator->file_fd, mmap_offset);
   if (mmap_base == MAP_FAILED)
     return NULL;
